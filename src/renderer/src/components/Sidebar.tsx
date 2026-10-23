@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconSend, IconSparkles, IconClose } from './Icons'
-import type { ChatMsg, SidebarInject, AgentEvent } from '../../../shared/types'
+import ModelManager from './ModelManager'
+import type { ChatMsg, SidebarInject, AgentEvent, SidebarMode } from '../../../shared/types'
 
 interface LogEntry {
   kind: 'step' | 'info' | 'error' | 'answer'
@@ -25,10 +26,19 @@ export default function Sidebar(): JSX.Element {
   const settings = useApp((s) => s.settings)
   const set = useApp((s) => s.set)
 
-  const [mode, setMode] = useState<'chat' | 'agent'>('chat')
+  const [mode, setMode] = useState<SidebarMode>('chat')
   const [health, setHealth] = useState<boolean | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [model, setModel] = useState<string>('')
+
+  // menu / toolbar can request a specific sidebar tab (e.g. Model Library)
+  const sidebarMode = useApp((s) => s.sidebarMode)
+  useEffect(() => {
+    if (sidebarMode) {
+      setMode(sidebarMode)
+      useApp.getState().set({ sidebarMode: null })
+    }
+  }, [sidebarMode])
 
   // chat state
   const [messages, setMessages] = useState<ChatMsg[]>([])
@@ -71,6 +81,11 @@ export default function Sidebar(): JSX.Element {
       })
     }
   }, [])
+
+  // model library changed elsewhere (a pull finished) → refresh the picker
+  useEffect(() => {
+    return window.aether.models.onChanged(() => void refresh())
+  }, [refresh])
 
   useEffect(() => {
     chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight })
@@ -244,6 +259,9 @@ export default function Sidebar(): JSX.Element {
         <button className={mode === 'agent' ? 'on' : ''} onClick={() => setMode('agent')}>
           Agent
         </button>
+        <button className={mode === 'models' ? 'on' : ''} onClick={() => setMode('models')} title="Model library — add any Ollama model">
+          Models
+        </button>
       </div>
 
       {health === false && (
@@ -255,10 +273,19 @@ export default function Sidebar(): JSX.Element {
           <button className="retry" onClick={() => void refresh()}>
             Retry connection
           </button>
+          <button
+            className="retry ghost"
+            onClick={() => setMode('models')}
+            title="Model library — download models in-app once Ollama is running"
+          >
+            Open Model Library
+          </button>
         </div>
       )}
 
-      {mode === 'chat' ? (
+      {mode === 'models' ? (
+        <ModelManager />
+      ) : mode === 'chat' ? (
         <>
           <div className="chat" ref={chatScroll}>
             {messages.length === 0 && (

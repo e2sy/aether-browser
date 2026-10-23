@@ -50,7 +50,7 @@ export const NEW_TAB_HTML = pageShell(
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
-    Aether Browser 0.2.0 — local AI, open source
+    Aether Browser 0.3.0 — local AI, open source
   </div>
   `,
   `
@@ -327,7 +327,7 @@ export const SETTINGS_HTML = pageShell(
     <div class="sec">
       <div class="label">Local model (Ollama)</div>
       <select id="model" style="width:100%"></select>
-      <div class="hint">Installed models appear here automatically. Get more: <span class="mono">ollama pull qwen3.5:9b</span></div>
+      <div class="hint">Installed models appear here automatically. To add more without the CLI, open the sidebar → <b>Models</b> (or press <span class="mono">Ctrl+Shift+M</span>) and pull any model from Ollama's library.</div>
     </div>
 
     <div class="sec">
@@ -357,7 +357,7 @@ export const SETTINGS_HTML = pageShell(
       </div>
     </div>
 
-    <div class="hint" style="margin-top:26px">Aether 0.2.0 — everything is stored locally on this device.</div>
+    <div class="hint" style="margin-top:26px">Aether 0.3.0 — everything is stored locally on this device.</div>
   </div>
   <style>
     .sec { margin-bottom:24px; }

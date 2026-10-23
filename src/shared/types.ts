@@ -88,6 +88,47 @@ export interface SidebarInject {
   focus?: boolean
 }
 
+export type SidebarMode = 'chat' | 'agent' | 'models'
+
+/** A model installed in the local Ollama instance (from GET /api/tags). */
+export interface OllamaModelInfo {
+  name: string
+  /** bytes on disk */
+  size: number
+  /** e.g. "9.2B" */
+  parameterSize: string
+  /** e.g. "Q4_K_M" */
+  quantization: string
+  /** e.g. "qwen2" */
+  family: string
+  modifiedAt: string
+}
+
+/** Live progress of a model pull, streamed main → renderer. */
+export interface PullProgress {
+  pullId: string
+  name: string
+  status: string
+  total: number
+  completed: number
+  /** 0–100, null while indeterminate (manifest / verify phases) */
+  percent: number | null
+  done: boolean
+  error?: string
+  cancelled?: boolean
+}
+
+/** Curated entry in the in-app model library. */
+export interface CatalogModel {
+  name: string
+  family: string
+  params: string
+  disk: string
+  ram: string
+  blurb: string
+  tags: string[]
+}
+
 export type AgentEventType = 'start' | 'step' | 'confirm' | 'ask_user' | 'done' | 'error' | 'cancelled'
 
 export interface AgentEvent {

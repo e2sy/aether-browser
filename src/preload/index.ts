@@ -50,7 +50,8 @@ const api = {
   state: {
     subscribe: subscribe('tabs:state'),
     onMaximized: subscribe('win:maximized'),
-    onSidebarInject: subscribe('sidebar:inject')
+    onSidebarInject: subscribe('sidebar:inject'),
+    onSidebarShow: subscribe('sidebar:show')
   },
 
   tabs: {
@@ -87,6 +88,23 @@ const api = {
     chat: (messages: Array<{ role: string; content: string }>, usePageContext: boolean, model?: string) =>
       stream('ai:chat', 'ai:chunk', { messages, usePageContext, model }),
     abort: (requestId: string) => ipcRenderer.invoke('ai:abort', requestId)
+  },
+
+  models: {
+    /** installed models with size / params / quantization */
+    detailed: () => ipcRenderer.invoke('models:detailed'),
+    /** curated suggestions for the library UI */
+    catalog: () => ipcRenderer.invoke('models:catalog'),
+    /** pull ANY model tag — ollama.com/library or hf.co GGUF */
+    pull: (name: string) => ipcRenderer.invoke('models:pull', name),
+    cancel: (pullId: string) => ipcRenderer.invoke('models:pull-cancel', pullId),
+    /** in-flight (and just-finished) pulls, for restoring the UI */
+    pulls: () => ipcRenderer.invoke('models:pulls'),
+    remove: (name: string) => ipcRenderer.invoke('models:delete', name),
+    info: (name: string) => ipcRenderer.invoke('models:show', name),
+    running: () => ipcRenderer.invoke('models:ps'),
+    onProgress: subscribe('models:pull-progress'),
+    onChanged: subscribe('models:changed')
   },
 
   agent: {

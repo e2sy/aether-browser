@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v0.2.0--alpha-orange) ![license](https://img.shields.io/badge/license-MIT-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+![status](https://img.shields.io/badge/status-v0.3.0--alpha-orange) ![license](https://img.shields.io/badge/license-MIT-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 ---
 
-## ✨ Features (v0.2.0)
+## ✨ Features (v0.3.0)
 
 | Feature | What it does |
 |---|---|
@@ -21,6 +21,7 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | ✍️ **Write helpers** | Select text on any page → right-click → Ask / Summarize / Rewrite / Translate into your sidebar |
 | 🛡️ **Ad & tracker blocking** | EasyList + EasyPrivacy via `@cliqz/adblocker-electron`, filters cached on disk after first download, toggle in Settings |
 | 🧭 **Manager pages** | `aether://history` (search, delete, clear), `aether://bookmarks`, `aether://settings` (model picker, search engine, agent behavior, privacy toggles) |
+| 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434`. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history/bookmarks |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
 
@@ -40,6 +41,10 @@ npm run dev
 ```
 
 > On 8GB machines, use `ollama pull qwen3.5:4b` instead — Aether auto-detects whatever you have.
+>
+> **No CLI? No problem.** Once Ollama is running, open the sidebar → **Models** (or `Ctrl+Shift+M`) and pull any
+> model from inside the browser — including the 4B class for smaller machines. First model pulled automatically
+> becomes the default brain.
 
 **Package installers** (NSIS / dmg / AppImage / deb):
 
@@ -52,6 +57,18 @@ npm run dist
 ```bash
 AETHER_HEADLESS=1 AETHER_SMOKE=1 xvfb-run -a npx electron .
 ```
+
+## 📦 Model Library
+
+The **Models** tab in the sidebar manages your local model zoo end-to-end:
+
+- **Add any model** — either from the curated catalog (with disk size + RAM hints) or by typing any exact
+  Ollama tag in the custom field: `qwen3.5:4b`, `llama3.1:8b`, `deepseek-r1:8b`, `hf.co/org/model-GGUF`…
+- **Live progress** — NDJSON streaming from Ollama renders per-model progress bars with percentage and status;
+  pulls keep running in the main process even if you close the sidebar or switch tabs, and reopen with state intact
+- **Cancel / delete / switch** — stop a download mid-flight, free disk space with a two-step delete, and make any
+  installed model the active brain for chat, writing and the agent in one click
+- **Smart defaults** — if no model is configured when a pull finishes, it is set as the active model automatically
 
 ## 🧠 How the agent works
 
@@ -100,16 +117,16 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 
 - [x] v0.1 — browser shell, chat-with-page, write helpers, AI search, agent v0 with confirm gate
 - [x] v0.2 — ad blocking, omnibox autocomplete, history/bookmarks/settings pages, tab drag-reorder, agent ask_user/list_tabs/screenshot tools, Chrome-like UA
-- [ ] v0.3 — per-site permissions UI, agent reliability (retries, DOM diffing), in-app model manager (pull/delete)
-- [ ] v0.4 — hybrid local+free-cloud fallback, page memory (sqlite-vec), agent macros (record/replay), find-in-page UI
+- [x] v0.3 — **in-app model manager** (pull ANY Ollama tag with live progress, cancel, delete, active-model switch)
+- [ ] v0.4 — per-site permissions UI, agent reliability (retries, DOM diffing), hybrid local+free-cloud fallback, page memory (sqlite-vec), agent macros (record/replay), find-in-page UI
 - [ ] v1.0 — extension support via electron-chrome-extensions, tab discarding, docs site, stable releases
 
 ## 🔐 Security notes
 
 - Renderers run with `contextIsolation`, `sandbox`, and no Node integration.
 - Tab/agent/settings/history IPC handlers verify the sender is the chrome UI; internal-page
-  handlers verify the sender URL is `aether://`. Ollama probing (`ai:health`, `ai:models`) is
-  blocked for regular web pages.
+  handlers verify the sender URL is `aether://`. Ollama probing (`ai:health`, `ai:models`) and the
+  model library (`models:pull` / `delete` / …) are blocked for regular web pages.
 - Model output is **never** rendered as HTML — all internal pages build DOM via `textContent`.
 - The agent is hard-prompted to never enter passwords or payment details, and stops at captchas/login walls.
 - Still alpha: audit before daily driving. File security issues privately.

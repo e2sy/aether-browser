@@ -14,9 +14,15 @@ export default function App(): JSX.Element {
       set({ tabs: s.tabs, activeId: s.activeId })
     })
     const unsubMax = window.aether.state.onMaximized((m) => set({ maximized: Boolean(m) }))
+    const unsubShow = window.aether.state.onSidebarShow((raw) => {
+      const mode = (raw as { mode?: string })?.mode
+      const sidebarMode = mode === 'models' ? 'models' : mode === 'agent' ? 'agent' : 'chat'
+      set({ sidebarOpen: true, sidebarMode })
+    })
     return () => {
       unsub()
       unsubMax()
+      unsubShow()
     }
   }, [])
 

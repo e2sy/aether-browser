@@ -21,6 +21,9 @@ import {
 } from './store'
 import { applyAdblockSetting } from './adblock'
 import { ollamaHealth, listModels, pickDefaultModel, chatStream, friendlyError, OllamaMessage } from './ollama'
+import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
+import { MODEL_CATALOG } from './model-catalog'
+import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
 import { webSearch, answerStream } from './search'
 import { agentRunner } from './agent/executor'
@@ -191,6 +194,60 @@ export function registerIpc(deps: Deps): void {
       return { models: await listModels() }
     } catch (err) {
       return { models: [], error: friendlyError(err) }
+    }
+  })
+
+  // ---------- AI: model library (add ANY Ollama model in-app) ----------
+  ipcMain.handle('models:detailed', async (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    try {
+      return { models: await listModelsDetailed() }
+    } catch (err) {
+      return { models: [], error: friendlyError(err) }
+    }
+  })
+
+  ipcMain.handle('models:catalog', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    return { catalog: MODEL_CATALOG }
+  })
+
+  ipcMain.handle('models:pull', (e, name: string) => {
+    guard(e, win(), 'models:pull')
+    const model = String(name || '').trim()
+    if (!/^[a-zA-Z0-9._\/:-]{1,120}$/.test(model)) {
+      throw new Error('Invalid model name — use an Ollama tag like "qwen3.5:4b"')
+    }
+    return startPull(model)
+  })
+
+  ipcMain.handle('models:pull-cancel', (e, pullId: string) => {
+    guard(e, win(), 'models:pull-cancel')
+    return cancelPull(String(pullId || ''))
+  })
+
+  ipcMain.handle('models:pulls', (e) => {
+    guard(e, win(), 'models:pulls')
+    return { pulls: activePulls() }
+  })
+
+  ipcMain.handle('models:delete', async (e, name: string) => {
+    guard(e, win(), 'models:delete')
+    await deleteModel(String(name || ''))
+    return { ok: true }
+  })
+
+  ipcMain.handle('models:show', async (e, name: string) => {
+    guard(e, win(), 'models:show')
+    return modelInfo(String(name || ''))
+  })
+
+  ipcMain.handle('models:ps', async (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    try {
+      return { running: await runningModels() }
+    } catch {
+      return { running: [] }
     }
   })
 

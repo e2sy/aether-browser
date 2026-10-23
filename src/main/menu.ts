@@ -37,6 +37,11 @@ export function buildMenu(deps: Deps): Menu {
           accelerator: 'CmdOrCtrl+,',
           click: (): void => openInternal('aether://settings')
         },
+        {
+          label: 'Model Library',
+          accelerator: 'CmdOrCtrl+Shift+M',
+          click: (): void => tabs()?.sendToChrome('sidebar:show', { mode: 'models' })
+        },
         { type: 'separator' },
         { role: 'quit' }
       ]
@@ -110,7 +115,7 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '0.2.0',
+              applicationVersion: '0.3.0',
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()
