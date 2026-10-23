@@ -2,7 +2,6 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Bookmark, HistoryEntry, Settings } from '../shared/types'
-
 /** Minimal debounced JSON file store — zero native dependencies. */
 export class JsonStore<T> {
   private file: string
@@ -40,17 +39,34 @@ export const DEFAULT_SETTINGS: Settings = {
   adblock: true,
   stripElectronUA: true,
   pageMemory: true,
-  cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' }
+  cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' },
+  memorySaver: 30,
+  extensions: []
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
 export function mergedSettings(): Settings {
   const merged = { ...DEFAULT_SETTINGS, ...settings.data }
   merged.cloudFallback = { ...DEFAULT_SETTINGS.cloudFallback, ...settings.data.cloudFallback }
+  if (!Array.isArray(merged.extensions)) merged.extensions = []
   return merged
 }
 
 export const settings = new JsonStore<Settings>('settings.json', DEFAULT_SETTINGS)
+
+/** Per-host zoom levels (zoom factor exponent, 0 = 100%). Persisted across boots. */
+export const zoomLevels = new JsonStore<Record<string, number>>('zoom.json', {})
+
+export function getZoomLevel(host: string): number {
+  return zoomLevels.data[host] ?? 0
+}
+
+export function setZoomLevel(host: string, level: number): void {
+  if (!host) return
+  if (Math.abs(level) < 0.001) delete zoomLevels.data[host]
+  else zoomLevels.data[host] = Math.round(level * 1000) / 1000
+  zoomLevels.save()
+}
 
 export const history = new JsonStore<HistoryEntry[]>('history.json', [])
 

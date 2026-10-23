@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aether Browser — Documentation</title>
+<meta name="description" content="User guide for Aether Browser: the open-source, AI-native browser powered by your local Ollama model. Extensions, agent, macros, memory saver and more." />
+<style>
+  :root {
+    --bg: #16171b; --bg2: #1e2026; --bg3: #262932;
+    --text: #e8eaf0; --muted: #9aa0ae; --dim: #7d828f;
+    --accent: #7c8cff; --accent2: #5b6cff;
+    --ok: #4ade80; --warn: #fbbf24; --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.7 -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd, .mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  code { background: var(--bg3); border-radius: 5px; padding: 1.5px 6px; font-size: 0.86em; color: #b9c0ff; }
+  kbd {
+    background: var(--bg3); border: 1px solid #3a3e49; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 7px; font-size: 0.8em; white-space: nowrap;
+  }
+  pre {
+    background: var(--bg2); border: 1px solid #2e313a; border-radius: 12px;
+    padding: 14px 18px; overflow-x: auto; font-size: 13px; line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 22px 90px; }
+  header.hero {
+    padding: 64px 22px 46px; text-align: center;
+    background: radial-gradient(1000px 380px at 50% -80px, rgba(91, 108, 255, 0.28), transparent 70%);
+    border-bottom: 1px solid #26282f;
+  }
+  header.hero h1 { font-size: 42px; margin: 0 0 10px; letter-spacing: -0.02em; }
+  header.hero h1 span { color: var(--accent); }
+  header.hero p { color: var(--muted); max-width: 640px; margin: 0 auto; }
+  .badges { margin-top: 18px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    background: var(--bg3); border: 1px solid #33363f; padding: 4px 12px; border-radius: 999px;
+  }
+  nav.toc {
+    position: sticky; top: 0; z-index: 5; backdrop-filter: blur(8px);
+    background: rgba(22, 23, 27, 0.88); border-bottom: 1px solid #26282f;
+    display: flex; gap: 4px; overflow-x: auto; padding: 10px 22px;
+    font-size: 12.5px; white-space: nowrap;
+  }
+  nav.toc a { color: var(--muted); padding: 5px 11px; border-radius: 8px; }
+  nav.toc a:hover { color: var(--text); background: var(--bg3); text-decoration: none; }
+  section { margin-top: 52px; }
+  h2 { font-size: 24px; letter-spacing: -0.01em; border-left: 3px solid var(--accent2); padding-left: 13px; }
+  h3 { font-size: 16.5px; margin: 30px 0 8px; color: #cfd4e4; }
+  p  { color: #c9cede; }
+  li { color: #c9cede; margin: 5px 0; }
+  .note {
+    background: rgba(91, 108, 255, 0.09); border: 1px solid rgba(124, 140, 255, 0.3);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 16px 0;
+  }
+  .warn {
+    background: rgba(251, 191, 36, 0.07); border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 16px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid #2b2e37; vertical-align: top; }
+  th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; }
+  td:first-child { white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 18px 0; }
+  .card { background: var(--bg2); border: 1px solid #2b2e37; border-radius: 14px; padding: 16px 18px; }
+  .card b { display: block; margin-bottom: 5px; }
+  .card p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  footer { margin-top: 70px; color: var(--dim); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Aether Browser <span>🌌</span></h1>
+  <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
+     Ollama model. No cloud, no API keys, no telemetry.</p>
+  <div class="badges">
+    <span class="badge">v1.0.0</span>
+    <span class="badge">GPL-3.0</span>
+    <span class="badge">Windows · macOS · Linux</span>
+    <span class="badge">Electron + Chromium</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#install">Install</a>
+  <a href="#models">Models</a>
+  <a href="#ai">AI features</a>
+  <a href="#agent">Agent</a>
+  <a href="#macros">Macros</a>
+  <a href="#extensions">Extensions</a>
+  <a href="#browser">Browser basics</a>
+  <a href="#privacy">Privacy</a>
+  <a href="#keys">Shortcuts</a>
+  <a href="#trouble">Troubleshooting</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- ============ INSTALL ============ -->
+  <section id="install">
+    <h2>Install &amp; first run</h2>
+    <p><b>Prerequisites:</b> <a href="https://nodejs.org">Node.js 20+</a> and
+       <a href="https://ollama.com/download">Ollama</a>.</p>
+    <pre><code># 1. Install Ollama, then pull a model (any one works — see Models):
+ollama pull qwen3.5:9b        # great tool calling, ~6 GB
+#   smaller machine?  ollama pull qwen3.5:4b   (~2.5 GB)
+
+# 2. Clone &amp; run Aether
+git clone https://github.com/YOUR_USER/aether-browser.git
+cd aether-browser
+npm install
+npm run dev</code></pre>
+
+    <div class="note"><b>No CLI for models?</b> Once Ollama is running you never need it again —
+      open the sidebar → <b>Models</b> tab (or press <kbd>Ctrl+Shift+M</kbd>) and pull any model
+      from inside the browser.</div>
+
+    <h3>Installers</h3>
+    <pre><code>npm run dist        # NSIS (Windows) / dmg (macOS) / AppImage + deb (Linux)</code></pre>
+  </section>
+
+  <!-- ============ MODELS ============ -->
+  <section id="models">
+    <h2>Models — use any Ollama model, including 4B</h2>
+    <p>The <b>Models</b> tab in the AI sidebar is a full model manager:</p>
+    <ul>
+      <li><b>Curated catalog</b> — one-click cards with disk size and RAM hints (Qwen 3.5
+          9B/4B/1.7B, Llama 3.1/3.2, Gemma 3, Phi, Hermes 3, Mistral, DeepSeek-R1, coder and
+          vision models, TinyLlama).</li>
+      <li><b>Any tag</b> — type any exact Ollama tag: <code>qwen3.5:4b</code>,
+          <code>llama3.1:8b</code>, <code>deepseek-r1:8b</code>, or a GGUF from the Hugging Face
+          registry (<code>hf.co/user/model-GGUF</code>).</li>
+      <li><b>Live progress</b> — pulls stream progress bars with percent and status. Pulls continue
+          in the background even if you close the sidebar, and restore their state when you reopen.</li>
+      <li><b>Cancel / delete / switch</b> — stop a download mid-flight, free disk space, or make
+          any installed model the active brain with one click. The first pulled model becomes the
+          default automatically.</li>
+    </ul>
+    <div class="note"><b>Which model for the agent?</b> Tool calling quality matters most. Good
+      picks: <code>qwen3.5:9b</code> (16 GB RAM), <code>qwen3.5:4b</code> or
+      <code>llama3.2:3b</code> (8 GB RAM). Chat and search work well with anything.</div>
+  </section>
+
+  <!-- ============ AI FEATURES ============ -->
+  <section id="ai">
+    <h2>AI features</h2>
+    <div class="grid">
+      <div class="card"><b>💬 Chat with any page</b>
+        <p>The sidebar extracts the page (Readability → Markdown) and answers grounded in it.
+           Turn page context off to chat freely. Conversations are remembered per site (local
+           page memory) and reused as context on your next visit.</p></div>
+      <div class="card"><b>🔍 AI search</b>
+        <p>Search from the omnibox opens <code>aether://search</code>: free DuckDuckGo results
+           next to a cited answer written by your local model. Perplexity-style, but private.</p></div>
+      <div class="card"><b>✍️ Write helpers</b>
+        <p>Select text on any page → right-click → <i>Ask / Summarize / Rewrite / Translate</i>.
+           The prompt lands in your sidebar.</p></div>
+      <div class="card"><b>☁️ Optional cloud fallback</b>
+        <p>If Ollama is unreachable, chat &amp; AI search can use any OpenAI-compatible endpoint
+           (Groq / OpenRouter free tiers). Opt-in, key stays on disk — the agent always stays local.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ AGENT ============ -->
+  <section id="agent">
+    <h2>The web automation agent</h2>
+    <p>Open the <b>Agent</b> tab, type a task, press Run. The agent renders the page as a numbered
+       menu of interactive elements and picks <b>one tool per step</b> (max 12 steps):</p>
+    <table>
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td><code>navigate</code></td><td>Open a URL in the current tab</td></tr>
+      <tr><td><code>click</code></td><td>Click an element by its <code>[ref]</code> number</td></tr>
+      <tr><td><code>type</code></td><td>Type into an input (optionally press Enter)</td></tr>
+      <tr><td><code>press_key</code></td><td>Send a key like <code>Enter</code>, <code>Escape</code></td></tr>
+      <tr><td><code>scroll</code></td><td>Scroll up / down</td></tr>
+      <tr><td><code>go_back</code></td><td>History back</td></tr>
+      <tr><td><code>read_page</code></td><td>Extract readable text</td></tr>
+      <tr><td><code>find_text</code></td><td>Find &amp; highlight text</td></tr>
+      <tr><td><code>list_tabs</code></td><td>See all open tabs</td></tr>
+      <tr><td><code>screenshot</code></td><td>Save a PNG of the page</td></tr>
+      <tr><td><code>ask_user</code></td><td>Pause and ask you a clarifying question</td></tr>
+      <tr><td><code>done</code></td><td>Report the final answer</td></tr>
+    </table>
+    <ul>
+      <li><b>Stable refs + DOM diffing</b> — elements keep their numbers while you interact, and
+          after each action the model only receives what changed.</li>
+      <li><b>Confirm gate</b> — every mutating action waits for your Allow / Deny (toggle in
+          Settings → “Agent asks before every action”).</li>
+      <li><b>Guardrails</b> — the agent refuses passwords and payment fields and stops at login
+          walls or captchas.</li>
+    </ul>
+  </section>
+
+  <!-- ============ MACROS ============ -->
+  <section id="macros">
+    <h2>Macros — replay without a model</h2>
+    <p>Tick <b>⏺ Record as macro</b> before an agent run. Successful actions are saved as a
+       replayable script; replay re-finds elements by captured CSS locators, needs <b>no model at
+       all</b>, and still respects the confirm gate.</p>
+    <h3>Editing macros</h3>
+    <p>Open the Macros list (Agent tab → <b>Macros</b>) and press <b>✎</b> to open the step
+       editor. You can rename the macro, reorder steps (<kbd>↑</kbd>/<kbd>↓</kbd>), edit any
+       argument, add new steps (<code>navigate</code>, <code>click</code>, <code>type</code>,
+       <code>press_key</code>, <code>scroll</code>, <code>go_back</code>), or remove steps —
+       then Save.</p>
+    <p>Typical use: record “search for X on a site” once, then edit the <code>type</code> step's
+       text and replay it any time — deterministic and instant.</p>
+  </section>
+
+  <!-- ============ EXTENSIONS ============ -->
+  <section id="extensions">
+    <h2>Chrome extensions</h2>
+    <p>Aether supports <b>unpacked</b> MV2/MV3 Chrome extensions via
+       <code>electron-chrome-extensions</code>: content scripts, background pages, browser-action
+       buttons with popups, and <code>chrome.contextMenus</code> items.</p>
+    <ol>
+      <li>Get an unpacked extension (a folder containing <code>manifest.json</code>).</li>
+      <li>Open <b>Settings</b> (<kbd>Ctrl+,</kbd>) → <b>Extensions (unpacked)</b> → <b>Load unpacked…</b></li>
+      <li>Its action button appears in the toolbar; right-click it for extension menus, click for
+          popups or the extension's action handler.</li>
+    </ol>
+    <ul>
+      <li><b>Disable / enable</b> — the ⏸ / ▶ buttons in the extensions list. Disabled extensions
+          are remembered but not loaded.</li>
+      <li><b>Remove</b> — the ✕ button (files on disk stay untouched).</li>
+    </ul>
+    <div class="warn"><b>Limits:</b> the Chrome Web Store's CRX one-click install isn't supported
+      (unpacked folders only — this is how the underlying Electron extension stack works).
+      Aether is licensed <b>GPL-3.0</b> because <code>electron-chrome-extensions</code> is
+      GPL-3.0 / patron dual-licensed.</div>
+  </section>
+
+  <!-- ============ BROWSER BASICS ============ -->
+  <section id="browser">
+    <h2>Browser basics</h2>
+    <h3>Tabs</h3>
+    <ul>
+      <li><b>Context menu</b> (right-click a tab): reload, duplicate, pin, mute, discard, close,
+          close others, close to the right.</li>
+      <li><b>Pin</b> — pinned tabs shrink to their favicon and sort first.</li>
+      <li><b>Mute</b> — 🔇 per tab; a ♪ indicator shows tabs playing audio.</li>
+    </ul>
+    <h3>Memory saver</h3>
+    <p>Settings → <b>Discard idle tabs after</b> (off / 15 / 30 / 60 minutes). Idle background
+       tabs are unloaded to free RAM; they show as <i>(unloaded)</i> and reload instantly when
+       clicked. Pinned and audio-playing tabs are never discarded.</p>
+    <h3>Per-site zoom</h3>
+    <p><kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd>
+       (or the View menu). Each site's zoom is remembered and re-applied on every visit; a
+       Chrome-style bubble shows the level and resets on click.</p>
+    <h3>Downloads</h3>
+    <p>Files land in your Downloads folder (duplicates get “ (1)” suffixes). A shelf at the
+       bottom-left shows progress with cancel and “show in folder”.</p>
+  </section>
+
+  <!-- ============ PRIVACY ============ -->
+  <section id="privacy">
+    <h2>Privacy &amp; security</h2>
+    <ul>
+      <li>All AI runs on <code>localhost:11434</code> by default; nothing leaves your machine
+          unless you enable the optional cloud fallback.</li>
+      <li>Renderers are sandboxed with context isolation and zero Node access. Web pages cannot
+          call browser IPC — sensitive channels verify the sender.</li>
+      <li><b>Ad &amp; tracker blocking</b> — EasyList + EasyPrivacy, cached on disk, toggleable.</li>
+      <li><b>Site permissions</b> — camera / mic / location / notifications prompt per site with
+          an optional “remember”; manage every grant in Settings.</li>
+      <li><b>Chrome-like identity</b> — the <code>Electron/</code> UA token is stripped so Google
+          and YouTube treat Aether like a normal Chrome browser (toggleable).</li>
+      <li>All data (history, bookmarks, page memory, permissions, settings) lives in your user
+          data folder as plain JSON files you can inspect and delete.</li>
+    </ul>
+  </section>
+
+  <!-- ============ SHORTCUTS ============ -->
+  <section id="keys">
+    <h2>Keyboard shortcuts</h2>
+    <table>
+      <tr><th>Shortcut</th><th>Action</th></tr>
+      <tr><td><kbd>Ctrl+T</kbd> / <kbd>Ctrl+W</kbd></td><td>New / close tab</td></tr>
+      <tr><td><kbd>Ctrl+Shift+D</kbd></td><td>Duplicate tab</td></tr>
+      <tr><td><kbd>Ctrl+Shift+P</kbd></td><td>Pin / unpin tab</td></tr>
+      <tr><td><kbd>Ctrl+Shift+U</kbd></td><td>Mute / unmute tab</td></tr>
+      <tr><td><kbd>Ctrl+L</kbd></td><td>Focus the omnibox</td></tr>
+      <tr><td><kbd>Ctrl+R</kbd> / <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd></td><td>Reload / back / forward</td></tr>
+      <tr><td><kbd>Ctrl+F</kbd></td><td>Find in page</td></tr>
+      <tr><td><kbd>Ctrl+H</kbd> / <kbd>Ctrl+Shift+O</kbd></td><td>History / bookmarks</td></tr>
+      <tr><td><kbd>Ctrl+,</kbd> / <kbd>Ctrl+Shift+M</kbd></td><td>Settings / Model library</td></tr>
+      <tr><td><kbd>Ctrl+Shift+A</kbd></td><td>Toggle the AI sidebar</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>-</kbd> / <kbd>0</kbd></td><td>Zoom in / out / reset (per site)</td></tr>
+    </table>
+    <p class="mono" style="font-size:12px;color:var(--dim)">macOS: use ⌘ instead of Ctrl.</p>
+  </section>
+
+  <!-- ============ TROUBLESHOOTING ============ -->
+  <section id="trouble">
+    <h2>Troubleshooting</h2>
+    <table>
+      <tr><th>Problem</th><th>Fix</th></tr>
+      <tr><td>“Ollama not reachable”</td>
+          <td>Start Ollama (<code>ollama serve</code> or the menu bar app). Check the URL in
+              Settings → model section. The sidebar health dot turns green when connected.</td></tr>
+      <tr><td>Agent clicks the wrong element</td>
+          <td>Use a stronger tool-calling model (qwen3.5:9b) and keep tasks short. Re-check the
+              confirm gate so you can Deny bad steps.</td></tr>
+      <tr><td>Google sign-in blocked</td>
+          <td>Keep “Identify as regular Chrome” enabled in Settings. If it persists, sign in on
+              accounts.google.com first, then browse.</td></tr>
+      <tr><td>Netflix / Spotify DRM won't play</td>
+          <td>Widevine isn't bundled with Electron. YouTube (non-DRM) works fine.</td></tr>
+      <tr><td>Extension didn't load</td>
+          <td>The folder must contain <code>manifest.json</code> at its root. Check the console
+              (<code>npm run dev</code>) for the <code>[extensions]</code> log line.</td></tr>
+      <tr><td>High RAM usage</td>
+          <td>Enable the memory saver (Settings → 15/30 min), or right-click tabs → Discard.</td></tr>
+    </table>
+  </section>
+
+  <footer>
+    Aether Browser v1.0.0 — GPL-3.0 ·
+    <a href="https://github.com/">GitHub</a> ·
+    Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
+  </footer>
+</div>
+</body>
+</html>

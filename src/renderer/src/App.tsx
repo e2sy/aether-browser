@@ -1,10 +1,13 @@
 import { useEffect } from 'react'
-import { useApp } from './state/store'
+import { useApp, upsertDownload } from './state/store'
+import type { DownloadState } from '../../shared/types'
 import TabStrip from './components/TabStrip'
 import Toolbar from './components/Toolbar'
 import Sidebar from './components/Sidebar'
 import FindBar from './components/FindBar'
 import PermPrompt from './components/PermPrompt'
+import ZoomBubble from './components/ZoomBubble'
+import DownloadBar from './components/DownloadBar'
 
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
@@ -21,10 +24,20 @@ export default function App(): JSX.Element {
       const sidebarMode = mode === 'models' ? 'models' : mode === 'agent' ? 'agent' : 'chat'
       set({ sidebarOpen: true, sidebarMode })
     })
+    const unsubZoom = window.aether.state.onZoom((raw) => {
+      const z = raw as { percent?: number } | null
+      if (z && typeof z.percent === 'number') set({ zoom: { percent: z.percent, ts: Date.now() } })
+    })
+    const unsubDl = window.aether.state.onDownload((raw) => {
+      const d = raw as DownloadState | null
+      if (d && d.id) upsertDownload(d)
+    })
     return () => {
       unsub()
       unsubMax()
       unsubShow()
+      unsubZoom()
+      unsubDl()
     }
   }, [])
 
@@ -40,6 +53,8 @@ export default function App(): JSX.Element {
       </div>
       <FindBar />
       <PermPrompt />
+      <ZoomBubble />
+      <DownloadBar />
     </div>
   )
 }

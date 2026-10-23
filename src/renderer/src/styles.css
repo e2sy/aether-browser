@@ -1411,3 +1411,384 @@ body {
   background: rgba(255, 107, 107, 0.12);
   color: var(--danger);
 }
+
+/* ---------- v1.0: tab context menu, pinned / discarded / muted tabs ---------- */
+
+.tab.pinned {
+  min-width: 0;
+  max-width: 46px;
+  padding: 0 8px;
+  justify-content: center;
+}
+
+.tab.discarded {
+  opacity: 0.55;
+}
+
+.tab.discarded .tab-title {
+  font-style: italic;
+}
+
+.tab-muted,
+.tab-audible {
+  flex: none;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.tab-audible {
+  color: #7c8cff;
+}
+
+.tab-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 5px;
+  background: var(--bg2, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--text, #e8eaf0);
+  font-size: 12.5px;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.tab-menu-item:hover:not(:disabled) {
+  background: var(--bg3, #2a2d35);
+}
+
+.tab-menu-item:disabled {
+  color: var(--muted, #565b66);
+  cursor: default;
+}
+
+.tab-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* ---------- extension browser actions ---------- */
+
+browser-action-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 2px;
+}
+
+browser-action-list::part(action) {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  padding: 4px;
+}
+
+browser-action-list::part(action):hover {
+  background: var(--bg3, #2a2d35);
+}
+
+/* ---------- zoom bubble ---------- */
+
+.zoom-bubble {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg2, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.zoom-bubble button {
+  border: none;
+  background: transparent;
+  color: var(--text, #e8eaf0);
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.zoom-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+}
+
+.zoom-btn:hover {
+  background: var(--bg3, #2a2d35);
+}
+
+.zoom-pct {
+  min-width: 56px;
+  height: 26px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.zoom-pct:hover {
+  background: var(--bg3, #2a2d35);
+}
+
+/* ---------- download bar ---------- */
+
+.download-bar {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 890;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 340px;
+}
+
+.dl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg2, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.dl-row.failed {
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
+.dl-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dl-name {
+  font-size: 12.5px;
+  color: var(--text, #e8eaf0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-sub {
+  font-size: 11px;
+  color: var(--muted, #7d828f);
+  margin-top: 1px;
+}
+
+.dl-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bg3, #2a2d35);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.dl-bar div {
+  height: 100%;
+  background: var(--accent, #5b6cff);
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.dl-bar.indeterminate div {
+  width: 40% !important;
+  animation: dl-indet 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes dl-indet {
+  from {
+    margin-left: 0;
+  }
+  to {
+    margin-left: 60%;
+  }
+}
+
+.dl-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.dl-actions button {
+  border: none;
+  background: transparent;
+  color: var(--muted, #9aa0ae);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.dl-actions button:hover {
+  background: var(--bg3, #2a2d35);
+  color: var(--text, #e8eaf0);
+}
+
+/* ---------- macro editor ---------- */
+
+.macro-edit {
+  padding: 10px;
+  background: var(--bg2, #1a1c21);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.macro-edit-name {
+  padding: 7px 9px;
+  font-size: 12.5px;
+  color: var(--text, #e8eaf0);
+  background: var(--bg3, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  outline: none;
+}
+
+.macro-edit-name:focus {
+  border-color: var(--accent, #7c8cff);
+}
+
+.macro-step {
+  padding: 7px 8px;
+  background: var(--bg3, #16171b);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.macro-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.macro-step-tool {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent, #7c8cff);
+  text-transform: uppercase;
+}
+
+.macro-step-btns {
+  display: flex;
+  gap: 3px;
+}
+
+.macro-step-btns button {
+  border: none;
+  background: transparent;
+  color: var(--muted, #7d828f);
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.macro-step-btns button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text, #e8eaf0);
+}
+
+.macro-step-btns button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.macro-arg {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--muted, #7d828f);
+}
+
+.macro-arg span {
+  min-width: 52px;
+}
+
+.macro-arg input[type='text'],
+.macro-arg input:not([type]) {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  font-size: 11.5px;
+  color: var(--text, #e8eaf0);
+  background: var(--bg2, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  outline: none;
+}
+
+.macro-arg input:focus {
+  border-color: var(--accent, #7c8cff);
+}
+
+.macro-add select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  color: var(--text, #e8eaf0);
+  background: var(--bg3, #1e2026);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  outline: none;
+}
+
+.macro-edit-err {
+  font-size: 11px;
+  color: var(--danger, #ff6b6b);
+}
+
+.macro-edit-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.macro-edit-btns button {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text, #e8eaf0);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.macro-edit-btns button:hover {
+  background: var(--bg3, #2a2d35);
+}
+
+.macro-edit-btns button.primary {
+  background: var(--accent, #5b6cff);
+  border-color: var(--accent, #5b6cff);
+  color: #fff;
+}
+
+.macro-edit-btns button.primary:hover {
+  filter: brightness(1.1);
+}

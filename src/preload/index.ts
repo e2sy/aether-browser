@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { injectBrowserAction } from 'electron-chrome-extensions/dist/browser-action'
 
 /**
  * Secure bridge. The renderer (chrome UI and internal pages) only ever sees
@@ -52,7 +53,11 @@ const api = {
     onMaximized: subscribe('win:maximized'),
     onSidebarInject: subscribe('sidebar:inject'),
     onSidebarShow: subscribe('sidebar:show'),
-    onFindShow: subscribe('find:show')
+    onFindShow: subscribe('find:show'),
+    /** per-site zoom feedback for the zoom bubble */
+    onZoom: subscribe('zoom:changed'),
+    /** download progress for the download bar */
+    onDownload: subscribe('download:progress')
   },
 
   tabs: {
@@ -65,7 +70,14 @@ const api = {
     back: (id: number) => ipcRenderer.invoke('tabs:back', id),
     forward: (id: number) => ipcRenderer.invoke('tabs:forward', id),
     reload: (id: number) => ipcRenderer.invoke('tabs:reload', id),
-    stop: (id: number) => ipcRenderer.invoke('tabs:stop', id)
+    stop: (id: number) => ipcRenderer.invoke('tabs:stop', id),
+    setPinned: (id: number, pinned: boolean) => ipcRenderer.invoke('tabs:setPinned', id, pinned),
+    toggleMuted: (id: number) => ipcRenderer.invoke('tabs:toggleMuted', id),
+    duplicate: (id: number) => ipcRenderer.invoke('tabs:duplicate', id),
+    discard: (id: number) => ipcRenderer.invoke('tabs:discard', id),
+    closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
+    closeRight: (id: number) => ipcRenderer.invoke('tabs:closeRight', id),
+    zoom: (action: 'in' | 'out' | 'reset') => ipcRenderer.invoke('tabs:zoom', action)
   },
 
   omnibox: {
@@ -148,8 +160,24 @@ const api = {
     list: () => ipcRenderer.invoke('macros:list'),
     save: (name: string, task: string, steps: Array<{ tool: string; args: Record<string, unknown> }>) =>
       ipcRenderer.invoke('macros:save', { name, task, steps }),
+    update: (id: string, patch: { name?: string; task?: string; steps?: Array<{ tool: string; args: Record<string, unknown> }> }) =>
+      ipcRenderer.invoke('macros:update', id, patch),
     remove: (id: string) => ipcRenderer.invoke('macros:delete', id),
     run: (id: string) => ipcRenderer.invoke('macros:run', id)
+  },
+
+  /** file downloads */
+  downloads: {
+    cancel: (id: string) => ipcRenderer.invoke('downloads:cancel', id),
+    reveal: (path: string) => ipcRenderer.invoke('downloads:reveal', path)
+  },
+
+  /** unpacked Chrome extensions */
+  extensions: {
+    list: () => ipcRenderer.invoke('extensions:list'),
+    add: () => ipcRenderer.invoke('extensions:add'),
+    toggle: (path: string) => ipcRenderer.invoke('extensions:toggle', path),
+    remove: (path: string) => ipcRenderer.invoke('extensions:remove', path)
   },
 
   settings: {
@@ -181,5 +209,15 @@ const api = {
 }
 
 contextBridge.exposeInMainWorld('aether', api)
+
+// <browser-action-list> support — inject ONLY into the browser chrome UI,
+// never into ordinary web pages.
+try {
+  const isChromeUI =
+    location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname)
+  if (isChromeUI) injectBrowserAction()
+} catch {
+  /* not the chrome UI — skip */
+}
 
 export type AetherApi = typeof api

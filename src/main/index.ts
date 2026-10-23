@@ -7,6 +7,8 @@ import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML 
 import { applyAdblockSetting } from './adblock'
 import { mergedSettings } from './store'
 import { installPermissionHandlers } from './permissions'
+import { initExtensions } from './extensions'
+import { installDownloadHandler } from './downloads'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -67,7 +69,14 @@ function createWindow(): void {
     if (win && !win.webContents.isDestroyed()) win.webContents.send('tabs:state', tabs!.getState())
   })
 
+  // extensions host must exist before the first tab so it gets registered
+  initExtensions(win, tabs)
+  installDownloadHandler((channel, payload) => {
+    if (win && !win.webContents.isDestroyed()) win.webContents.send(channel, payload)
+  })
+
   tabs.create()
+  tabs.startMemorySaver()
   applyLayout()
 }
 
@@ -119,19 +128,39 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
+    let tHistory: number | undefined
     setTimeout(() => {
       const first = tabs?.listIds()[0]
       if (first !== undefined) tabs?.navigate(first, 'aether://settings')
     }, 3000)
+    // v1.0: create background tabs, then exercise memory-saver discard + wake
+    setTimeout(() => {
+      tabs?.create('aether://history', true)
+      tHistory = tabs?.listIds().find((id) => tabs?.get(id)?.url.includes('history'))
+      tabs?.create('aether://bookmarks', true) // pushes history tab to background
+    }, 4200)
+    setTimeout(() => {
+      if (tHistory !== undefined && tabs) {
+        tabs.discard(tHistory)
+        const rec = tabs.getState().tabs.find((t) => t.id === tHistory)
+        console.log('[smoke] discard worked:', rec?.discarded ? 'YES' : 'NO')
+      }
+    }, 5200)
+    setTimeout(() => {
+      if (tHistory !== undefined) tabs?.activate(tHistory) // should wake the view
+    }, 5800)
     setTimeout(() => {
       const state = tabs?.getState()
       console.log('[smoke] tabs:', JSON.stringify(state))
       const newtabLoaded = state?.tabs.some((t) => t.url.startsWith('aether://'))
       const settingsLoaded = state?.tabs.some((t) => t.url.startsWith('aether://settings'))
+      const woken = state?.tabs.find((t) => t.id === tHistory)
+      const wakeWorked = Boolean(woken && !woken.discarded && woken.url.includes('history'))
       console.log('[smoke] internal page loaded:', newtabLoaded ? 'YES' : 'NO')
       console.log('[smoke] settings page loaded:', settingsLoaded ? 'YES' : 'NO')
-      app.exit(newtabLoaded && settingsLoaded ? 0 : 1)
-    }, 6500)
+      console.log('[smoke] discard + wake worked:', wakeWorked ? 'YES' : 'NO')
+      app.exit(newtabLoaded && settingsLoaded && wakeWorked ? 0 : 1)
+    }, 7500)
   }
 
   app.on('activate', () => {

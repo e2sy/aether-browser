@@ -8,6 +8,12 @@ export interface TabMeta {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
+  pinned: boolean
+  muted: boolean
+  /** Tab is currently playing audio (blocks memory-saver discard) */
+  audible: boolean
+  /** Memory saver unloaded this tab — reloads on activation */
+  discarded: boolean
 }
 
 export interface TabsState {
@@ -31,6 +37,39 @@ export interface Settings {
   pageMemory: boolean
   /** Optional OpenAI-compatible fallback used when Ollama is unreachable (chat + AI search only) */
   cloudFallback: CloudFallbackConfig
+  /** Auto-discard idle background tabs after N minutes (0 disables memory saver) */
+  memorySaver: number
+  /** Unpacked extensions to load at boot */
+  extensions: ExtensionRecord[]
+}
+
+/** A loaded unpacked extension (persisted across boots). */
+export interface ExtensionRecord {
+  path: string
+  enabled: boolean
+}
+
+/** Info about an installed extension for the settings UI. */
+export interface ExtensionInfo {
+  id: string
+  name: string
+  version: string
+  path: string
+  enabled: boolean
+}
+
+/** Live state of a file download, streamed main → renderer. */
+export interface DownloadState {
+  id: string
+  filename: string
+  path: string
+  received: number
+  total: number
+  /** null while the server doesn't send Content-Length */
+  percent: number | null
+  done: boolean
+  cancelled?: boolean
+  error?: string
 }
 
 export interface CloudFallbackConfig {
@@ -198,4 +237,11 @@ export interface FindResult {
 export interface AiStatus {
   ollama: boolean
   cloud: boolean
+}
+
+/** Request to update an existing macro (macro editor). */
+export interface MacroUpdate {
+  name?: string
+  task?: string
+  steps?: MacroStep[]
 }

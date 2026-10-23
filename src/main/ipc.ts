@@ -30,7 +30,14 @@ import {
   revokePermission,
   clearPermissions
 } from './permissions'
-import { listMacros, saveMacro, deleteMacro, getMacro } from './macros'
+import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro } from './macros'
+import { installDownloadHandler, cancelDownload, revealDownload } from './downloads'
+import {
+  listExtensionInfos,
+  addExtensionFromDialog,
+  toggleExtension,
+  removeExtension
+} from './extensions'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
@@ -117,6 +124,39 @@ export function registerIpc(deps: Deps): void {
   ipcMain.handle('tabs:reorder', (e, from: number, to: number) => {
     guard(e, win(), 'tabs:reorder')
     tm()?.reorder(Number(from), Number(to))
+  })
+
+  // tab extras: pin / mute / duplicate / discard / bulk close
+  ipcMain.handle('tabs:setPinned', (e, id: number, pinned: boolean) => {
+    guard(e, win(), 'tabs:setPinned')
+    tm()?.setPinned(Number(id), Boolean(pinned))
+  })
+  ipcMain.handle('tabs:toggleMuted', (e, id: number) => {
+    guard(e, win(), 'tabs:toggleMuted')
+    tm()?.toggleMuted(Number(id))
+  })
+  ipcMain.handle('tabs:duplicate', (e, id: number) => {
+    guard(e, win(), 'tabs:duplicate')
+    return tm()?.duplicate(Number(id))
+  })
+  ipcMain.handle('tabs:discard', (e, id: number) => {
+    guard(e, win(), 'tabs:discard')
+    tm()?.discard(Number(id))
+  })
+  ipcMain.handle('tabs:closeOthers', (e, id: number) => {
+    guard(e, win(), 'tabs:closeOthers')
+    tm()?.closeOthers(Number(id))
+  })
+  ipcMain.handle('tabs:closeRight', (e, id: number) => {
+    guard(e, win(), 'tabs:closeRight')
+    tm()?.closeRight(Number(id))
+  })
+
+  // per-site zoom
+  ipcMain.handle('tabs:zoom', (e, action: 'in' | 'out' | 'reset') => {
+    guard(e, win(), 'tabs:zoom')
+    const a = action === 'reset' ? 'reset' : action === 'out' ? 'out' : 'in'
+    tm()?.zoomForActive(a)
   })
 
   // ---------- window chrome ----------
@@ -449,6 +489,51 @@ export function registerIpc(deps: Deps): void {
   ipcMain.handle('macros:delete', (e, id: string) => {
     guard(e, win(), 'macros:delete')
     deleteMacro(String(id || ''))
+  })
+
+  ipcMain.handle(
+    'macros:update',
+    (e, id: string, patch: { name?: string; task?: string; steps?: MacroStep[] }) => {
+      guard(e, win(), 'macros:update')
+      const res = updateMacro(String(id || ''), patch || {})
+      if (res.error) throw new Error(res.error)
+      return { macro: res.macro }
+    }
+  )
+
+  // ---------- downloads ----------
+  ipcMain.handle('downloads:cancel', (e, id: string) => {
+    guard(e, win(), 'downloads:cancel')
+    cancelDownload(String(id || ''))
+  })
+
+  ipcMain.handle('downloads:reveal', (e, path: string) => {
+    guard(e, win(), 'downloads:reveal')
+    revealDownload(String(path || ''))
+  })
+
+  // ---------- extensions (unpacked, via electron-chrome-extensions) ----------
+  ipcMain.handle('extensions:list', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    return listExtensionInfos()
+  })
+
+  ipcMain.handle('extensions:add', async (e) => {
+    guard(e, win(), 'extensions:add')
+    const info = await addExtensionFromDialog()
+    return { info }
+  })
+
+  ipcMain.handle('extensions:toggle', async (e, path: string) => {
+    guard(e, win(), 'extensions:toggle')
+    await toggleExtension(String(path || ''))
+    return listExtensionInfos()
+  })
+
+  ipcMain.handle('extensions:remove', async (e, path: string) => {
+    guard(e, win(), 'extensions:remove')
+    await removeExtension(String(path || ''))
+    return listExtensionInfos()
   })
 
   ipcMain.handle('macros:run', (e, id: string) => {

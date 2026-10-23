@@ -1,6 +1,7 @@
 import { app, Menu, MenuItemConstructorOptions, clipboard, shell } from 'electron'
 import type { WebContents } from 'electron'
 import type { TabManager } from './tabs'
+import { contextMenuItems } from './extensions'
 
 interface Deps {
   getTabs: () => TabManager | undefined
@@ -43,6 +44,22 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => tabs()?.sendToChrome('sidebar:show', { mode: 'models' })
         },
         { type: 'separator' },
+        {
+          label: 'Duplicate Tab',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => withActive((tm, id) => tm.duplicate(id))
+        },
+        {
+          label: 'Pin Tab',
+          accelerator: 'CmdOrCtrl+Shift+P',
+          click: () => withActive((tm, id) => tm.togglePinned(id))
+        },
+        {
+          label: 'Mute Tab',
+          accelerator: 'CmdOrCtrl+Shift+U',
+          click: () => withActive((tm, id) => tm.toggleMuted(id))
+        },
+        { type: 'separator' },
         { role: 'quit' }
       ]
     },
@@ -74,9 +91,21 @@ export function buildMenu(deps: Deps): Menu {
         },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => withActive((tm, id) => tm.zoom(id, 'in'))
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => withActive((tm, id) => tm.zoom(id, 'out'))
+        },
+        {
+          label: 'Reset Zoom',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => withActive((tm, id) => tm.zoom(id, 'reset'))
+        },
         { type: 'separator' },
         { role: 'togglefullscreen' }
       ]
@@ -121,7 +150,7 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '0.4.0',
+              applicationVersion: '1.0.0',
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()
@@ -136,6 +165,12 @@ export function buildMenu(deps: Deps): Menu {
 /** Right-click menu inside web pages: edit roles + AI write helpers. */
 export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParams, tm: TabManager): void {
   const items: MenuItemConstructorOptions[] = []
+
+  // extension-provided context menu items (chrome.contextMenus) come first
+  const extItems = contextMenuItems(wc, params)
+  if (extItems.length) {
+    items.push(...(extItems as unknown as MenuItemConstructorOptions[]), { type: 'separator' })
+  }
 
   if (params.selectionText?.trim()) {
     const selection = params.selectionText.trim()

@@ -252,6 +252,69 @@ export default function Sidebar(): JSX.Element {
     [loadMacros]
   )
 
+  // ----- macro editor (edit steps / rename / reorder) -----
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editSteps, setEditSteps] = useState<MacroStep[]>([])
+  const [editErr, setEditErr] = useState('')
+
+  const startEdit = useCallback((m: Macro): void => {
+    setEditId(m.id)
+    setEditName(m.name)
+    setEditSteps(m.steps.map((s) => ({ tool: s.tool, args: { ...s.args } })))
+    setEditErr('')
+  }, [])
+
+  const saveEdit = useCallback(async (): Promise<void> => {
+    if (!editId) return
+    try {
+      await window.aether.macros.update(editId, { name: editName.trim(), steps: editSteps })
+      setEditId(null)
+      void loadMacros()
+    } catch (err) {
+      setEditErr(String((err as Error)?.message || err))
+    }
+  }, [editId, editName, editSteps, loadMacros])
+
+  const updArg = (i: number, key: string, value: string | boolean): void => {
+    setEditSteps((steps) =>
+      steps.map((s, j) => {
+        if (j !== i) return s
+        let v: unknown = value
+        if (typeof value === 'string') {
+          if (key === 'ref' || key === 'amount') {
+            const n = Number(value)
+            if (value !== '' && !Number.isNaN(n)) v = n
+          } else if (key === 'submit') {
+            v = value === 'true'
+          }
+        }
+        return { ...s, args: { ...s.args, [key]: v } }
+      })
+    )
+  }
+  const moveStep = (i: number, dir: number): void => {
+    setEditSteps((steps) => {
+      const next = [...steps]
+      const j = i + dir
+      if (j < 0 || j >= next.length) return steps
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  }
+  const delStep = (i: number): void => setEditSteps((steps) => steps.filter((_, j) => j !== i))
+  const addStep = (tool: string): void => {
+    const defaults: Record<string, Record<string, unknown>> = {
+      navigate: { url: 'https://' },
+      click: { ref: 1 },
+      type: { ref: 1, text: '', submit: false },
+      press_key: { key: 'Enter' },
+      scroll: { direction: 'down', amount: 600 },
+      go_back: {}
+    }
+    setEditSteps((steps) => [...steps, { tool, args: { ...(defaults[tool] || {}) } }])
+  }
+
   const cancelAgent = useCallback((): void => {
     if (agentReq) window.aether.agent.cancel(agentReq)
     setRunning(false)
@@ -527,22 +590,82 @@ export default function Sidebar(): JSX.Element {
             {macrosOpen && (
               <div className="macros-list">
                 {macros.length === 0 && <div className="macros-empty">Run the agent with ⏺ Record to save a replayable macro.</div>}
-                {macros.map((m) => (
-                  <div key={m.id} className="macro-row">
-                    <div className="macro-info">
-                      <div className="macro-name">{m.name}</div>
-                      <div className="macro-meta">
-                        {m.steps.length} steps · {m.runs} runs
+                {macros.map((m) =>
+                  editId === m.id ? (
+                    <div key={m.id} className="macro-edit">
+                      <input
+                        className="macro-edit-name"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Macro name"
+                      />
+                      {editSteps.map((st, i) => (
+                        <div key={i} className="macro-step">
+                          <div className="macro-step-head">
+                            <span className="macro-step-tool">{st.tool}</span>
+                            <span className="macro-step-btns">
+                              <button disabled={i === 0} onClick={() => moveStep(i, -1)} title="Move up">↑</button>
+                              <button disabled={i === editSteps.length - 1} onClick={() => moveStep(i, 1)} title="Move down">↓</button>
+                              <button onClick={() => delStep(i)} title="Remove step">✕</button>
+                            </span>
+                          </div>
+                          {Object.entries(st.args).map(([k, v]) => (
+                            <label key={k} className="macro-arg">
+                              <span>{k}</span>
+                              {typeof v === 'boolean' ? (
+                                <input type="checkbox" checked={v} onChange={(e) => updArg(i, k, e.target.checked)} />
+                              ) : (
+                                <input value={String(v ?? '')} onChange={(e) => updArg(i, k, e.target.value)} />
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                      <div className="macro-add">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) addStep(e.target.value)
+                            e.currentTarget.value = ''
+                          }}
+                        >
+                          <option value="">+ Add step…</option>
+                          <option value="navigate">navigate</option>
+                          <option value="click">click</option>
+                          <option value="type">type</option>
+                          <option value="press_key">press_key</option>
+                          <option value="scroll">scroll</option>
+                          <option value="go_back">go_back</option>
+                        </select>
+                      </div>
+                      {editErr && <div className="macro-edit-err">{editErr}</div>}
+                      <div className="macro-edit-btns">
+                        <button onClick={() => setEditId(null)}>Cancel</button>
+                        <button className="primary" onClick={() => void saveEdit()}>
+                          Save macro
+                        </button>
                       </div>
                     </div>
-                    <button className="macro-run" disabled={running} onClick={() => void runMacro(m.id)} title="Replay on the current tab">
-                      ▶
-                    </button>
-                    <button className="macro-del" onClick={() => void removeMacro(m.id)} title="Delete macro">
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                  ) : (
+                    <div key={m.id} className="macro-row">
+                      <div className="macro-info">
+                        <div className="macro-name">{m.name}</div>
+                        <div className="macro-meta">
+                          {m.steps.length} steps · {m.runs} runs
+                        </div>
+                      </div>
+                      <button className="macro-run" disabled={running} onClick={() => void runMacro(m.id)} title="Replay on the current tab">
+                        ▶
+                      </button>
+                      <button className="macro-run" onClick={() => startEdit(m)} title="Edit steps">
+                        ✎
+                      </button>
+                      <button className="macro-del" onClick={() => void removeMacro(m.id)} title="Delete macro">
+                        ✕
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </div>

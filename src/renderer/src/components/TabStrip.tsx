@@ -1,17 +1,62 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { TabMeta } from '../../../shared/types'
 import { useApp } from '../state/store'
 import { IconClose, IconPlus } from './Icons'
+
+interface MenuState {
+  x: number
+  y: number
+  tab: TabMeta
+}
 
 export default function TabStrip(): JSX.Element {
   const { tabs, activeId, maximized } = useApp()
   const set = useApp((s) => s.set)
   const dragIdx = useRef<number | null>(null)
+  const [menu, setMenu] = useState<MenuState | null>(null)
   const isMac = window.aether.platform === 'darwin'
   const isWinLike = !isMac
 
-  const favicon = (url: string, fav: string | null): JSX.Element => {
-    if (fav) {
-      return <img src={fav} width="14" height="14" style={{ borderRadius: 3, flexShrink: 0 }} alt="" />
+  useEffect(() => {
+    if (!menu) return
+    const close = (): void => setMenu(null)
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMenu(null)
+    }
+    window.addEventListener('click', close)
+    window.addEventListener('blur', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('blur', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu])
+
+  const favicon = (t: TabMeta): JSX.Element => {
+    if (t.discarded) {
+      return (
+        <div
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 3,
+            background: '#2a2d35',
+            color: '#565b66',
+            fontSize: 9,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}
+          title="Unloaded to save memory"
+        >
+          z
+        </div>
+      )
+    }
+    if (t.favicon) {
+      return <img src={t.favicon} width="14" height="14" style={{ borderRadius: 3, flexShrink: 0 }} alt="" />
     }
     return (
       <div
@@ -28,10 +73,30 @@ export default function TabStrip(): JSX.Element {
           flexShrink: 0
         }}
       >
-        {/^aether:/i.test(url) ? '✦' : '·'}
+        {/^aether:/i.test(t.url) ? '✦' : '·'}
       </div>
     )
   }
+
+  const menuItems = (t: TabMeta): Array<{ label: string; action?: () => void; sep?: boolean; disabled?: boolean }> => [
+    { label: 'Reload', action: () => window.aether.tabs.reload(t.id), disabled: t.discarded },
+    { label: 'Duplicate tab', action: () => window.aether.tabs.duplicate(t.id), disabled: t.discarded },
+    { label: t.pinned ? 'Unpin tab' : 'Pin tab', action: () => window.aether.tabs.setPinned(t.id, !t.pinned) },
+    {
+      label: t.muted ? 'Unmute tab' : 'Mute tab',
+      action: () => window.aether.tabs.toggleMuted(t.id),
+      disabled: t.discarded
+    },
+    {
+      label: 'Discard (free memory)',
+      action: () => window.aether.tabs.discard(t.id),
+      disabled: t.discarded || t.pinned || t.id === activeId
+    },
+    { label: '', sep: true },
+    { label: 'Close tab', action: () => window.aether.tabs.close(t.id) },
+    { label: 'Close other tabs', action: () => window.aether.tabs.closeOthers(t.id) },
+    { label: 'Close tabs to the right', action: () => window.aether.tabs.closeRight(t.id) }
+  ]
 
   return (
     <div className={`tabstrip ${isMac ? 'pad-mac' : ''}`}>
@@ -39,8 +104,10 @@ export default function TabStrip(): JSX.Element {
         {tabs.map((t, idx) => (
           <div
             key={t.id}
-            className={`tab ${t.id === activeId ? 'active' : ''}`}
-            draggable
+            className={`tab ${t.id === activeId ? 'active' : ''} ${t.pinned ? 'pinned' : ''} ${
+              t.discarded ? 'discarded' : ''
+            }`}
+            draggable={!t.pinned}
             onDragStart={(e) => {
               dragIdx.current = idx
               e.dataTransfer.effectAllowed = 'move'
@@ -62,20 +129,38 @@ export default function TabStrip(): JSX.Element {
             onAuxClick={(e) => {
               if (e.button === 1) window.aether.tabs.close(t.id)
             }}
-            title={t.title}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setMenu({ x: e.clientX, y: e.clientY, tab: t })
+            }}
+            title={
+              t.discarded
+                ? `${t.title}\nUnloaded to save memory — click to reload`
+                : t.muted
+                  ? `${t.title}\nMuted`
+                  : t.title
+            }
           >
-            {favicon(t.url, t.favicon)}
-            <span className="tab-title">{t.loading ? 'Loading…' : t.title || 'New Tab'}</span>
-            <button
-              className="tab-close"
-              onClick={(e) => {
-                e.stopPropagation()
-                window.aether.tabs.close(t.id)
-              }}
-              title="Close tab"
-            >
-              <IconClose size={11} />
-            </button>
+            {favicon(t)}
+            {!t.pinned && (
+              <span className="tab-title">
+                {t.loading ? 'Loading…' : t.discarded ? `${t.title} (unloaded)` : t.title || 'New Tab'}
+              </span>
+            )}
+            {t.muted && <span className="tab-muted" title="Muted">🔇</span>}
+            {t.audible && !t.muted && <span className="tab-audible" title="Playing audio">♪</span>}
+            {!t.pinned && (
+              <button
+                className="tab-close"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.aether.tabs.close(t.id)
+                }}
+                title="Close tab"
+              >
+                <IconClose size={11} />
+              </button>
+            )}
           </div>
         ))}
         <button className="icon-btn new-tab" onClick={() => window.aether.tabs.create()} title="New tab (Ctrl+T)">
@@ -102,6 +187,27 @@ export default function TabStrip(): JSX.Element {
         </div>
       )}
       <div className="tabstrip-drag" />
+      {menu && (
+        <div className="tab-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          {menuItems(menu.tab).map((item, i) =>
+            item.sep ? (
+              <div key={i} className="tab-menu-sep" />
+            ) : (
+              <button
+                key={i}
+                className="tab-menu-item"
+                disabled={item.disabled}
+                onClick={() => {
+                  item.action?.()
+                  setMenu(null)
+                }}
+              >
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }

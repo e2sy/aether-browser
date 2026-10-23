@@ -22,7 +22,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
-        run: node scripts/test-v04.mjs
+        run: |
+          node scripts/test-v04.mjs
+          node scripts/test-v10.mjs
       - name: Build
         run: npm run build
       - name: Headless smoke test (Linux only)

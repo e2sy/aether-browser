@@ -50,6 +50,18 @@ export default function Toolbar(): JSX.Element {
         e.preventDefault()
         toggleSidebar()
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        void window.aether.tabs.zoom('in')
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault()
+        void window.aether.tabs.zoom('out')
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault()
+        void window.aether.tabs.zoom('reset')
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -203,6 +215,8 @@ export default function Toolbar(): JSX.Element {
           </div>
         )}
       </div>
+
+      <browser-action-list />
 
       <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+Shift+A)">
         <IconSidebar />

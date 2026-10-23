@@ -59,6 +59,48 @@ export function deleteMacro(id: string): void {
   store.save()
 }
 
+/** Edit a saved macro: rename and/or modify steps (macro editor). */
+export function updateMacro(
+  id: string,
+  patch: { name?: string; task?: string; steps?: MacroStep[] }
+): { macro?: Macro; error?: string } {
+  const m = getMacro(String(id || ''))
+  if (!m) return { error: 'Macro not found' }
+
+  if (patch.name !== undefined) {
+    const cleanName = String(patch.name || '').trim().slice(0, 60)
+    if (!cleanName) return { error: 'Macro needs a name' }
+    m.name = cleanName
+  }
+  if (patch.task !== undefined) m.task = String(patch.task || '').slice(0, 500)
+
+  if (patch.steps !== undefined) {
+    const steps = Array.isArray(patch.steps) ? patch.steps : []
+    if (steps.length === 0) return { error: 'Macro needs at least one step' }
+    if (steps.length > MAX_STEPS) return { error: `Too many steps (${steps.length}, max ${MAX_STEPS})` }
+    const allowedTools = new Set(['navigate', 'click', 'type', 'press_key', 'scroll', 'go_back'])
+    const clean: MacroStep[] = []
+    for (const st of steps) {
+      if (!st || !allowedTools.has(String(st.tool))) continue
+      let args: Record<string, unknown> = {}
+      try {
+        args = typeof st.args === 'object' && st.args !== null ? JSON.parse(JSON.stringify(st.args)) : {}
+      } catch {
+        continue
+      }
+      if (JSON.stringify(args).length > 4096) continue
+      clean.push({ tool: String(st.tool), args })
+    }
+    if (!clean.length) {
+      return { error: 'No replayable steps (only navigate/click/type/press_key/scroll/go_back are allowed)' }
+    }
+    m.steps = clean
+  }
+
+  store.save()
+  return { macro: m }
+}
+
 export function markRun(id: string): void {
   const m = getMacro(id)
   if (m) {
