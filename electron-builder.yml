@@ -1,0 +1,21 @@
+appId: dev.aether.browser
+productName: Aether
+directories:
+  output: release
+files:
+  - out/**
+asar: true
+npmRebuild: false
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  category: Utility
+  target:
+    - AppImage
+    - deb

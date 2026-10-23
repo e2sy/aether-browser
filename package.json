@@ -1,0 +1,37 @@
+{
+  "name": "aether-browser",
+  "version": "0.1.0",
+  "description": "Open-source AI browser — full Chromium compatibility, powered entirely by your local Ollama model",
+  "main": "out/main/index.js",
+  "author": "Aether Browser contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder",
+    "dist:dir": "electron-vite build && electron-builder --dir"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "jsdom": "^24.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "turndown": "^7.1.2",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/turndown": "^5.0.5",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^45.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^3.0.0",
+    "typescript": "^5.5.4",
+    "vite": "^6.0.0"
+  }
+}
