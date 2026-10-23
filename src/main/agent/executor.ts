@@ -1,27 +1,38 @@
-import { WebContentsView, WebContents } from 'electron'
+import { WebContentsView, WebContents, app } from 'electron'
 import { randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { chatOnce, friendlyError, pickDefaultModel, OllamaMessage } from '../ollama'
 import { settings } from '../store'
 import { extractPage } from '../extract'
 import { AGENT_SYSTEM } from './prompts'
 import { TOOLS, MUTATING_TOOLS, executeTool, ExecContext } from './tools'
 import { snapshotPage, formatSnapshot } from './serializer'
+import type { TabManager } from '../tabs'
 import type { AgentEventType, ToolCallArgs } from '../../shared/types'
 
 const MAX_STEPS = 12
 const CONFIRM_TIMEOUT_MS = 120_000
+const ANSWER_TIMEOUT_MS = 180_000
 
 export class AgentRunner {
   private aborts = new Map<string, AbortController>()
   private confirms = new Map<string, (ok: boolean) => void>()
+  private asks = new Map<string, (answer: string | null) => void>()
 
   cancel(requestId: string): void {
     this.aborts.get(requestId)?.abort()
     this.confirms.get(requestId)?.(false)
+    this.asks.get(requestId)?.(null)
   }
 
   respondConfirm(requestId: string, approved: boolean): void {
     this.confirms.get(requestId)?.(approved)
+  }
+
+  answer(requestId: string, text: string): void {
+    const t = text.trim()
+    this.asks.get(requestId)?.(t ? t.slice(0, 500) : null)
   }
 
   private waitConfirm(requestId: string): Promise<boolean> {
@@ -38,7 +49,21 @@ export class AgentRunner {
     })
   }
 
-  async run(task: string, view: WebContentsView, sender: WebContents): Promise<void> {
+  private waitAnswer(requestId: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.asks.delete(requestId)
+        resolve(null)
+      }, ANSWER_TIMEOUT_MS)
+      this.asks.set(requestId, (answer: string | null) => {
+        clearTimeout(timer)
+        this.asks.delete(requestId)
+        resolve(answer)
+      })
+    })
+  }
+
+  async run(task: string, view: WebContentsView, tm: TabManager, sender: WebContents): Promise<void> {
     const requestId = randomUUID().replace(/-/g, '').slice(0, 10)
     const ctrl = new AbortController()
     this.aborts.set(requestId, ctrl)
@@ -90,10 +115,10 @@ export class AgentRunner {
             if (!ok) {
               result = 'The user DENIED this action. Do not retry it; ask the user how to proceed or finish with done.'
             } else {
-              result = await this.exec(name, args, view, ctrl.signal)
+              result = await this.exec(name, args, view, tm, emit, requestId, ctrl.signal)
             }
           } else {
-            result = await this.exec(name, args, view, ctrl.signal)
+            result = await this.exec(name, args, view, tm, emit, requestId, ctrl.signal)
           }
 
           if (result.startsWith('OK') && MUTATING_TOOLS.has(name)) mutated = true
@@ -120,6 +145,7 @@ export class AgentRunner {
     } finally {
       this.aborts.delete(requestId)
       this.confirms.delete(requestId)
+      this.asks.delete(requestId)
     }
   }
 
@@ -127,6 +153,9 @@ export class AgentRunner {
     name: string,
     args: ToolCallArgs,
     view: WebContentsView,
+    tm: TabManager,
+    emit: (type: AgentEventType, extra?: Record<string, unknown>) => void,
+    requestId: string,
     signal: AbortSignal
   ): Promise<string> {
     const wc = view.webContents
@@ -234,6 +263,40 @@ export class AgentRunner {
         } catch (err) {
           return `FAILED: ${err instanceof Error ? err.message : String(err)}`
         }
+      },
+      listTabs: async () => {
+        const rows = tm
+          .listIds()
+          .map((id) => {
+            const t = tm.get(id)
+            const mark = id === tm.activeId ? ' (current)' : ''
+            return t ? `#${id}${mark} ${t.title} — ${t.url}` : ''
+          })
+          .filter(Boolean)
+        return rows.length ? `OK: open tabs:\n${rows.join('\n')}` : 'OK: no other tabs open'
+      },
+      screenshot: async () => {
+        try {
+          const image = await wc.capturePage()
+          const dir = path.join(app.getPath('userData'), 'screenshots')
+          fs.mkdirSync(dir, { recursive: true })
+          const file = path.join(dir, `agent-${Date.now()}.png`)
+          fs.writeFileSync(file, image.toPNG())
+          const size = image.getSize()
+          return `OK: screenshot saved to ${file} (${size.width}x${size.height})`
+        } catch (err) {
+          return `FAILED: ${err instanceof Error ? err.message : String(err)}`
+        }
+      },
+      askUser: async (a: ToolCallArgs) => {
+        const question = String(a.question || '').trim().slice(0, 500)
+        if (!question) return 'FAILED: empty question'
+        emit('ask_user', { data: question })
+        const answer = await this.waitAnswer(requestId)
+        if (answer === null) {
+          return 'No user answer (timeout or skipped). Proceed with your best judgment, or call done and explain what you need.'
+        }
+        return `OK: the user replied: "${answer}"`
       }
     }
 

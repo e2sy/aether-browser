@@ -15,6 +15,11 @@ interface ConfirmState {
   args: Record<string, unknown>
 }
 
+interface AskState {
+  requestId: string
+  question: string
+}
+
 export default function Sidebar(): JSX.Element {
   const tab = useActiveTab()
   const settings = useApp((s) => s.settings)
@@ -39,6 +44,8 @@ export default function Sidebar(): JSX.Element {
   const [log, setLog] = useState<LogEntry[]>([])
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
   const [agentReq, setAgentReq] = useState<string | null>(null)
+  const [askState, setAskState] = useState<AskState | null>(null)
+  const [askInput, setAskInput] = useState('')
   const canUsePage = Boolean(tab && /^https?:/i.test(tab.url))
 
   // ----- init: health, models, settings -----
@@ -85,23 +92,31 @@ export default function Sidebar(): JSX.Element {
       if (ev.type === 'start') {
         setAgentReq(ev.requestId)
         setRunning(true)
+        setAskState(null)
+        setConfirmState(null)
         setLog([{ kind: 'info', text: `Agent started with model: ${(ev.data as { model?: string })?.model || 'default'}` }])
       } else if (ev.type === 'step') {
         const res = (ev.data as { result?: string })?.result || ''
         setLog((l) => [...l, { kind: 'step', tool: ev.tool, text: describe(ev.tool, ev.args) + (res ? `  → ${res.slice(0, 160)}` : '') }])
       } else if (ev.type === 'confirm') {
         setConfirmState({ requestId: ev.requestId, tool: ev.tool || '', args: ev.args || {} })
+      } else if (ev.type === 'ask_user') {
+        setAskState({ requestId: ev.requestId, question: String((ev.data as string) || '') })
+        setAskInput('')
       } else if (ev.type === 'done') {
         setRunning(false)
         setConfirmState(null)
+        setAskState(null)
         setLog((l) => [...l, { kind: 'answer', text: String((ev.data as { answer?: string })?.answer || 'Done.') }])
       } else if (ev.type === 'error') {
         setRunning(false)
         setConfirmState(null)
+        setAskState(null)
         setLog((l) => [...l, { kind: 'error', text: String(ev.data) }])
       } else if (ev.type === 'cancelled') {
         setRunning(false)
         setConfirmState(null)
+        setAskState(null)
         setLog((l) => [...l, { kind: 'info', text: 'Agent stopped.' }])
       }
     })
@@ -172,6 +187,21 @@ export default function Sidebar(): JSX.Element {
     },
     [confirmState]
   )
+
+  const submitAnswer = useCallback((): void => {
+    if (askState) {
+      window.aether.agent.answer(askState.requestId, askInput)
+      setAskState(null)
+      setAskInput('')
+    }
+  }, [askState, askInput])
+
+  const skipAnswer = useCallback((): void => {
+    if (askState) {
+      window.aether.agent.answer(askState.requestId, '')
+      setAskState(null)
+    }
+  }, [askState])
 
   return (
     <div className="sidebar">
@@ -319,6 +349,31 @@ export default function Sidebar(): JSX.Element {
               </div>
             ))}
           </div>
+          {askState && (
+            <div className="ask">
+              <div className="ask-title">
+                The agent asks: <b>{askState.question}</b>
+              </div>
+              <div className="composer-row">
+                <input
+                  className="task"
+                  autoFocus
+                  value={askInput}
+                  placeholder="Your answer…"
+                  onChange={(e) => setAskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitAnswer()
+                  }}
+                />
+                <button className="send" onClick={submitAnswer} title="Answer">
+                  <IconSend size={15} />
+                </button>
+              </div>
+              <button className="ask-skip" onClick={skipAnswer}>
+                Skip — let the agent decide
+              </button>
+            </div>
+          )}
           {confirmState && (
             <div className="confirm">
               <div className="confirm-title">
@@ -349,6 +404,11 @@ function describe(tool?: string, args?: Record<string, unknown>): string {
   if (tool === 'find_text') return `→ "${args?.query}"`
   if (tool === 'scroll') return `→ ${args?.direction}`
   if (tool === 'read_page') return '→ extracting page'
+  if (tool === 'list_tabs') return '→ listing open tabs'
+  if (tool === 'screenshot') return '→ saving screenshot'
+  if (tool === 'ask_user') return `→ "${String(args?.question || '').slice(0, 80)}"`
+  if (tool === 'press_key') return `→ ${args?.key}`
+  if (tool === 'go_back') return '→ back'
   return ''
 }
 

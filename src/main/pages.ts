@@ -50,7 +50,7 @@ export const NEW_TAB_HTML = pageShell(
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
-    Aether Browser 0.1.0 — local AI, open source
+    Aether Browser 0.2.0 — local AI, open source
   </div>
   `,
   `
@@ -173,5 +173,255 @@ export const SEARCH_HTML = pageShell(
   })
   var params = new URLSearchParams(location.search)
   run(params.get('q'))
+  `
+)
+
+/* ------------------------------------------------------------------ */
+/* Shared manager-page helpers (history / bookmarks / settings)        */
+/* ------------------------------------------------------------------ */
+
+const MGR_CSS = `
+  .wrap { width:min(760px,92vw); margin-top:7vh; padding-bottom:60px; }
+  .head { display:flex; align-items:center; gap:14px; margin-bottom:22px; }
+  .head h1 { font-size:20px; font-weight:700; letter-spacing:-0.02em; margin-right:auto; }
+  .head input { flex:none; width:280px; padding:10px 14px; font-size:13px; color:#e8eaf0;
+    background:#1e2026; border:1px solid #2e313a; border-radius:10px; outline:none; }
+  .head input:focus { border-color:#7c8cff; }
+  .muted-btn { padding:9px 14px; font-size:12px; color:#ff8a8a; background:transparent;
+    border:1px solid #3a2a2a; border-radius:10px; cursor:pointer; }
+  .muted-btn:hover { background:#2a1c1c; }
+  .rows { display:flex; flex-direction:column; gap:6px; }
+  .row { display:flex; align-items:center; gap:12px; padding:11px 14px;
+    background:#1a1c21; border:1px solid #2e313a; border-radius:10px; cursor:pointer; }
+  .row:hover { border-color:#3d4150; }
+  .row .ic { width:30px; height:30px; border-radius:8px; background:#7c8cff22; color:#7c8cff;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:none; }
+  .row .meta { min-width:0; flex:1; }
+  .row .t { font-size:13px; color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .u { font-size:11px; color:#7d828f; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .row .when { font-size:11px; color:#565b66; flex:none; }
+  .row .del { flex:none; width:26px; height:26px; border:none; border-radius:7px; background:transparent;
+    color:#565b66; font-size:14px; cursor:pointer; }
+  .row .del:hover { background:#2a1c1c; color:#ff8a8a; }
+  .empty2 { color:#565b66; font-size:13px; padding:30px 4px; text-align:center; }
+  .none { border:none; background:transparent; color:#9aa0ae; cursor:default; }
+`
+
+function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string): string {
+  const clearBtn = withClear ? '<button class="muted-btn" id="clear">Clear all</button>' : ''
+  return pageShell(
+    title,
+    `
+    <div class="wrap">
+      <div class="head">
+        <h1>${heading}</h1>
+        <input id="q" type="text" placeholder="Search…" />
+        ${clearBtn}
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="empty2" id="empty" style="display:none">Nothing here yet.</div>
+    </div>
+    <style>${MGR_CSS}</style>
+    `,
+    script
+  )
+}
+
+export const HISTORY_HTML = mgrShell(
+  'History',
+  'History',
+  true,
+  '',
+  `
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  function when(ts) {
+    var d = new Date(ts), today = new Date()
+    var hm = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes()
+    if (d.toDateString() === today.toDateString()) return hm
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm
+  }
+  var current = []
+  function render(items) {
+    current = items
+    var rows = document.getElementById('rows')
+    rows.innerHTML = ''
+    document.getElementById('empty').style.display = items.length ? 'none' : 'block'
+    items.forEach(function (h) {
+      var row = document.createElement('div'); row.className = 'row'
+      var ic = document.createElement('div'); ic.className = 'ic none'
+      ic.textContent = (h.host || '?').replace(/^www\\./, '').charAt(0).toUpperCase()
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(h.title || h.url); t.className = 't'
+      var u = esc(h.url); u.className = 'u'
+      meta.appendChild(t); meta.appendChild(u)
+      var w = document.createElement('div'); w.className = 'when'; w.textContent = when(h.ts)
+      var del = document.createElement('button'); del.className = 'del'; del.textContent = '\\u00d7'
+      del.title = 'Remove from history'
+      del.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.history.remove(h.url)
+        render(current.filter(function (x) { return x.url !== h.url }))
+      })
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(w); row.appendChild(del)
+      row.addEventListener('click', function () { window.aether.internal.open(h.url) })
+      rows.appendChild(row)
+    })
+  }
+  function load() { window.aether.history.search(document.getElementById('q').value).then(render) }
+  document.getElementById('q').addEventListener('input', load)
+  document.getElementById('clear').addEventListener('click', function () {
+    if (confirm('Clear ALL browsing history?')) { window.aether.history.clear(); render([]) }
+  })
+  load()
+  `
+)
+
+export const BOOKMARKS_HTML = mgrShell(
+  'Bookmarks',
+  'Bookmarks',
+  false,
+  '',
+  `
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  var current = []
+  function render(items) {
+    current = items
+    var rows = document.getElementById('rows')
+    rows.innerHTML = ''
+    document.getElementById('empty').style.display = items.length ? 'none' : 'block'
+    document.getElementById('empty').textContent = items.length ? '' : 'No bookmarks yet — use the star in the toolbar.'
+    items.forEach(function (b) {
+      var row = document.createElement('div'); row.className = 'row'
+      var host = ''
+      try { host = new URL(b.url).hostname } catch (err) { host = '?' }
+      var ic = document.createElement('div'); ic.className = 'ic none'
+      ic.textContent = host.replace(/^www\\./, '').charAt(0).toUpperCase()
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(b.title || b.url); t.className = 't'
+      var u = esc(b.url); u.className = 'u'
+      meta.appendChild(t); meta.appendChild(u)
+      var del = document.createElement('button'); del.className = 'del'; del.textContent = '\\u00d7'
+      del.title = 'Remove bookmark'
+      del.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.bookmarks.remove(b.url)
+        render(current.filter(function (x) { return x.url !== b.url }))
+      })
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(del)
+      row.addEventListener('click', function () { window.aether.internal.open(b.url) })
+      rows.appendChild(row)
+    })
+  }
+  function load() { window.aether.bookmarks.search(document.getElementById('q').value).then(render) }
+  document.getElementById('q').addEventListener('input', load)
+  load()
+  `
+)
+
+export const SETTINGS_HTML = pageShell(
+  'Settings',
+  `
+  <div class="wrap" style="width:min(620px,92vw)">
+    <div class="head"><h1>Settings</h1><span id="health" style="font-size:12px;color:#7d828f"></span></div>
+
+    <div class="sec">
+      <div class="label">Local model (Ollama)</div>
+      <select id="model" style="width:100%"></select>
+      <div class="hint">Installed models appear here automatically. Get more: <span class="mono">ollama pull qwen3.5:9b</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Address bar searches use</div>
+      <div class="opts">
+        <label><input type="radio" name="sm" value="ai" /> Aether AI search (private, cited)</label>
+        <label><input type="radio" name="sm" value="google" /> Google</label>
+        <label><input type="radio" name="sm" value="duckduckgo" /> DuckDuckGo</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Behavior</div>
+      <div class="opts">
+        <label><input type="checkbox" id="confirmAgentActions" /> Agent asks before every action</label>
+        <label><input type="checkbox" id="usePageContext" /> Sidebar chat sees the current page</label>
+        <label><input type="checkbox" id="adblock" /> Block ads &amp; trackers (EasyList + EasyPrivacy)</label>
+        <label><input type="checkbox" id="stripElectronUA" /> Identify as regular Chrome (better Google / YouTube compatibility)</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Data</div>
+      <div class="opts row-btns">
+        <button class="muted-btn" id="clearHistory">Clear browsing history</button>
+        <button class="muted-btn" id="clearBookmarks">Remove all bookmarks</button>
+      </div>
+    </div>
+
+    <div class="hint" style="margin-top:26px">Aether 0.2.0 — everything is stored locally on this device.</div>
+  </div>
+  <style>
+    .sec { margin-bottom:24px; }
+    .label { font-size:12px; letter-spacing:.08em; color:#9aa0ae; margin-bottom:10px; }
+    .opts { display:flex; flex-direction:column; gap:9px; }
+    .opts label { font-size:13px; color:#e8eaf0; display:flex; align-items:center; gap:9px; cursor:pointer; }
+    .opts input { accent-color:#5b6cff; width:14px; height:14px; }
+    .row-btns { flex-direction:row; gap:10px; }
+    .hint { font-size:11.5px; color:#7d828f; line-height:1.6; }
+    .mono { font-family:monospace; color:#7c8cff; }
+    select { padding:10px 12px; font-size:13px; color:#e8eaf0; background:#1e2026;
+      border:1px solid #2e313a; border-radius:10px; outline:none; }
+  </style>
+  `,
+  `
+  function load() {
+    window.aether.settings.get().then(function (s) {
+      document.getElementById('model').value = s.model || ''
+      var radios = document.querySelectorAll('input[name=sm]')
+      for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === s.searchMode
+      document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
+      document.getElementById('usePageContext').checked = !!s.usePageContext
+      document.getElementById('adblock').checked = !!s.adblock
+      document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
+    })
+    window.aether.ai.health().then(function (h) {
+      document.getElementById('health').textContent = h.ok ? '● Ollama connected' : '● Ollama not reachable'
+      document.getElementById('health').style.color = h.ok ? '#4ade80' : '#ff6b6b'
+    })
+    window.aether.ai.models().then(function (m) {
+      var sel = document.getElementById('model')
+      sel.innerHTML = ''
+      var models = m.models || []
+      if (!models.length) {
+        var o = document.createElement('option'); o.value = ''; o.textContent = '(no models installed yet)'
+        sel.appendChild(o); return
+      }
+      models.forEach(function (name) {
+        var o = document.createElement('option'); o.value = name; o.textContent = name
+        sel.appendChild(o)
+      })
+      window.aether.settings.get().then(function (s) { sel.value = s.model || models[0] })
+    })
+  }
+  function save(patch) { window.aether.settings.set(patch) }
+  document.getElementById('model').addEventListener('change', function (e) { save({ model: e.target.value || null }) })
+  var radios = document.querySelectorAll('input[name=sm]')
+  for (var i = 0; i < radios.length; i++) {
+    radios[i].addEventListener('change', function (e) { if (e.target.checked) save({ searchMode: e.target.value }) })
+  }
+  document.getElementById('confirmAgentActions').addEventListener('change', function (e) { save({ confirmAgentActions: e.target.checked }) })
+  document.getElementById('usePageContext').addEventListener('change', function (e) { save({ usePageContext: e.target.checked }) })
+  document.getElementById('adblock').addEventListener('change', function (e) { save({ adblock: e.target.checked }) })
+  document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
+  document.getElementById('clearHistory').addEventListener('click', function () {
+    if (confirm('Clear ALL browsing history?')) window.aether.history.clear()
+  })
+  document.getElementById('clearBookmarks').addEventListener('click', function () {
+    if (confirm('Remove ALL bookmarks?')) {
+      window.aether.bookmarks.search('').then(function (list) {
+        list.forEach(function (b) { window.aether.bookmarks.remove(b.url) })
+      })
+    }
+  })
+  load()
   `
 )

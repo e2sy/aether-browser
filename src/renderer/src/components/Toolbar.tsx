@@ -2,6 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar } from './Icons'
 
+interface Sug {
+  kind: 'search' | 'url' | 'history' | 'bookmark'
+  label: string
+  sub?: string
+  value: string
+}
+
+const KIND_ICON: Record<Sug['kind'], string> = {
+  search: '✦',
+  url: '↗',
+  history: '🕘',
+  bookmark: '★'
+}
+
+const DOMAINISH = /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/
+
 export default function Toolbar(): JSX.Element {
   const tab = useActiveTab()
   const sidebarOpen = useApp((s) => s.sidebarOpen)
@@ -9,7 +25,11 @@ export default function Toolbar(): JSX.Element {
   const [omnibox, setOmnibox] = useState('')
   const [focused, setFocused] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
+  const [sugs, setSugs] = useState<Sug[]>([])
+  const [sugIdx, setSugIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!focused) setOmnibox(tab?.url === 'aether://newtab' ? '' : tab?.url || '')
@@ -41,10 +61,47 @@ export default function Toolbar(): JSX.Element {
     void window.aether.ui.setSidebar(next)
   }
 
-  const commit = (): void => {
-    const text = omnibox.trim()
+  const refreshSuggestions = (q: string): void => {
+    if (suggestTimer.current) clearTimeout(suggestTimer.current)
+    const text = q.trim()
+    if (!text) {
+      setSugs([])
+      setSugIdx(-1)
+      return
+    }
+    suggestTimer.current = setTimeout(async () => {
+      try {
+        const { history, bookmarks } = (await window.aether.omnibox.suggest(text)) as {
+          history: Array<{ url: string; title: string; host: string }>
+          bookmarks: Array<{ url: string; title: string }>
+        }
+        const out: Sug[] = [{ kind: 'search', label: `Search for “${text}”`, sub: 'address bar search', value: text }]
+        if (!/\s/.test(text) && DOMAINISH.test(text)) {
+          out.push({ kind: 'url', label: `Go to ${text}`, sub: 'open URL', value: text })
+        }
+        for (const h of history) {
+          if (out.length >= 7) break
+          out.push({ kind: 'history', label: h.title || h.url, sub: h.host, value: h.url })
+        }
+        for (const b of bookmarks) {
+          if (out.some((s) => s.value === b.url)) continue
+          if (out.length >= 8) break
+          out.push({ kind: 'bookmark', label: b.title || b.url, sub: 'bookmark', value: b.url })
+        }
+        setSugs(out)
+        setSugIdx(-1)
+      } catch {
+        setSugs([])
+      }
+    }, 110)
+  }
+
+  const commitValue = (value?: string): void => {
+    const text = (value !== undefined ? value : omnibox).trim()
     if (text && tab) {
       window.aether.tabs.omnibox(tab.id, text)
+      setSugs([])
+      setSugIdx(-1)
       inputRef.current?.blur()
       setFocused(false)
     }
@@ -55,6 +112,8 @@ export default function Toolbar(): JSX.Element {
     const now = await window.aether.bookmarks.toggle({ url: tab.url, title: tab.title })
     setBookmarked(now)
   }
+
+  const pickSug = (s: Sug): void => commitValue(s.value)
 
   return (
     <div className="toolbar">
@@ -81,16 +140,35 @@ export default function Toolbar(): JSX.Element {
         <input
           ref={inputRef}
           value={omnibox}
-          placeholder={focused ? 'Search with Aether AI or enter a URL' : ''}
-          onChange={(e) => setOmnibox(e.target.value)}
+          placeholder={focused ? 'Search, or enter a URL — ↑↓ to pick a suggestion' : ''}
+          onChange={(e) => {
+            setOmnibox(e.target.value)
+            refreshSuggestions(e.target.value)
+          }}
           onFocus={(e) => {
+            if (blurTimer.current) clearTimeout(blurTimer.current)
             setFocused(true)
             e.currentTarget.select()
           }}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            blurTimer.current = setTimeout(() => {
+              setFocused(false)
+              setSugs([])
+              setSugIdx(-1)
+            }, 160)
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commit()
-            if (e.key === 'Escape') {
+            if (e.key === 'ArrowDown' && sugs.length) {
+              e.preventDefault()
+              setSugIdx((i) => (i + 1) % sugs.length)
+            } else if (e.key === 'ArrowUp' && sugs.length) {
+              e.preventDefault()
+              setSugIdx((i) => (i - 1 + sugs.length) % sugs.length)
+            } else if (e.key === 'Enter') {
+              commitValue(sugIdx >= 0 && sugs[sugIdx] ? sugs[sugIdx].value : undefined)
+            } else if (e.key === 'Escape') {
+              setSugs([])
+              setSugIdx(-1)
               inputRef.current?.blur()
               setFocused(false)
             }
@@ -105,6 +183,25 @@ export default function Toolbar(): JSX.Element {
         >
           <IconStar filled={bookmarked} size={14} />
         </button>
+        {focused && sugs.length > 0 && (
+          <div className="omni-suggest">
+            {sugs.map((s, i) => (
+              <div
+                key={`${s.kind}-${s.value}-${i}`}
+                className={`sug-item ${i === sugIdx ? 'on' : ''}`}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  pickSug(s)
+                }}
+                onMouseEnter={() => setSugIdx(i)}
+              >
+                <span className={`sug-ico ${s.kind}`}>{KIND_ICON[s.kind]}</span>
+                <span className="sug-label">{s.label}</span>
+                {s.sub && <span className="sug-sub">{s.sub}</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+Shift+A)">

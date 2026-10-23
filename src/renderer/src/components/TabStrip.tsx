@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import { useApp } from '../state/store'
 import { IconClose, IconPlus } from './Icons'
 
 export default function TabStrip(): JSX.Element {
   const { tabs, activeId, maximized } = useApp()
   const set = useApp((s) => s.set)
+  const dragIdx = useRef<number | null>(null)
   const isMac = window.aether.platform === 'darwin'
   const isWinLike = !isMac
 
@@ -34,10 +36,28 @@ export default function TabStrip(): JSX.Element {
   return (
     <div className={`tabstrip ${isMac ? 'pad-mac' : ''}`}>
       <div className="tabs">
-        {tabs.map((t) => (
+        {tabs.map((t, idx) => (
           <div
             key={t.id}
             className={`tab ${t.id === activeId ? 'active' : ''}`}
+            draggable
+            onDragStart={(e) => {
+              dragIdx.current = idx
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', String(idx))
+            }}
+            onDragOver={(e) => {
+              if (dragIdx.current !== null && dragIdx.current !== idx) e.preventDefault()
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              const from = dragIdx.current
+              dragIdx.current = null
+              if (from !== null && from !== idx) window.aether.tabs.reorder(from, idx)
+            }}
+            onDragEnd={() => {
+              dragIdx.current = null
+            }}
             onClick={() => window.aether.tabs.activate(t.id)}
             onAuxClick={(e) => {
               if (e.button === 1) window.aether.tabs.close(t.id)

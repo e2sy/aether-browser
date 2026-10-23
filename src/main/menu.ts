@@ -14,6 +14,12 @@ export function buildMenu(deps: Deps): Menu {
     const id = activeId()
     if (tm && id !== null) fn(tm, id)
   }
+  const openInternal = (url: string): void => {
+    const tm = tabs()
+    const id = activeId()
+    if (tm && id !== null) tm.navigate(id, url)
+    else tm?.create(url)
+  }
 
   const template: MenuItemConstructorOptions[] = [
     {
@@ -24,6 +30,12 @@ export function buildMenu(deps: Deps): Menu {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click: () => withActive((tm, id) => tm.close(id))
+        },
+        { type: 'separator' },
+        {
+          label: 'Settings',
+          accelerator: 'CmdOrCtrl+,',
+          click: (): void => openInternal('aether://settings')
         },
         { type: 'separator' },
         { role: 'quit' }
@@ -70,6 +82,17 @@ export function buildMenu(deps: Deps): Menu {
           label: 'Forward',
           accelerator: 'Alt+Right',
           click: () => withActive((tm, id) => tm.forward(id))
+        },
+        { type: 'separator' },
+        {
+          label: 'Browse History',
+          accelerator: 'CmdOrCtrl+H',
+          click: (): void => openInternal('aether://history')
+        },
+        {
+          label: 'Bookmarks',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: (): void => openInternal('aether://bookmarks')
         }
       ]
     },
@@ -87,7 +110,7 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '0.1.0',
+              applicationVersion: '0.2.0',
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()

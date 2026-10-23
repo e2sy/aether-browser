@@ -36,7 +36,14 @@ export const DEFAULT_SETTINGS: Settings = {
   model: null,
   usePageContext: true,
   confirmAgentActions: true,
-  searchMode: 'ai'
+  searchMode: 'ai',
+  adblock: true,
+  stripElectronUA: true
+}
+
+/** Settings with defaults merged in (older settings.json files may miss keys). */
+export function mergedSettings(): Settings {
+  return { ...DEFAULT_SETTINGS, ...settings.data }
 }
 
 export const settings = new JsonStore<Settings>('settings.json', DEFAULT_SETTINGS)
@@ -63,6 +70,53 @@ export function addHistory(url: string, title: string): void {
 
 export function recentHistory(n = 12): HistoryEntry[] {
   return history.data.slice(0, n)
+}
+
+export function searchHistory(q: string, n = 300): HistoryEntry[] {
+  const t = q.trim().toLowerCase()
+  if (!t) return history.data.slice(0, n)
+  return history.data
+    .filter((h) => h.url.toLowerCase().includes(t) || h.title.toLowerCase().includes(t))
+    .slice(0, n)
+}
+
+export function deleteHistory(url: string): void {
+  history.data = history.data.filter((h) => h.url !== url)
+  history.save()
+}
+
+export function clearHistory(): void {
+  history.data = []
+  history.save()
+}
+
+export function removeBookmark(url: string): void {
+  bookmarks.data = bookmarks.data.filter((b) => b.url !== url)
+  bookmarks.save()
+}
+
+export function searchBookmarks(q: string, n = 200): Bookmark[] {
+  const t = q.trim().toLowerCase()
+  if (!t) return bookmarks.data.slice(0, n)
+  return bookmarks.data
+    .filter((b) => b.url.toLowerCase().includes(t) || b.title.toLowerCase().includes(t))
+    .slice(0, n)
+}
+
+/** Ranked omnibox suggestions: matching history + bookmarks. */
+export function searchOmnibox(q: string, n = 6): { history: HistoryEntry[]; bookmarks: Bookmark[] } {
+  const t = q.trim().toLowerCase()
+  if (!t) return { history: recentHistory(4), bookmarks: [] }
+  const scored = history.data
+    .filter((h) => h.url.toLowerCase().includes(t) || h.title.toLowerCase().includes(t))
+    .map((h, idx) => ({ h, score: (h.title.toLowerCase().includes(t) ? 2 : 0) + Math.max(0, 100 - idx) / 100 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+    .map((s) => s.h)
+  const bms = bookmarks.data
+    .filter((b) => b.url.toLowerCase().includes(t) || b.title.toLowerCase().includes(t))
+    .slice(0, n)
+  return { history: scored, bookmarks: bms }
 }
 
 /** Most visited hosts (by number of distinct page visits recorded). */

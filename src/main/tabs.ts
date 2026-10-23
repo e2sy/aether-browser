@@ -211,6 +211,16 @@ export class TabManager {
     return [...this.order]
   }
 
+  /** Reorder tabs (drag & drop): move the tab at fromIdx to toIdx. */
+  reorder(fromIdx: number, toIdx: number): void {
+    const from = Math.max(0, Math.min(Math.floor(fromIdx), this.order.length - 1))
+    const to = Math.max(0, Math.min(Math.floor(toIdx), this.order.length - 1))
+    if (from === to) return
+    const [id] = this.order.splice(from, 1)
+    this.order.splice(to, 0, id)
+    this.emit()
+  }
+
   /** Push an event to the browser-chrome renderer (tab strip / sidebar UI). */
   sendToChrome(channel: string, payload: unknown): void {
     const wc = this.win.webContents

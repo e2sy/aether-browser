@@ -3,7 +3,23 @@ import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
-import { settings, bookmarks, isBookmarked, toggleBookmark, topSites, recentHistory, DEFAULT_SETTINGS } from './store'
+import {
+  settings,
+  bookmarks,
+  isBookmarked,
+  toggleBookmark,
+  removeBookmark,
+  topSites,
+  recentHistory,
+  searchHistory,
+  searchBookmarks,
+  searchOmnibox,
+  deleteHistory,
+  clearHistory,
+  mergedSettings,
+  DEFAULT_SETTINGS
+} from './store'
+import { applyAdblockSetting } from './adblock'
 import { ollamaHealth, listModels, pickDefaultModel, chatStream, friendlyError, OllamaMessage } from './ollama'
 import { extractPage } from './extract'
 import { webSearch, answerStream } from './search'
@@ -85,6 +101,11 @@ export function registerIpc(deps: Deps): void {
   simple('tabs:reload', (m, id) => m.reload(id))
   simple('tabs:stop', (m, id) => m.stop(id))
 
+  ipcMain.handle('tabs:reorder', (e, from: number, to: number) => {
+    guard(e, win(), 'tabs:reorder')
+    tm()?.reorder(Number(from), Number(to))
+  })
+
   // ---------- window chrome ----------
   ipcMain.handle('ui:setSidebar', (e, open: boolean) => {
     guard(e, win(), 'ui:setSidebar')
@@ -111,13 +132,16 @@ export function registerIpc(deps: Deps): void {
   // ---------- settings / bookmarks / history ----------
   ipcMain.handle('settings:get', (e) => {
     guard(e, win(), 'settings:get')
-    return settings.data
+    return mergedSettings()
   })
   ipcMain.handle('settings:set', (e, patch: Partial<Settings>) => {
     guard(e, win(), 'settings:set')
     settings.data = { ...DEFAULT_SETTINGS, ...settings.data, ...patch }
     settings.save()
-    return settings.data
+    if (patch.adblock !== undefined) {
+      void applyAdblockSetting(Boolean(patch.adblock))
+    }
+    return mergedSettings()
   })
 
   ipcMain.handle('bookmarks:toggle', (e, entry: { url: string; title: string }) => {
@@ -126,17 +150,43 @@ export function registerIpc(deps: Deps): void {
   })
   ipcMain.handle('bookmarks:is', (e, url: string) => isBookmarked(String(url || '')))
   ipcMain.handle('bookmarks:list', (e) => bookmarks.data)
+  ipcMain.handle('bookmarks:remove', (e, url: string) => {
+    guard(e, win(), 'bookmarks:remove')
+    removeBookmark(String(url || ''))
+  })
+  ipcMain.handle('bookmarks:search', (e, q: string) => {
+    guard(e, win(), 'bookmarks:search')
+    return searchBookmarks(String(q || ''), 300)
+  })
   ipcMain.handle('history:recent', (e) => {
     guard(e, win(), 'history:recent')
     return recentHistory(30)
   })
+  ipcMain.handle('history:search', (e, q: string) => {
+    guard(e, win(), 'history:search')
+    return searchHistory(String(q || ''), 300)
+  })
+  ipcMain.handle('history:remove', (e, url: string) => {
+    guard(e, win(), 'history:remove')
+    deleteHistory(String(url || ''))
+  })
+  ipcMain.handle('history:clear', (e) => {
+    guard(e, win(), 'history:clear')
+    clearHistory()
+  })
+  ipcMain.handle('omnibox:suggest', (e, q: string) => {
+    guard(e, win(), 'omnibox:suggest')
+    return searchOmnibox(String(q || ''), 5)
+  })
 
-  // ---------- AI: sidebar chat ----------
-  ipcMain.handle('ai:health', async () => {
+  // ---------- AI: health / models (chrome + internal pages only) ----------
+  ipcMain.handle('ai:health', async (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
     return { ok: await ollamaHealth() }
   })
 
-  ipcMain.handle('ai:models', async () => {
+  ipcMain.handle('ai:models', async (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
     try {
       return { models: await listModels() }
     } catch (err) {
@@ -198,10 +248,11 @@ export function registerIpc(deps: Deps): void {
   // ---------- AI: agent ----------
   ipcMain.handle('agent:run', async (e, task: string) => {
     guard(e, win(), 'agent:run')
-    const view = tm()?.activeView()
-    if (!view) throw new Error('No active tab')
+    const manager = tm()
+    const view = manager?.activeView()
+    if (!manager || !view) throw new Error('No active tab')
     // fire and forget — progress streams via 'agent:event'
-    agentRunner.run(String(task || ''), view, e.sender).catch((err) => {
+    agentRunner.run(String(task || ''), view, manager, e.sender).catch((err) => {
       console.error('[agent] crashed', err)
     })
     return { started: true }
@@ -210,6 +261,11 @@ export function registerIpc(deps: Deps): void {
   ipcMain.handle('agent:respond', (e, requestId: string, approved: boolean) => {
     guard(e, win(), 'agent:respond')
     agentRunner.respondConfirm(String(requestId), Boolean(approved))
+  })
+
+  ipcMain.handle('agent:answer', (e, requestId: string, text: string) => {
+    guard(e, win(), 'agent:answer')
+    agentRunner.answer(String(requestId), String(text || ''))
   })
 
   ipcMain.handle('agent:cancel', (e, requestId: string) => {

@@ -59,10 +59,15 @@ const api = {
     omnibox: (id: number, text: string) => ipcRenderer.invoke('tabs:omnibox', id, text),
     close: (id: number) => ipcRenderer.invoke('tabs:close', id),
     activate: (id: number) => ipcRenderer.invoke('tabs:activate', id),
+    reorder: (from: number, to: number) => ipcRenderer.invoke('tabs:reorder', from, to),
     back: (id: number) => ipcRenderer.invoke('tabs:back', id),
     forward: (id: number) => ipcRenderer.invoke('tabs:forward', id),
     reload: (id: number) => ipcRenderer.invoke('tabs:reload', id),
     stop: (id: number) => ipcRenderer.invoke('tabs:stop', id)
+  },
+
+  omnibox: {
+    suggest: (q: string) => ipcRenderer.invoke('omnibox:suggest', q)
   },
 
   ui: {
@@ -87,6 +92,7 @@ const api = {
   agent: {
     run: (task: string) => ipcRenderer.invoke('agent:run', task),
     respond: (requestId: string, approved: boolean) => ipcRenderer.invoke('agent:respond', requestId, approved),
+    answer: (requestId: string, text: string) => ipcRenderer.invoke('agent:answer', requestId, text),
     cancel: (requestId: string) => ipcRenderer.invoke('agent:cancel', requestId),
     onEvent: subscribe('agent:event')
   },
@@ -99,7 +105,16 @@ const api = {
   bookmarks: {
     toggle: (entry: { url: string; title: string }) => ipcRenderer.invoke('bookmarks:toggle', entry),
     is: (url: string) => ipcRenderer.invoke('bookmarks:is', url),
-    list: () => ipcRenderer.invoke('bookmarks:list')
+    list: () => ipcRenderer.invoke('bookmarks:list'),
+    search: (q: string) => ipcRenderer.invoke('bookmarks:search', q),
+    remove: (url: string) => ipcRenderer.invoke('bookmarks:remove', url)
+  },
+
+  history: {
+    recent: () => ipcRenderer.invoke('history:recent'),
+    search: (q: string) => ipcRenderer.invoke('history:search', q),
+    remove: (url: string) => ipcRenderer.invoke('history:remove', url),
+    clear: () => ipcRenderer.invoke('history:clear')
   },
 
   internal: {

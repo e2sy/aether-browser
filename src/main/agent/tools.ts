@@ -100,6 +100,34 @@ export const TOOLS: OllamaTool[] = [
   {
     type: 'function',
     function: {
+      name: 'list_tabs',
+      description: 'List all open tabs (id, title, URL) for context. The agent acts only in the current tab.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'screenshot',
+      description: 'Save a PNG screenshot of the current page to disk; returns the file path and dimensions. Prefer read_page for content \u2014 you cannot view images.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ask_user',
+      description: 'Ask the user a short clarifying question and wait for their typed answer. Use instead of guessing when the task is ambiguous or a required choice cannot be inferred from the page.',
+      parameters: {
+        type: 'object',
+        properties: { question: { type: 'string', description: 'One short, specific question' } },
+        required: ['question']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'done',
       description: 'Finish the task and report the result to the user.',
       parameters: {
@@ -123,6 +151,9 @@ export interface ExecContext {
   goBack: () => Promise<string>
   readPage: () => Promise<string>
   findText: (args: ToolCallArgs) => Promise<string>
+  listTabs: () => Promise<string>
+  screenshot: () => Promise<string>
+  askUser: (args: ToolCallArgs) => Promise<string>
 }
 
 export async function executeTool(name: string, args: ToolCallArgs, ctx: ExecContext): Promise<string> {
@@ -143,6 +174,12 @@ export async function executeTool(name: string, args: ToolCallArgs, ctx: ExecCon
       return ctx.readPage()
     case 'find_text':
       return ctx.findText(args)
+    case 'list_tabs':
+      return ctx.listTabs()
+    case 'screenshot':
+      return ctx.screenshot()
+    case 'ask_user':
+      return ctx.askUser(args)
     default:
       return `Unknown tool: ${name}`
   }

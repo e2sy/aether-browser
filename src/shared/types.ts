@@ -24,7 +24,16 @@ export interface Settings {
   model: string | null
   usePageContext: boolean
   confirmAgentActions: boolean
-  searchMode: 'ai' | 'engine'
+  searchMode: 'ai' | 'google' | 'duckduckgo'
+  adblock: boolean
+  stripElectronUA: boolean
+}
+
+export interface OmniboxSuggestion {
+  kind: 'search' | 'url' | 'history' | 'bookmark'
+  label: string
+  sub?: string
+  value: string
 }
 
 export interface PageDoc {
@@ -79,7 +88,7 @@ export interface SidebarInject {
   focus?: boolean
 }
 
-export type AgentEventType = 'start' | 'step' | 'confirm' | 'done' | 'error' | 'cancelled'
+export type AgentEventType = 'start' | 'step' | 'confirm' | 'ask_user' | 'done' | 'error' | 'cancelled'
 
 export interface AgentEvent {
   requestId: string

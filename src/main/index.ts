@@ -3,7 +3,9 @@ import path from 'node:path'
 import { TabManager } from './tabs'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
-import { NEW_TAB_HTML, SEARCH_HTML } from './pages'
+import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML } from './pages'
+import { applyAdblockSetting } from './adblock'
+import { mergedSettings } from './store'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -69,21 +71,33 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const INTERNAL_PAGES: Record<string, string> = {
+    search: SEARCH_HTML,
+    newtab: NEW_TAB_HTML,
+    history: HISTORY_HTML,
+    bookmarks: BOOKMARKS_HTML,
+    settings: SETTINGS_HTML
+  }
   protocol.handle('aether', (req) => {
     const url = new URL(req.url)
-    const html =
-      url.hostname === 'search'
-        ? SEARCH_HTML
-        : url.hostname === 'newtab'
-          ? NEW_TAB_HTML
-          : '<h1>404</h1>'
+    const html = INTERNAL_PAGES[url.hostname] || '<h1>404</h1>'
     return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
   })
+
+  // Identify as a regular Chrome so Google / YouTube treat us normally
+  // (Electron's default UA carries an Electron/ token that some sites flag).
+  if (mergedSettings().stripElectronUA !== false) {
+    const ses = session.defaultSession
+    ses.setUserAgent(ses.getUserAgent().replace(/\s+Electron\/\S+/, ''))
+  }
 
   // conservative permission policy for web content
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
     cb(['media', 'clipboard-sanitized-write', 'fullscreen'].includes(permission))
   })
+
+  // ad & tracker blocking (best-effort, cached filters)
+  void applyAdblockSetting(mergedSettings().adblock !== false)
 
   registerIpc({
     getWindow: () => win,
@@ -104,12 +118,18 @@ app.whenReady().then(() => {
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
     setTimeout(() => {
+      const first = tabs?.listIds()[0]
+      if (first !== undefined) tabs?.navigate(first, 'aether://settings')
+    }, 3000)
+    setTimeout(() => {
       const state = tabs?.getState()
       console.log('[smoke] tabs:', JSON.stringify(state))
-      const loaded = state?.tabs.some((t) => t.url.startsWith('aether://newtab'))
-      console.log('[smoke] internal newtab loaded:', loaded ? 'YES' : 'NO')
-      app.exit(loaded ? 0 : 1)
-    }, 5000)
+      const newtabLoaded = state?.tabs.some((t) => t.url.startsWith('aether://'))
+      const settingsLoaded = state?.tabs.some((t) => t.url.startsWith('aether://settings'))
+      console.log('[smoke] internal page loaded:', newtabLoaded ? 'YES' : 'NO')
+      console.log('[smoke] settings page loaded:', settingsLoaded ? 'YES' : 'NO')
+      app.exit(newtabLoaded && settingsLoaded ? 0 : 1)
+    }, 6500)
   }
 
   app.on('activate', () => {
