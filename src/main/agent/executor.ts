@@ -7,9 +7,10 @@ import { settings } from '../store'
 import { extractPage } from '../extract'
 import { AGENT_SYSTEM } from './prompts'
 import { TOOLS, MUTATING_TOOLS, executeTool, ExecContext } from './tools'
-import { snapshotPage, formatSnapshot } from './serializer'
+import { snapshotPage, formatSnapshot, formatSnapshotDiff, locatorFor } from './serializer'
+import { markRun } from '../macros'
 import type { TabManager } from '../tabs'
-import type { AgentEventType, ToolCallArgs } from '../../shared/types'
+import type { AgentEventType, Macro, MacroStep, PageSnapshot, ToolCallArgs } from '../../shared/types'
 
 const MAX_STEPS = 12
 const CONFIRM_TIMEOUT_MS = 120_000
@@ -63,40 +64,98 @@ export class AgentRunner {
     })
   }
 
-  async run(task: string, view: WebContentsView, tm: TabManager, sender: WebContents): Promise<void> {
+  /** Wait for an in-flight navigation to finish, then a small settle delay. */
+  private async waitSettle(wc: WebContents): Promise<void> {
+    if (wc.isLoading()) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, 10_000)
+        const onDone = (): void => done()
+        function done(): void {
+          clearTimeout(timer)
+          wc.removeListener('did-stop-loading', onDone)
+          resolve()
+        }
+        wc.once('did-stop-loading', onDone)
+      })
+    }
+    await new Promise((r) => setTimeout(r, 450))
+  }
+
+  /**
+   * One model turn with a single retry on transient failures (model load, hiccup).
+   */
+  private async chatOnceRetry(
+    model: string,
+    messages: OllamaMessage[],
+    signal: AbortSignal
+  ): Promise<OllamaMessage> {
+    try {
+      return (await chatOnce(model, messages, TOOLS, signal)).message
+    } catch (err) {
+      if (signal.aborted) throw err
+      await new Promise((r) => setTimeout(r, 1200))
+      return (await chatOnce(model, messages, TOOLS, signal)).message
+    }
+  }
+
+  async run(
+    task: string,
+    view: WebContentsView,
+    tm: TabManager,
+    sender: WebContents,
+    opts: { record?: boolean } = {}
+  ): Promise<void> {
     const requestId = randomUUID().replace(/-/g, '').slice(0, 10)
     const ctrl = new AbortController()
     this.aborts.set(requestId, ctrl)
     const emit = (type: AgentEventType, extra: Record<string, unknown> = {}): void => {
       if (!sender.isDestroyed()) sender.send('agent:event', { requestId, type, ...extra })
     }
+    const wc = view.webContents
 
     try {
       const model = settings.data.model || (await pickDefaultModel())
       if (!model) {
         emit('error', {
-          data: 'No Ollama model available. Install Ollama (https://ollama.com) and run:  ollama pull qwen3.5:9b'
+          data: 'No local model available for the agent (the cloud fallback only covers chat & AI search). Install Ollama and pull a model.'
         })
         return
       }
-      emit('start', { data: { model } })
+      emit('start', { data: { model, record: Boolean(opts.record), maxSteps: MAX_STEPS } })
 
       const snap = await snapshotPage(view)
       const messages: OllamaMessage[] = [
         { role: 'system', content: AGENT_SYSTEM },
         { role: 'user', content: `Task: ${task}\n\nCurrent page state:\n${formatSnapshot(snap)}` }
       ]
+      let prev: PageSnapshot = snap
+      let consecProse = 0
       let lastTitle = snap.title
+      const recorded: MacroStep[] = []
 
       for (let step = 1; step <= MAX_STEPS; step++) {
-        const { message } = await chatOnce(model, messages, TOOLS, ctrl.signal)
+        if (ctrl.signal.aborted) break
+        const message = await this.chatOnceRetry(model, messages, ctrl.signal)
         messages.push(message)
         const calls = message.tool_calls || []
 
+        // No tool call: nudge once, then accept the prose as the final answer.
         if (!calls.length) {
-          emit('done', { data: { answer: message.content || 'Done.' } })
-          return
+          const text = (message.content || '').trim()
+          if (consecProse >= 1 || step === MAX_STEPS) {
+            emit('done', { data: { answer: text || 'Done.' } })
+            return
+          }
+          consecProse++
+          if (text) emit('step', { tool: 'thinking', args: {}, data: { result: text.slice(0, 160), step, maxSteps: MAX_STEPS } })
+          messages.push({
+            role: 'user',
+            content:
+              'Respond with ONE tool call (navigate/click/type/scroll/read_page/…), or call done with your final answer. Plain prose without an action is not accepted.'
+          })
+          continue
         }
+        consecProse = 0
 
         let mutated = false
         for (const call of calls) {
@@ -104,7 +163,7 @@ export class AgentRunner {
           const args = (call.function?.arguments || {}) as ToolCallArgs
 
           if (name === 'done') {
-            emit('done', { data: { answer: String(args.answer || 'Done.') } })
+            emit('done', { data: { answer: String(args.answer || 'Done.'), steps: opts.record ? recorded : undefined } })
             return
           }
 
@@ -115,28 +174,45 @@ export class AgentRunner {
             if (!ok) {
               result = 'The user DENIED this action. Do not retry it; ask the user how to proceed or finish with done.'
             } else {
-              result = await this.exec(name, args, view, tm, emit, requestId, ctrl.signal)
+              result = await executeTool(name, args, this.buildCtx(view, tm, emit, requestId, ctrl.signal))
             }
           } else {
-            result = await this.exec(name, args, view, tm, emit, requestId, ctrl.signal)
+            result = await executeTool(name, args, this.buildCtx(view, tm, emit, requestId, ctrl.signal))
+          }
+
+          // macro recording: capture successful mutating steps with a replayable locator
+          if (opts.record && result.startsWith('OK') && MUTATING_TOOLS.has(name)) {
+            const recArgs: ToolCallArgs = { ...args }
+            if ((name === 'click' || name === 'type') && Number.isFinite(Number(args.ref))) {
+              const loc = await locatorFor(view, Number(args.ref))
+              if (loc) recArgs.__locator = loc
+            }
+            recorded.push({ tool: name, args: recArgs })
           }
 
           if (result.startsWith('OK') && MUTATING_TOOLS.has(name)) mutated = true
           messages.push({ role: 'tool', content: result.slice(0, 4000), tool_name: name })
-          emit('step', { tool: name, args, data: { result: result.slice(0, 300) } })
+          emit('step', { tool: name, args, data: { result: result.slice(0, 300), step, maxSteps: MAX_STEPS } })
         }
 
         if (mutated) {
-          await new Promise((r) => setTimeout(r, 800)) // let the page settle
+          await this.waitSettle(wc)
           const fresh = await snapshotPage(view)
           lastTitle = fresh.title
-          messages.push({ role: 'user', content: `Updated page state:\n${formatSnapshot(fresh)}` })
+          const sameUrl = fresh.url === prev.url
+          messages.push({
+            role: 'user',
+            content: sameUrl ? `Updated page state (diff):\n${formatSnapshotDiff(prev, fresh)}` : `Updated page state:\n${formatSnapshot(fresh)}`
+          })
+          prev = fresh
         }
       }
 
+      const doneSteps = opts.record ? recorded : undefined
       emit('done', {
         data: {
-          answer: `Stopped after ${MAX_STEPS} steps (safety limit). Last page seen: "${lastTitle}". You can refine the task and run again.`
+          answer: `Stopped after ${MAX_STEPS} steps (safety limit). Last page seen: "${lastTitle}". You can refine the task and run again.`,
+          steps: doneSteps
         }
       })
     } catch (err) {
@@ -149,19 +225,81 @@ export class AgentRunner {
     }
   }
 
-  private async exec(
-    name: string,
-    args: ToolCallArgs,
+  /** Replay a saved macro: same tools, no model, same confirmation gates. */
+  async runMacro(macro: Macro, view: WebContentsView, tm: TabManager, sender: WebContents): Promise<void> {
+    const requestId = randomUUID().replace(/-/g, '').slice(0, 10)
+    const ctrl = new AbortController()
+    this.aborts.set(requestId, ctrl)
+    const emit = (type: AgentEventType, extra: Record<string, unknown> = {}): void => {
+      if (!sender.isDestroyed()) sender.send('agent:event', { requestId, type, ...extra })
+    }
+
+    try {
+      emit('start', { data: { macro: macro.name, total: macro.steps.length } })
+      const ctx = this.buildCtx(view, tm, emit, requestId, ctrl.signal)
+
+      for (let i = 0; i < macro.steps.length; i++) {
+        if (ctrl.signal.aborted) break
+        const st = macro.steps[i]
+        let result: string
+        if (MUTATING_TOOLS.has(st.tool) && settings.data.confirmAgentActions) {
+          emit('confirm', { tool: st.tool, args: st.args })
+          const ok = await this.waitConfirm(requestId)
+          if (!ok) {
+            result = 'SKIP: denied by user'
+          } else {
+            result = await executeTool(st.tool, st.args, ctx)
+          }
+        } else {
+          result = await executeTool(st.tool, st.args, ctx)
+        }
+
+        emit('step', {
+          tool: st.tool,
+          args: st.args,
+          data: { result: result.slice(0, 200), step: i + 1, maxSteps: macro.steps.length, macro: macro.name }
+        })
+
+        if (result.startsWith('SKIP')) continue
+        if (result.startsWith('FAILED') || result.startsWith('Unknown tool')) {
+          emit('done', { data: { answer: `Macro stopped at step ${i + 1} (${st.tool}): ${result}` } })
+          return
+        }
+        if (MUTATING_TOOLS.has(st.tool)) await this.waitSettle(view.webContents)
+      }
+
+      markRun(macro.id)
+      emit('done', { data: { answer: `Macro "${macro.name}" finished: ${macro.steps.length} step(s) replayed.` } })
+    } catch (err) {
+      if (ctrl.signal.aborted) emit('cancelled', {})
+      else emit('error', { data: friendlyError(err) })
+    } finally {
+      this.aborts.delete(requestId)
+      this.confirms.delete(requestId)
+      this.asks.delete(requestId)
+    }
+  }
+
+  /** Build the tool execution context used by both agent runs and macro replays. */
+  private buildCtx(
     view: WebContentsView,
     tm: TabManager,
     emit: (type: AgentEventType, extra?: Record<string, unknown>) => void,
     requestId: string,
     signal: AbortSignal
-  ): Promise<string> {
+  ): ExecContext {
     const wc = view.webContents
     const js = async (code: string): Promise<unknown> => wc.executeJavaScript(code, true)
 
-    const ctx: ExecContext = {
+    // locator-aware selector: macro replays use the recorded CSS path, live runs use data-agent-ref
+    const selFor = (a: ToolCallArgs): string => {
+      const loc = typeof a.__locator === 'string' && a.__locator ? a.__locator : null
+      if (loc) return `document.querySelector(${JSON.stringify(loc)})`
+      const ref = Number(a.ref)
+      return `document.querySelector('[data-agent-ref="${ref}"]')`
+    }
+
+    return {
       navigate: async (a: ToolCallArgs) => {
         const url = String(a.__url || '')
         if (!/^https?:\/\//i.test(url)) return `FAILED: only http(s) URLs are allowed, got: ${url}`
@@ -174,26 +312,22 @@ export class AgentRunner {
         }
       },
       click: async (a: ToolCallArgs) => {
-        const ref = Number(a.ref)
-        if (!Number.isFinite(ref)) return 'FAILED: ref must be a number'
         const pos = (await js(
-          `(() => { const el = document.querySelector('[data-agent-ref="${ref}"]'); if (!el) return null; el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) } })()`
+          `(() => { const el = ${selFor(a)}; if (!el) return null; el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) } })()`
         )) as { x: number; y: number } | null
         if (!pos) {
           return 'FAILED: element not found — the page changed since the last snapshot. Re-observe and pick a valid ref.'
         }
         wc.sendInputEvent({ type: 'mouseDown', x: pos.x, y: pos.y, button: 'left', clickCount: 1 })
         wc.sendInputEvent({ type: 'mouseUp', x: pos.x, y: pos.y, button: 'left', clickCount: 1 })
-        return `OK: clicked element [${ref}]`
+        return `OK: clicked element`
       },
       typeText: async (a: ToolCallArgs) => {
-        const ref = Number(a.ref)
         const text = String(a.text ?? '')
-        if (!Number.isFinite(ref)) return 'FAILED: ref must be a number'
         const textJson = JSON.stringify(text)
         const res = (await js(
           `(() => {
-            const el = document.querySelector('[data-agent-ref="${ref}"]')
+            const el = ${selFor(a)}
             if (!el) return null
             el.focus()
             const tag = el.tagName.toLowerCase()
@@ -220,7 +354,7 @@ export class AgentRunner {
           wc.sendInputEvent({ type: 'keyUp', keyCode: 'Enter' })
           return `OK: typed ${text.length} chars and pressed Enter`
         }
-        return `OK: typed ${text.length} chars into [${ref}]`
+        return `OK: typed ${text.length} chars`
       },
       pressKey: async (a: ToolCallArgs) => {
         const key = String(a.key || '').slice(0, 20)
@@ -299,8 +433,6 @@ export class AgentRunner {
         return `OK: the user replied: "${answer}"`
       }
     }
-
-    return executeTool(name, args, ctx)
   }
 }
 

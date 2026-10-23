@@ -55,7 +55,13 @@ export function buildMenu(deps: Deps): Menu {
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'selectAll' }
+        { role: 'selectAll' },
+        { type: 'separator' },
+        {
+          label: 'Find in Page',
+          accelerator: 'CmdOrCtrl+F',
+          click: (): void => tabs()?.sendToChrome('find:show', {})
+        }
       ]
     },
     {
@@ -115,7 +121,7 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '0.3.0',
+              applicationVersion: '0.4.0',
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()

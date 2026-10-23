@@ -50,7 +50,7 @@ export const NEW_TAB_HTML = pageShell(
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
-    Aether Browser 0.3.0 — local AI, open source
+    Aether Browser 0.4.0 — local AI, open source
   </div>
   `,
   `
@@ -344,8 +344,30 @@ export const SETTINGS_HTML = pageShell(
       <div class="opts">
         <label><input type="checkbox" id="confirmAgentActions" /> Agent asks before every action</label>
         <label><input type="checkbox" id="usePageContext" /> Sidebar chat sees the current page</label>
+        <label><input type="checkbox" id="pageMemory" /> Remember page conversations per site (local memory)</label>
         <label><input type="checkbox" id="adblock" /> Block ads &amp; trackers (EasyList + EasyPrivacy)</label>
         <label><input type="checkbox" id="stripElectronUA" /> Identify as regular Chrome (better Google / YouTube compatibility)</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Site permissions</div>
+      <div class="hint" style="margin-bottom:10px">Sites ask before using these. Your Allow / Block choices are remembered here.</div>
+      <div id="perms" style="display:flex; flex-direction:column; gap:6px"></div>
+      <div class="row-btns" style="margin-top:10px"><button class="muted-btn" id="clearPerms">Forget all site permissions</button></div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Cloud fallback (optional — chat &amp; AI search only)</div>
+      <div class="hint" style="margin-bottom:10px">If Ollama is unreachable, chat and AI search can use any OpenAI-compatible endpoint (e.g. Groq or OpenRouter free tiers). The agent always stays local. Your key never leaves this device.</div>
+      <div class="opts">
+        <label><input type="checkbox" id="cfEnabled" /> Enable cloud fallback</label>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px">
+        <input id="cfUrl" type="text" placeholder="https://api.groq.com/openai/v1" />
+        <input id="cfModel" type="text" placeholder="Model, e.g. llama-3.3-70b-versatile" />
+        <input id="cfKey" type="password" placeholder="API key (stored locally only)" />
+        <div class="row-btns"><button class="save-btn" id="cfSave">Save cloud fallback</button><span id="cfSaved" style="font-size:11.5px;color:#4ade80;align-self:center"></span></div>
       </div>
     </div>
 
@@ -354,10 +376,11 @@ export const SETTINGS_HTML = pageShell(
       <div class="opts row-btns">
         <button class="muted-btn" id="clearHistory">Clear browsing history</button>
         <button class="muted-btn" id="clearBookmarks">Remove all bookmarks</button>
+        <button class="muted-btn" id="clearMemory">Clear page memory</button>
       </div>
     </div>
 
-    <div class="hint" style="margin-top:26px">Aether 0.3.0 — everything is stored locally on this device.</div>
+    <div class="hint" style="margin-top:26px">Aether 0.4.0 — everything is stored locally on this device.</div>
   </div>
   <style>
     .sec { margin-bottom:24px; }
@@ -368,8 +391,22 @@ export const SETTINGS_HTML = pageShell(
     .row-btns { flex-direction:row; gap:10px; }
     .hint { font-size:11.5px; color:#7d828f; line-height:1.6; }
     .mono { font-family:monospace; color:#7c8cff; }
-    select { padding:10px 12px; font-size:13px; color:#e8eaf0; background:#1e2026;
-      border:1px solid #2e313a; border-radius:10px; outline:none; }
+    select, #cfUrl, #cfModel, #cfKey { padding:10px 12px; font-size:13px; color:#e8eaf0; background:#1e2026;
+      border:1px solid #2e313a; border-radius:10px; outline:none; width:100%; }
+    #cfUrl:focus, #cfModel:focus, #cfKey:focus { border-color:#7c8cff; }
+    .save-btn { padding:9px 14px; font-size:12px; color:#fff; background:#5b6cff;
+      border:none; border-radius:10px; cursor:pointer; }
+    .save-btn:hover { background:#6d7cff; }
+    .perm-row { display:flex; align-items:center; gap:10px; padding:9px 12px;
+      background:#1a1c21; border:1px solid #2e313a; border-radius:10px; font-size:12.5px; }
+    .perm-row .host { color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .perm-row .what { color:#7d828f; flex:none; }
+    .perm-row .badge { flex:none; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
+    .perm-row .badge.allow { color:#4ade80; background:#4ade8018; }
+    .perm-row .badge.block { color:#ff6b6b; background:#ff6b6b18; }
+    .perm-row .del { margin-left:auto; flex:none; width:24px; height:24px; border:none; border-radius:7px;
+      background:transparent; color:#565b66; font-size:13px; cursor:pointer; }
+    .perm-row .del:hover { background:#2a1c1c; color:#ff8a8a; }
   </style>
   `,
   `
@@ -380,8 +417,14 @@ export const SETTINGS_HTML = pageShell(
       for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === s.searchMode
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
       document.getElementById('usePageContext').checked = !!s.usePageContext
+      document.getElementById('pageMemory').checked = s.pageMemory !== false
       document.getElementById('adblock').checked = !!s.adblock
       document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
+      var cf = s.cloudFallback || {}
+      document.getElementById('cfEnabled').checked = !!cf.enabled
+      document.getElementById('cfUrl').value = cf.baseUrl || ''
+      document.getElementById('cfModel').value = cf.model || ''
+      document.getElementById('cfKey').value = cf.apiKey || ''
     })
     window.aether.ai.health().then(function (h) {
       document.getElementById('health').textContent = h.ok ? '● Ollama connected' : '● Ollama not reachable'
@@ -401,6 +444,33 @@ export const SETTINGS_HTML = pageShell(
       })
       window.aether.settings.get().then(function (s) { sel.value = s.model || models[0] })
     })
+    loadPerms()
+  }
+  var PERM_LABELS = { media: 'camera & microphone', geolocation: 'your location', notifications: 'notifications', midi: 'MIDI devices', 'speaker-selection': 'audio output', 'display-capture': 'screen capture' }
+  function loadPerms() {
+    window.aether.perms.list().then(function (list) {
+      var box = document.getElementById('perms')
+      box.innerHTML = ''
+      if (!list.length) {
+        var none = document.createElement('div')
+        none.textContent = 'No remembered permissions yet.'
+        none.style.cssText = 'color:#565b66;font-size:12.5px;padding:2px 2px'
+        box.appendChild(none); return
+      }
+      list.forEach(function (p) {
+        var row = document.createElement('div'); row.className = 'perm-row'
+        var host = document.createElement('span'); host.className = 'host'; host.textContent = p.origin
+        var what = document.createElement('span'); what.className = 'what'; what.textContent = PERM_LABELS[p.permission] || p.permission
+        var badge = document.createElement('span'); badge.className = 'badge ' + p.decision; badge.textContent = p.decision
+        var del = document.createElement('button'); del.className = 'del'; del.textContent = '\u00d7'; del.title = 'Forget this decision'
+        del.addEventListener('click', function () {
+          window.aether.perms.revoke(p.origin, p.permission)
+          loadPerms()
+        })
+        row.appendChild(host); row.appendChild(what); row.appendChild(badge); row.appendChild(del)
+        box.appendChild(row)
+      })
+    })
   }
   function save(patch) { window.aether.settings.set(patch) }
   document.getElementById('model').addEventListener('change', function (e) { save({ model: e.target.value || null }) })
@@ -410,8 +480,22 @@ export const SETTINGS_HTML = pageShell(
   }
   document.getElementById('confirmAgentActions').addEventListener('change', function (e) { save({ confirmAgentActions: e.target.checked }) })
   document.getElementById('usePageContext').addEventListener('change', function (e) { save({ usePageContext: e.target.checked }) })
+  document.getElementById('pageMemory').addEventListener('change', function (e) { save({ pageMemory: e.target.checked }) })
   document.getElementById('adblock').addEventListener('change', function (e) { save({ adblock: e.target.checked }) })
   document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
+  document.getElementById('cfSave').addEventListener('click', function () {
+    save({
+      cloudFallback: {
+        enabled: document.getElementById('cfEnabled').checked,
+        baseUrl: document.getElementById('cfUrl').value.trim(),
+        model: document.getElementById('cfModel').value.trim(),
+        apiKey: document.getElementById('cfKey').value.trim()
+      }
+    })
+    var ok = document.getElementById('cfSaved')
+    ok.textContent = 'Saved ✓'
+    setTimeout(function () { ok.textContent = '' }, 2500)
+  })
   document.getElementById('clearHistory').addEventListener('click', function () {
     if (confirm('Clear ALL browsing history?')) window.aether.history.clear()
   })
@@ -421,6 +505,12 @@ export const SETTINGS_HTML = pageShell(
         list.forEach(function (b) { window.aether.bookmarks.remove(b.url) })
       })
     }
+  })
+  document.getElementById('clearMemory').addEventListener('click', function () {
+    if (confirm('Forget all remembered page conversations?')) window.aether.memory.clear()
+  })
+  document.getElementById('clearPerms').addEventListener('click', function () {
+    if (confirm('Forget all remembered site permissions?')) window.aether.perms.clear().then(loadPerms)
   })
   load()
   `

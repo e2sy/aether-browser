@@ -6,6 +6,7 @@ import { buildMenu } from './menu'
 import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML } from './pages'
 import { applyAdblockSetting } from './adblock'
 import { mergedSettings } from './store'
+import { installPermissionHandlers } from './permissions'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -91,9 +92,10 @@ app.whenReady().then(() => {
     ses.setUserAgent(ses.getUserAgent().replace(/\s+Electron\/\S+/, ''))
   }
 
-  // conservative permission policy for web content
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb(['media', 'clipboard-sanitized-write', 'fullscreen'].includes(permission))
+  // per-site permissions: auto-allow harmless, prompt (and remember) for camera /
+  // mic / location / notifications, deny everything else — see main/permissions.ts
+  installPermissionHandlers((payload) => {
+    if (win && !win.webContents.isDestroyed()) win.webContents.send('perm:request', payload)
   })
 
   // ad & tracker blocking (best-effort, cached filters)

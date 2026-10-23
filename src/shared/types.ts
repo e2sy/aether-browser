@@ -27,6 +27,18 @@ export interface Settings {
   searchMode: 'ai' | 'google' | 'duckduckgo'
   adblock: boolean
   stripElectronUA: boolean
+  /** Remember per-domain notes from sidebar chats and reuse them as context */
+  pageMemory: boolean
+  /** Optional OpenAI-compatible fallback used when Ollama is unreachable (chat + AI search only) */
+  cloudFallback: CloudFallbackConfig
+}
+
+export interface CloudFallbackConfig {
+  enabled: boolean
+  /** e.g. https://api.groq.com/openai/v1 */
+  baseUrl: string
+  apiKey: string
+  model: string
 }
 
 export interface OmniboxSuggestion {
@@ -51,6 +63,8 @@ export interface ElementRef {
   placeholder?: string
   value?: string
   href?: string
+  /** Stable identity key — same element keeps the same ref across snapshots */
+  key?: string
 }
 
 export interface PageSnapshot {
@@ -137,4 +151,51 @@ export interface AgentEvent {
   tool?: string
   args?: ToolCallArgs
   data?: unknown
+}
+
+/** One recorded agent action — replayable without a model (see Macro). */
+export interface MacroStep {
+  tool: string
+  args: ToolCallArgs
+}
+
+export interface Macro {
+  id: string
+  name: string
+  task: string
+  steps: MacroStep[]
+  createdAt: number
+  runs: number
+}
+
+/** A remembered page conversation (per-domain local memory). */
+export interface MemoryEntry {
+  id: string
+  host: string
+  url: string
+  title: string
+  q: string
+  a: string
+  ts: number
+}
+
+/** A remembered site permission decision ("https://example.com" + "media"). */
+export interface PermissionEntry {
+  origin: string
+  permission: string
+  decision: 'allow' | 'block'
+  ts: number
+}
+
+/** Progress of an in-page search pushed to the find bar. */
+export interface FindResult {
+  tabId: number
+  active: number
+  matches: number
+}
+
+/** Which brain answered — local Ollama or the optional cloud fallback. */
+export interface AiStatus {
+  ollama: boolean
+  cloud: boolean
 }

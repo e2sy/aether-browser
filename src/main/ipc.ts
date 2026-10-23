@@ -20,14 +20,24 @@ import {
   DEFAULT_SETTINGS
 } from './store'
 import { applyAdblockSetting } from './adblock'
-import { ollamaHealth, listModels, pickDefaultModel, chatStream, friendlyError, OllamaMessage } from './ollama'
+import { ollamaHealth, listModels, pickDefaultModel, friendlyError, OllamaMessage } from './ollama'
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
+import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
+import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
+import {
+  respondPermission,
+  listPermissions,
+  revokePermission,
+  clearPermissions
+} from './permissions'
+import { listMacros, saveMacro, deleteMacro, getMacro } from './macros'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
-import { webSearch, answerStream } from './search'
+import { webSearch } from './search'
 import { agentRunner } from './agent/executor'
-import { chatWithPageSystem } from './agent/prompts'
+import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
+import type { MacroStep } from '../shared/types'
 
 const HISTORY_WINDOW = 20
 
@@ -188,6 +198,11 @@ export function registerIpc(deps: Deps): void {
     return { ok: await ollamaHealth() }
   })
 
+  ipcMain.handle('ai:status', async (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    return aiStatus()
+  })
+
   ipcMain.handle('ai:models', async (e) => {
     if (!privileged(e, win())) throw new Error('Unauthorized')
     try {
@@ -267,28 +282,64 @@ export function registerIpc(deps: Deps): void {
       const ctrl = new AbortController()
       aborts.set(requestId, ctrl)
 
+      // which brain answers: local Ollama if reachable, else the opt-in cloud fallback
+      let choice: BrainChoice | null = null
       try {
-        const model = payload.model || settings.data.model || (await pickDefaultModel())
-        if (!model) throw new Error('No Ollama model found. Run:  ollama pull qwen3.5:9b')
+        choice = await resolveBrain()
+        if (choice && choice.provider === 'local' && payload.model) {
+          choice = { provider: 'local', model: payload.model }
+        }
+      } catch {
+        choice = null
+      }
+      if (!choice) {
+        const msg =
+          'No AI brain available — Ollama is not reachable and no cloud fallback is configured. ' +
+          'Install Ollama and pull a model, or add a cloud fallback in Settings.'
+        if (!sender.isDestroyed()) sender.send('ai:chunk', { requestId, error: msg })
+        return { error: msg }
+      }
 
-        const messages: OllamaMessage[] = []
-        if (payload.usePageContext) {
-          const view = tm()?.activeView()
-          if (view) {
-            const page = await extractPage(view)
-            if (page) messages.push({ role: 'system', content: chatWithPageSystem(page) })
+      // page context + per-domain memory notes
+      let memoryHost = ''
+      let memoryUrl = ''
+      let memoryTitle = ''
+      const messages: OllamaMessage[] = []
+      if (payload.usePageContext) {
+        const view = tm()?.activeView()
+        if (view) {
+          const page = await extractPage(view)
+          if (page) {
+            let sys = chatWithPageSystem(page)
+            if (mergedSettings().pageMemory !== false) {
+              const notes = memoryPromptFor(hostOf(page.url))
+              if (notes) sys += notes
+              memoryHost = hostOf(page.url)
+              memoryUrl = page.url
+              memoryTitle = page.title
+            }
+            messages.push({ role: 'system', content: sys })
           }
         }
-        messages.push(...payload.messages.slice(-HISTORY_WINDOW))
+      }
+      messages.push(...payload.messages.slice(-HISTORY_WINDOW))
 
-        let full = ''
-        for await (const delta of chatStream(model, messages, ctrl.signal)) {
+      let full = ''
+      try {
+        for await (const delta of streamBrain(choice, messages, ctrl.signal)) {
           full += delta
           if (!sender.isDestroyed()) sender.send('ai:chunk', { requestId, delta })
         }
-        return { content: full, model }
+        // remember this Q/A pair for the site (local page memory)
+        if (memoryHost && full.trim() && mergedSettings().pageMemory !== false && !ctrl.signal.aborted) {
+          const lastUser = [...payload.messages].reverse().find((m) => m.role === 'user')
+          if (lastUser) {
+            addMemory({ host: memoryHost, url: memoryUrl, title: memoryTitle, q: lastUser.content, a: full })
+          }
+        }
+        return { content: full, model: choice.model, provider: choice.provider }
       } catch (err) {
-        const msg = ctrl.signal.aborted ? 'Aborted.' : friendlyError(err)
+        const msg = ctrl.signal.aborted ? 'Aborted.' : brainError(err)
         if (!sender.isDestroyed()) sender.send('ai:chunk', { requestId, error: msg })
         return { error: msg }
       } finally {
@@ -303,15 +354,19 @@ export function registerIpc(deps: Deps): void {
   })
 
   // ---------- AI: agent ----------
-  ipcMain.handle('agent:run', async (e, task: string) => {
+  ipcMain.handle('agent:run', async (e, payload: { task: string; record?: boolean }) => {
     guard(e, win(), 'agent:run')
     const manager = tm()
     const view = manager?.activeView()
     if (!manager || !view) throw new Error('No active tab')
+    const task = typeof payload === 'string' ? payload : String(payload?.task || '')
+    const record = typeof payload === 'object' && payload !== null && Boolean(payload.record)
     // fire and forget — progress streams via 'agent:event'
-    agentRunner.run(String(task || ''), view, manager, e.sender).catch((err) => {
-      console.error('[agent] crashed', err)
-    })
+    agentRunner
+      .run(task, view, manager, e.sender, { record })
+      .catch((err) => {
+        console.error('[agent] crashed', err)
+      })
     return { started: true }
   })
 
@@ -328,6 +383,85 @@ export function registerIpc(deps: Deps): void {
   ipcMain.handle('agent:cancel', (e, requestId: string) => {
     guard(e, win(), 'agent:cancel')
     agentRunner.cancel(String(requestId))
+  })
+
+  // ---------- find in page (Ctrl+F) ----------
+  ipcMain.handle('find:start', (e, tabId: number, query: string, forward?: boolean) => {
+    guard(e, win(), 'find:start')
+    tm()?.find(Number(tabId), String(query || ''), forward !== false)
+  })
+
+  ipcMain.handle('find:stop', (e, tabId: number) => {
+    guard(e, win(), 'find:stop')
+    tm()?.stopFind(Number(tabId))
+  })
+
+  // ---------- per-site permissions ----------
+  ipcMain.handle('perms:respond', (e, requestId: string, allow: boolean, remember: boolean) => {
+    guard(e, win(), 'perms:respond')
+    respondPermission(String(requestId || ''), Boolean(allow), Boolean(remember))
+  })
+
+  ipcMain.handle('perms:list', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    return listPermissions()
+  })
+
+  ipcMain.handle('perms:revoke', (e, origin: string, permission: string) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    revokePermission(String(origin || ''), String(permission || ''))
+  })
+
+  ipcMain.handle('perms:clear', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    clearPermissions()
+  })
+
+  // ---------- page memory (local, per-domain) ----------
+  ipcMain.handle('memory:list', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    return listMemory()
+  })
+
+  ipcMain.handle('memory:remove', (e, id: string) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    removeMemory(String(id || ''))
+  })
+
+  ipcMain.handle('memory:clear', (e) => {
+    if (!privileged(e, win())) throw new Error('Unauthorized')
+    clearMemory()
+  })
+
+  // ---------- agent macros (record / replay) ----------
+  ipcMain.handle('macros:list', (e) => {
+    guard(e, win(), 'macros:list')
+    return listMacros()
+  })
+
+  ipcMain.handle('macros:save', (e, payload: { name: string; task: string; steps: MacroStep[] }) => {
+    guard(e, win(), 'macros:save')
+    const res = saveMacro(payload?.name || '', payload?.task || '', Array.isArray(payload?.steps) ? payload.steps : [])
+    if (res.error) throw new Error(res.error)
+    return { macro: res.macro }
+  })
+
+  ipcMain.handle('macros:delete', (e, id: string) => {
+    guard(e, win(), 'macros:delete')
+    deleteMacro(String(id || ''))
+  })
+
+  ipcMain.handle('macros:run', (e, id: string) => {
+    guard(e, win(), 'macros:run')
+    const manager = tm()
+    const view = manager?.activeView()
+    const macro = getMacro(String(id || ''))
+    if (!manager || !view) throw new Error('No active tab')
+    if (!macro) throw new Error('Macro not found')
+    agentRunner.runMacro(macro, view, manager, e.sender).catch((err) => {
+      console.error('[macro] crashed', err)
+    })
+    return { started: true }
   })
 
   // ---------- internal pages (aether://) ----------
@@ -368,18 +502,21 @@ export function registerIpc(deps: Deps): void {
       }
       send({ sources })
 
-      const model = settings.data.model || (await pickDefaultModel())
-      if (!model) {
-        send({ error: 'Ollama is not set up — showing web results only. Install Ollama and run:  ollama pull qwen3.5:9b' })
+      const choice = await resolveBrain()
+      if (!choice) {
+        send({
+          error:
+            'No AI brain available — Ollama is not reachable and no cloud fallback is configured. Install Ollama and pull a model, or add a cloud fallback in Settings. Showing web results only.'
+        })
         return { ok: false }
       }
-      for await (const delta of answerStream(String(payload.q || ''), sources, model, ctrl.signal)) {
+      for await (const delta of streamBrain(choice, buildSearchMessages(String(payload.q || ''), sources), ctrl.signal)) {
         send({ delta })
       }
       send({ done: true })
       return { ok: true }
     } catch (err) {
-      const msg = ctrl.signal.aborted ? 'Aborted.' : friendlyError(err)
+      const msg = ctrl.signal.aborted ? 'Aborted.' : brainError(err)
       send({ error: msg })
       return { error: msg }
     } finally {
@@ -390,6 +527,14 @@ export function registerIpc(deps: Deps): void {
 
 export function newRequestId(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10)
+}
+
+function buildSearchMessages(q: string, results: SearchResult[]): OllamaMessage[] {
+  const resultsText = results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
+  return [
+    { role: 'system', content: SEARCH_SYSTEM },
+    { role: 'user', content: `Question: ${q}\n\nWeb results:\n${resultsText || '(no results found)'}` }
+  ]
 }
 
 export type { SidebarInject }

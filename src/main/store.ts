@@ -38,12 +38,16 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmAgentActions: true,
   searchMode: 'ai',
   adblock: true,
-  stripElectronUA: true
+  stripElectronUA: true,
+  pageMemory: true,
+  cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' }
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
 export function mergedSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, ...settings.data }
+  const merged = { ...DEFAULT_SETTINGS, ...settings.data }
+  merged.cloudFallback = { ...DEFAULT_SETTINGS.cloudFallback, ...settings.data.cloudFallback }
+  return merged
 }
 
 export const settings = new JsonStore<Settings>('settings.json', DEFAULT_SETTINGS)

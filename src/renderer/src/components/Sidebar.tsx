@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconSend, IconSparkles, IconClose } from './Icons'
 import ModelManager from './ModelManager'
-import type { ChatMsg, SidebarInject, AgentEvent, SidebarMode } from '../../../shared/types'
+import type { ChatMsg, SidebarInject, AgentEvent, SidebarMode, Macro, MacroStep } from '../../../shared/types'
 
 interface LogEntry {
   kind: 'step' | 'info' | 'error' | 'answer'
@@ -27,7 +27,7 @@ export default function Sidebar(): JSX.Element {
   const set = useApp((s) => s.set)
 
   const [mode, setMode] = useState<SidebarMode>('chat')
-  const [health, setHealth] = useState<boolean | null>(null)
+  const [health, setHealth] = useState<{ ollama: boolean; cloud: boolean } | null>(null)
   const [models, setModels] = useState<string[]>([])
   const [model, setModel] = useState<string>('')
 
@@ -56,11 +56,25 @@ export default function Sidebar(): JSX.Element {
   const [agentReq, setAgentReq] = useState<string | null>(null)
   const [askState, setAskState] = useState<AskState | null>(null)
   const [askInput, setAskInput] = useState('')
+  const [record, setRecord] = useState(false)
+  const [savedSteps, setSavedSteps] = useState<MacroStep[] | null>(null)
+  const [macroName, setMacroName] = useState('')
+  const [macros, setMacros] = useState<Macro[]>([])
+  const [macrosOpen, setMacrosOpen] = useState(false)
   const canUsePage = Boolean(tab && /^https?:/i.test(tab.url))
+
+  const loadMacros = useCallback(async (): Promise<void> => {
+    try {
+      setMacros((await window.aether.macros.list()) as Macro[])
+    } catch {
+      setMacros([])
+    }
+  }, [])
 
   // ----- init: health, models, settings -----
   useEffect(() => {
     void refresh()
+    void loadMacros()
     void window.aether.settings.get().then((s) => {
       set({ settings: s })
       if (s.model) setModel(s.model)
@@ -68,9 +82,9 @@ export default function Sidebar(): JSX.Element {
   }, [])
 
   const refresh = useCallback(async (): Promise<void> => {
-    const h = await window.aether.ai.health()
-    setHealth(h.ok)
-    if (h.ok) {
+    const st = await window.aether.ai.status()
+    setHealth(st)
+    if (st.ollama) {
       const m = await window.aether.ai.models()
       setModels(m.models)
       setModel((cur) => {
@@ -109,7 +123,16 @@ export default function Sidebar(): JSX.Element {
         setRunning(true)
         setAskState(null)
         setConfirmState(null)
-        setLog([{ kind: 'info', text: `Agent started with model: ${(ev.data as { model?: string })?.model || 'default'}` }])
+        setSavedSteps(null)
+        const d = ev.data as { model?: string; record?: boolean; macro?: string } | undefined
+        setLog([
+          {
+            kind: 'info',
+            text: d?.macro
+              ? `Replaying macro "${d.macro}" (no model needed)`
+              : `Agent started with model: ${d?.model || 'default'}${d?.record ? ' · recording' : ''}`
+          }
+        ])
       } else if (ev.type === 'step') {
         const res = (ev.data as { result?: string })?.result || ''
         setLog((l) => [...l, { kind: 'step', tool: ev.tool, text: describe(ev.tool, ev.args) + (res ? `  → ${res.slice(0, 160)}` : '') }])
@@ -122,7 +145,12 @@ export default function Sidebar(): JSX.Element {
         setRunning(false)
         setConfirmState(null)
         setAskState(null)
-        setLog((l) => [...l, { kind: 'answer', text: String((ev.data as { answer?: string })?.answer || 'Done.') }])
+        const d = ev.data as { answer?: string; steps?: MacroStep[] } | undefined
+        if (d?.steps && d.steps.length) {
+          setSavedSteps(d.steps)
+          if (!macroName) setMacroName('')
+        }
+        setLog((l) => [...l, { kind: 'answer', text: String(d?.answer || 'Done.') }])
       } else if (ev.type === 'error') {
         setRunning(false)
         setConfirmState(null)
@@ -135,7 +163,7 @@ export default function Sidebar(): JSX.Element {
         setLog((l) => [...l, { kind: 'info', text: 'Agent stopped.' }])
       }
     })
-  }, [])
+  }, [macroName])
 
   // ----- chat send -----
   const send = useCallback(async (): Promise<void> => {
@@ -184,8 +212,45 @@ export default function Sidebar(): JSX.Element {
     const t = task.trim()
     if (!t || running) return
     setRunning(true)
-    await window.aether.agent.run(t)
-  }, [task, running])
+    setSavedSteps(null)
+    await window.aether.agent.run(t, record)
+  }, [task, running, record])
+
+  const saveMacro = useCallback(async (): Promise<void> => {
+    if (!savedSteps || !macroName.trim()) return
+    try {
+      await window.aether.macros.save(macroName.trim(), task.trim(), savedSteps as Array<{ tool: string; args: Record<string, unknown> }>)
+      setSavedSteps(null)
+      setMacroName('')
+      setMacrosOpen(true)
+      void loadMacros()
+    } catch (err) {
+      setLog((l) => [...l, { kind: 'error', text: 'Could not save macro: ' + String((err as Error)?.message || err) }])
+    }
+  }, [savedSteps, macroName, task, loadMacros])
+
+  const runMacro = useCallback(
+    async (id: string): Promise<void> => {
+      if (running) return
+      setRunning(true)
+      setSavedSteps(null)
+      try {
+        await window.aether.macros.run(id)
+      } catch (err) {
+        setRunning(false)
+        setLog((l) => [...l, { kind: 'error', text: String((err as Error)?.message || err) }])
+      }
+    },
+    [running]
+  )
+
+  const removeMacro = useCallback(
+    async (id: string): Promise<void> => {
+      await window.aether.macros.remove(id)
+      void loadMacros()
+    },
+    [loadMacros]
+  )
 
   const cancelAgent = useCallback((): void => {
     if (agentReq) window.aether.agent.cancel(agentReq)
@@ -224,7 +289,18 @@ export default function Sidebar(): JSX.Element {
         <div className="sidebar-title">
           <IconSparkles size={15} />
           <span>Aether AI</span>
-          <span className={`dot ${health === null ? 'wait' : health ? 'ok' : 'bad'}`} title={health ? 'Ollama connected' : 'Ollama not reachable'} />
+          <span
+            className={`dot ${health === null ? 'wait' : health?.ollama ? 'ok' : health?.cloud ? 'cloud' : 'bad'}`}
+            title={
+              health === null
+                ? 'Checking…'
+                : health?.ollama
+                  ? 'Ollama connected (local brain)'
+                  : health?.cloud
+                    ? 'Ollama offline — using cloud fallback for chat'
+                    : 'Ollama not reachable'
+            }
+          />
         </div>
         <div className="sidebar-head-actions">
           <select
@@ -264,7 +340,7 @@ export default function Sidebar(): JSX.Element {
         </button>
       </div>
 
-      {health === false && (
+      {health && !health.ollama && !health.cloud && (
         <div className="ollama-hint">
           <b>Ollama is not running.</b>
           <br />
@@ -359,6 +435,32 @@ export default function Sidebar(): JSX.Element {
               </button>
             )}
           </div>
+          <div className="agent-options">
+            <button className={`chip small ${record ? 'on' : ''}`} onClick={() => setRecord(!record)} title="Record every action so you can replay it later without the model">
+              ⏺ Record as macro
+            </button>
+          </div>
+          {savedSteps && !running && (
+            <div className="macro-save">
+              <input
+                className="task"
+                value={macroName}
+                autoFocus
+                placeholder="Name this macro…"
+                maxLength={60}
+                onChange={(e) => setMacroName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void saveMacro()
+                }}
+              />
+              <button className="macro-save-btn" onClick={() => void saveMacro()} disabled={!macroName.trim()}>
+                💾 Save ({savedSteps.length} steps)
+              </button>
+              <button className="macro-dismiss" onClick={() => setSavedSteps(null)} title="Discard recording">
+                ✕
+              </button>
+            </div>
+          )}
           {settings?.confirmAgentActions === false && (
             <div className="warn-line">⚠ Confirm-each-action is OFF in settings — the agent acts without asking.</div>
           )}
@@ -417,6 +519,33 @@ export default function Sidebar(): JSX.Element {
               </div>
             </div>
           )}
+          <div className="macros">
+            <button className="macros-toggle" onClick={() => setMacrosOpen(!macrosOpen)}>
+              <span>{macrosOpen ? '▾' : '▸'} Macros</span>
+              <span className="macros-count">{macros.length}</span>
+            </button>
+            {macrosOpen && (
+              <div className="macros-list">
+                {macros.length === 0 && <div className="macros-empty">Run the agent with ⏺ Record to save a replayable macro.</div>}
+                {macros.map((m) => (
+                  <div key={m.id} className="macro-row">
+                    <div className="macro-info">
+                      <div className="macro-name">{m.name}</div>
+                      <div className="macro-meta">
+                        {m.steps.length} steps · {m.runs} runs
+                      </div>
+                    </div>
+                    <button className="macro-run" disabled={running} onClick={() => void runMacro(m.id)} title="Replay on the current tab">
+                      ▶
+                    </button>
+                    <button className="macro-del" onClick={() => void removeMacro(m.id)} title="Delete macro">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -426,8 +555,11 @@ export default function Sidebar(): JSX.Element {
 function describe(tool?: string, args?: Record<string, unknown>): string {
   if (!tool) return ''
   if (tool === 'navigate') return `→ ${args?.url}`
-  if (tool === 'click') return `→ element [${args?.ref}]`
-  if (tool === 'type') return `→ element [${args?.ref}] "${String(args?.text || '').slice(0, 40)}"`
+  if (tool === 'click') return args?.__locator ? `→ ${String(args.__locator)}` : `→ element [${args?.ref}]`
+  if (tool === 'type')
+    return args?.__locator
+      ? `→ ${String(args.__locator)} "${String(args?.text || '').slice(0, 40)}"`
+      : `→ element [${args?.ref}] "${String(args?.text || '').slice(0, 40)}"`
   if (tool === 'find_text') return `→ "${args?.query}"`
   if (tool === 'scroll') return `→ ${args?.direction}`
   if (tool === 'read_page') return '→ extracting page'
@@ -436,6 +568,7 @@ function describe(tool?: string, args?: Record<string, unknown>): string {
   if (tool === 'ask_user') return `→ "${String(args?.question || '').slice(0, 80)}"`
   if (tool === 'press_key') return `→ ${args?.key}`
   if (tool === 'go_back') return '→ back'
+  if (tool === 'thinking') return '· thinking'
   return ''
 }
 

@@ -95,6 +95,13 @@ export class TabManager {
       return { action: 'deny' }
     })
     wc.on('context-menu', (_e, params) => onContextMenu(wc, params, this))
+    wc.on('found-in-page', (_e, result) => {
+      this.sendToChrome('find:result', {
+        tabId: id,
+        active: result.activeMatchOrdinal,
+        matches: result.matches
+      })
+    })
 
     view.setBounds(this.bounds)
     wc.loadURL(url).catch(() => undefined)
@@ -219,6 +226,19 @@ export class TabManager {
     const [id] = this.order.splice(from, 1)
     this.order.splice(to, 0, id)
     this.emit()
+  }
+
+  /** In-page find (Ctrl+F find bar). */
+  find(id: number, query: string, forward = true): void {
+    const tab = this.tabs.get(id)
+    if (!tab || !query) return
+    tab.view.webContents.findInPage(query, { forward })
+  }
+
+  stopFind(id: number): void {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    tab.view.webContents.stopFindInPage('clearSelection')
   }
 
   /** Push an event to the browser-chrome renderer (tab strip / sidebar UI). */

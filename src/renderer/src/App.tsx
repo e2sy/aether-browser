@@ -3,6 +3,8 @@ import { useApp } from './state/store'
 import TabStrip from './components/TabStrip'
 import Toolbar from './components/Toolbar'
 import Sidebar from './components/Sidebar'
+import FindBar from './components/FindBar'
+import PermPrompt from './components/PermPrompt'
 
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
@@ -36,6 +38,8 @@ export default function App(): JSX.Element {
         <div className="webarea" />
         {sidebarOpen && <Sidebar />}
       </div>
+      <FindBar />
+      <PermPrompt />
     </div>
   )
 }

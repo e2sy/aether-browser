@@ -1107,3 +1107,307 @@ body {
   background: var(--faint);
   background-clip: content-box;
 }
+
+/* ============ v0.4: find bar ============ */
+.findbar {
+  position: fixed;
+  top: 84px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.findbar input {
+  width: 190px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+}
+
+.findbar input:focus {
+  border-color: var(--accent);
+}
+
+.find-count {
+  font-size: 11.5px;
+  color: var(--muted);
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.find-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.find-btn:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+
+/* ============ v0.4: permission prompt ============ */
+.perm-prompt {
+  position: fixed;
+  top: 84px;
+  left: 16px;
+  z-index: 60;
+  width: 300px;
+  padding: 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.perm-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.perm-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.perm-remember input {
+  accent-color: var(--accent2);
+  width: 13px;
+  height: 13px;
+}
+
+.perm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.perm-actions .deny,
+.perm-actions .allow {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.perm-actions .deny {
+  color: var(--muted);
+  background: var(--bg3);
+}
+
+.perm-actions .deny:hover {
+  color: var(--danger);
+}
+
+.perm-actions .allow {
+  color: #fff;
+  background: var(--accent2);
+}
+
+.perm-actions .allow:hover {
+  background: var(--accent);
+}
+
+/* ============ v0.4: cloud status dot ============ */
+.dot.cloud {
+  background: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+}
+
+/* ============ v0.4: agent options + macros ============ */
+.agent-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chip.small {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 14px;
+}
+
+.macro-save {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.macro-save input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+}
+
+.macro-save input:focus {
+  border-color: var(--accent);
+}
+
+.macro-save-btn {
+  flex: none;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent2);
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.macro-save-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.macro-dismiss {
+  flex: none;
+  width: 30px;
+  border: none;
+  border-radius: 9px;
+  background: var(--bg3);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.macro-dismiss:hover {
+  color: var(--danger);
+}
+
+.macros {
+  flex: none;
+  border-top: 1px solid var(--border);
+}
+
+.macros-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.macros-toggle:hover {
+  color: var(--text);
+}
+
+.macros-count {
+  background: var(--bg3);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 10.5px;
+}
+
+.macros-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 10px 10px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.macros-empty {
+  color: var(--faint);
+  font-size: 11.5px;
+  padding: 4px 6px 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+.macro-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.macro-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.macro-name {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.macro-meta {
+  font-size: 10.5px;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+.macro-run,
+.macro-del {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.macro-run:hover:not(:disabled) {
+  background: rgba(124, 140, 255, 0.15);
+  color: var(--accent);
+}
+
+.macro-run:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.macro-del:hover {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+}

@@ -51,7 +51,8 @@ const api = {
     subscribe: subscribe('tabs:state'),
     onMaximized: subscribe('win:maximized'),
     onSidebarInject: subscribe('sidebar:inject'),
-    onSidebarShow: subscribe('sidebar:show')
+    onSidebarShow: subscribe('sidebar:show'),
+    onFindShow: subscribe('find:show')
   },
 
   tabs: {
@@ -83,6 +84,8 @@ const api = {
 
   ai: {
     health: () => ipcRenderer.invoke('ai:health'),
+    /** which brains are available: { ollama, cloud } */
+    status: () => ipcRenderer.invoke('ai:status'),
     models: () => ipcRenderer.invoke('ai:models'),
     pageContext: () => ipcRenderer.invoke('ai:pageContext'),
     chat: (messages: Array<{ role: string; content: string }>, usePageContext: boolean, model?: string) =>
@@ -108,11 +111,45 @@ const api = {
   },
 
   agent: {
-    run: (task: string) => ipcRenderer.invoke('agent:run', task),
+    run: (task: string, record?: boolean) => ipcRenderer.invoke('agent:run', { task, record: Boolean(record) }),
     respond: (requestId: string, approved: boolean) => ipcRenderer.invoke('agent:respond', requestId, approved),
     answer: (requestId: string, text: string) => ipcRenderer.invoke('agent:answer', requestId, text),
     cancel: (requestId: string) => ipcRenderer.invoke('agent:cancel', requestId),
     onEvent: subscribe('agent:event')
+  },
+
+  /** Ctrl+F in-page search */
+  find: {
+    start: (tabId: number, query: string, forward?: boolean) =>
+      ipcRenderer.invoke('find:start', tabId, query, forward),
+    stop: (tabId: number) => ipcRenderer.invoke('find:stop', tabId),
+    onResult: subscribe('find:result')
+  },
+
+  /** per-site permission prompts + remembered decisions */
+  perms: {
+    respond: (requestId: string, allow: boolean, remember: boolean) =>
+      ipcRenderer.invoke('perms:respond', requestId, allow, remember),
+    list: () => ipcRenderer.invoke('perms:list'),
+    revoke: (origin: string, permission: string) => ipcRenderer.invoke('perms:revoke', origin, permission),
+    clear: () => ipcRenderer.invoke('perms:clear'),
+    onRequest: subscribe('perm:request')
+  },
+
+  /** local per-domain page memory */
+  memory: {
+    list: () => ipcRenderer.invoke('memory:list'),
+    remove: (id: string) => ipcRenderer.invoke('memory:remove', id),
+    clear: () => ipcRenderer.invoke('memory:clear')
+  },
+
+  /** recorded agent macros */
+  macros: {
+    list: () => ipcRenderer.invoke('macros:list'),
+    save: (name: string, task: string, steps: Array<{ tool: string; args: Record<string, unknown> }>) =>
+      ipcRenderer.invoke('macros:save', { name, task, steps }),
+    remove: (id: string) => ipcRenderer.invoke('macros:delete', id),
+    run: (id: string) => ipcRenderer.invoke('macros:run', id)
   },
 
   settings: {
