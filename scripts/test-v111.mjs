@@ -46,7 +46,8 @@ execSync(`cp -r ${APP}/src ${tmp}/src`, { stdio: 'pipe' })
 const entry = path.join(tmp, 'src', 'main', 'testable.ts')
 fs.writeFileSync(
   entry,
-  `export { sanitizeFilename, uniquePath } from './downloads'`
+  `export { sanitizeFilename, uniquePath } from './downloads'
+   export { resolveInput } from './resolve'`
 )
 
 execSync(
@@ -111,6 +112,15 @@ const r = execSync('node scripts/ensure-electron.mjs', { cwd: APP, stdio: 'pipe'
 ok(r !== undefined, 'exits 0 when the platform binary already exists (no needless download)')
 if (createdBin) fs.rmSync(binPath)
 if (createdDist) fs.rmSync(distDir, { recursive: true, force: true })
+
+/* ---------- resolveInput: new-tab search box regression (v1.1.2) ---------- */
+console.log('\nresolveInput — new-tab box must open sites, not just search')
+ok(B.resolveInput('youtube.com') === 'https://youtube.com', 'youtube.com → opens the site directly')
+ok(B.resolveInput('https://youtube.com/watch?v=x') === 'https://youtube.com/watch?v=x', 'explicit URL passes through unchanged')
+ok(B.resolveInput('www.google.com') === 'https://www.google.com', 'www.google.com → opens the site')
+ok(/^aether:\/\/search\?q=/.test(B.resolveInput('best pizza recipe')), 'plain words → AI search page')
+ok(B.resolveInput('localhost:3000') === 'http://localhost:3000', 'localhost gets http:// scheme')
+ok(B.resolveInput('') === null, 'empty input → no navigation')
 
 /* ---------- summary ---------- */
 console.log(`\n${pass} pass, ${fail} fail`)

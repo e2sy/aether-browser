@@ -2,6 +2,7 @@ import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
+import { resolveInput } from './resolve'
 import { entryForSender, applyLayout } from './windows'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
 import {
@@ -569,7 +570,11 @@ export function registerIpc(): void {
   ipcMain.handle('internal:search', (e, q: string) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
     const text = String(q || '').trim()
-    if (text) e.sender.loadURL('aether://search?q=' + encodeURIComponent(text))
+    if (!text) return
+    // resolve exactly like the omnibox: "youtube.com" opens the site,
+    // plain words run the chosen search (AI page / Google / DuckDuckGo)
+    const url = resolveInput(text)
+    if (url) e.sender.loadURL(url)
   })
 
   ipcMain.handle('internal:open', (e, url: string) => {
