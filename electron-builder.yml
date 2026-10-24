@@ -16,6 +16,11 @@ win:
   icon: build/icon.ico
   target:
     - nsis
+  fileAssociations:
+    - ext: crx
+      name: Aether Extension Package
+      role: Viewer
+      description: Install this Chrome extension into Aether
 linux:
   category: Utility
   icon: build/icon.png

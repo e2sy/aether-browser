@@ -252,6 +252,37 @@ export default function Sidebar(): JSX.Element {
     [loadMacros]
   )
 
+  // ----- macro import / export (.macro.json files) -----
+  const exportMacro = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const res = (await window.aether.macros.export(id)) as { path?: string | null }
+        if (res?.path) {
+          setLog((l) => [...l, { kind: 'info', text: `Macro exported to ${res.path}` }])
+        }
+      } catch (err) {
+        setLog((l) => [...l, { kind: 'error', text: 'Export failed: ' + String((err as Error)?.message || err) }])
+      }
+    },
+    []
+  )
+
+  const importMacro = useCallback(async (): Promise<void> => {
+    try {
+      const res = (await window.aether.macros.import()) as { macro?: Macro; warning?: string }
+      if (res?.macro) {
+        setLog((l) => [
+          ...l,
+          { kind: 'info', text: `Imported macro "${res.macro!.name}" (${res.macro!.steps.length} steps)${res.warning ? ' — ' + res.warning : ''}` }
+        ])
+        setMacrosOpen(true)
+        void loadMacros()
+      }
+    } catch (err) {
+      setLog((l) => [...l, { kind: 'error', text: 'Import failed: ' + String((err as Error)?.message || err) }])
+    }
+  }, [loadMacros])
+
   // ----- macro editor (edit steps / rename / reorder) -----
   const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -585,7 +616,19 @@ export default function Sidebar(): JSX.Element {
           <div className="macros">
             <button className="macros-toggle" onClick={() => setMacrosOpen(!macrosOpen)}>
               <span>{macrosOpen ? '▾' : '▸'} Macros</span>
-              <span className="macros-count">{macros.length}</span>
+              <span className="macros-head-btns">
+                <span className="macros-count">{macros.length}</span>
+                <button
+                  className="macro-io"
+                  title="Import a shared macro (.macro.json)"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void importMacro()
+                  }}
+                >
+                  ⤓
+                </button>
+              </span>
             </button>
             {macrosOpen && (
               <div className="macros-list">
@@ -659,6 +702,13 @@ export default function Sidebar(): JSX.Element {
                       </button>
                       <button className="macro-run" onClick={() => startEdit(m)} title="Edit steps">
                         ✎
+                      </button>
+                      <button
+                        className="macro-run"
+                        onClick={() => void exportMacro(m.id)}
+                        title="Export as .macro.json to share"
+                      >
+                        ⤒
                       </button>
                       <button className="macro-del" onClick={() => void removeMacro(m.id)} title="Delete macro">
                         ✕

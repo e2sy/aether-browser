@@ -14,6 +14,8 @@ export interface TabMeta {
   audible: boolean
   /** Memory saver unloaded this tab — reloads on activation */
   discarded: boolean
+  /** Light sleep: muted + throttled at 1 fps — wakes instantly on activation */
+  hibernated: boolean
 }
 
 export interface TabsState {
@@ -37,7 +39,8 @@ export interface Settings {
   pageMemory: boolean
   /** Optional OpenAI-compatible fallback used when Ollama is unreachable (chat + AI search only) */
   cloudFallback: CloudFallbackConfig
-  /** Auto-discard idle background tabs after N minutes (0 disables memory saver) */
+  /** Tiered memory saver: hibernate idle background tabs after N minutes,
+   *  fully unload them after 3×N minutes (0 disables the memory saver) */
   memorySaver: number
   /** Unpacked extensions to load at boot */
   extensions: ExtensionRecord[]
@@ -244,4 +247,20 @@ export interface MacroUpdate {
   name?: string
   task?: string
   steps?: MacroStep[]
+}
+
+/** On-disk macro file produced by macros:export (also accepted by import). */
+export interface MacroFile {
+  aetherMacro: 1
+  name: string
+  task: string
+  steps: MacroStep[]
+  exportedAt?: number
+}
+
+/** Result of installing an extension from a .crx / .zip file. */
+export interface ExtensionInstallResult {
+  name: string
+  path: string
+  enabled: boolean
 }

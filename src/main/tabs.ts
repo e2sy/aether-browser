@@ -22,6 +22,25 @@ const hostOf = (url: string): string => {
 const ZOOM_STEP = 0.5
 const ZOOM_MAX = 5.5
 
+/**
+ * Pure tier decision for the memory saver (unit-tested):
+ *   idle ≥ base      → hibernate (light sleep, instant wake)
+ *   idle ≥ 3 × base  → discard   (view unloaded, reload on wake)
+ */
+export function tierFor(idleMinutes: number, baseMinutes: number): 'none' | 'hibernate' | 'discard' {
+  if (!baseMinutes || baseMinutes <= 0) return 'none'
+  if (idleMinutes >= baseMinutes * 3) return 'discard'
+  if (idleMinutes >= baseMinutes) return 'hibernate'
+  return 'none'
+}
+
+export interface TabManagerHooks {
+  /** called instead of closing the window itself when the last tab closes */
+  onEmpty?: (win: BrowserWindow) => void
+  /** “Move tab to new window” — implemented by the window manager */
+  popout?: (win: BrowserWindow, tabId: number) => void
+}
+
 export class TabManager {
   private tabs = new Map<number, Tab>()
   private order: number[] = []
@@ -33,8 +52,14 @@ export class TabManager {
   constructor(
     private win: BrowserWindow,
     private preloadPath: string,
-    private onState: () => void
+    private onState: () => void,
+    private hooks: TabManagerHooks = {}
   ) {}
+
+  /** The window this tab collection lives in (used by the extensions host). */
+  get window(): BrowserWindow {
+    return this.win
+  }
 
   create(url = 'aether://newtab', activate = true): number {
     const id = this.nextId++
@@ -51,6 +76,7 @@ export class TabManager {
       muted: false,
       audible: false,
       discarded: false,
+      hibernated: false,
       lastActiveAt: Date.now()
     }
     this.tabs.set(id, tab)
@@ -75,6 +101,7 @@ export class TabManager {
     })
     tab.view = view
     tab.discarded = false
+    tab.hibernated = false
     const wc = view.webContents
 
     wc.on('page-title-updated', (_e, title) => {
@@ -182,6 +209,8 @@ export class TabManager {
     // wake a memory-saver-discarded tab
     if (tab.discarded || !tab.view) {
       this.spawnView(tab, tab.url || 'aether://newtab')
+    } else if (tab.hibernated) {
+      this.wake(tab)
     }
 
     if (this.activeId !== null && this.activeId !== id) {
@@ -225,7 +254,10 @@ export class TabManager {
         this.activate(next)
       }
     }
-    if (!this.order.length) this.win.close()
+    if (!this.order.length) {
+      if (this.hooks.onEmpty) this.hooks.onEmpty(this.win)
+      else this.win.close()
+    }
     this.emit()
   }
 
@@ -365,12 +397,68 @@ export class TabManager {
     if (!tab || tab.discarded) return
     if (tab.pinned || tab.id === this.activeId) return
     tab.discarded = true
+    tab.hibernated = false
     tab.loading = false
     tab.canGoBack = false
     tab.canGoForward = false
     tab.audible = false
     this.destroyView(tab)
     this.emit()
+  }
+
+  // ---------- tier 1: hibernation (light sleep) ----------
+
+  /**
+   * Hibernate a background tab: mute it, throttle rendering to 1 fps and let
+   * Chromium background-throttle its timers. The view stays alive, so waking
+   * is instant — unlike discard, which reloads the page.
+   */
+  hibernate(id: number): void {
+    const tab = this.tabs.get(id)
+    if (!tab || tab.discarded || tab.hibernated) return
+    if (tab.pinned || tab.id === this.activeId || !tab.view) return
+    tab.hibernated = true
+    this.applyHibernation(tab)
+    console.log(`[memory-saver] hibernating idle tab ${id} (${tab.url})`)
+    this.emit()
+  }
+
+  toggleHibernated(id: number): void {
+    const tab = this.tabs.get(id)
+    if (!tab) return
+    if (tab.hibernated) {
+      this.wake(tab)
+      this.emit()
+    } else {
+      this.hibernate(id)
+    }
+  }
+
+  private applyHibernation(tab: Tab): void {
+    const wc = tab.view?.webContents
+    if (!wc) return
+    try {
+      wc.setAudioMuted(true)
+      wc.setFrameRate(1)
+    } catch {
+      /* view gone */
+    }
+  }
+
+  /** Restore a hibernated tab to full speed (called on activation). */
+  private wake(tab: Tab): void {
+    if (!tab.hibernated) return
+    tab.hibernated = false
+    const wc = tab.view?.webContents
+    if (wc) {
+      try {
+        wc.setFrameRate(60)
+        wc.setAudioMuted(tab.muted)
+      } catch {
+        /* view gone */
+      }
+    }
+    tab.lastActiveAt = Date.now()
   }
 
   /** Is this tab allowed to be auto-discarded by the memory saver? */
@@ -385,18 +473,29 @@ export class TabManager {
     )
   }
 
-  /** Periodically unload idle background tabs (memory saver). */
+  /** Is this tab allowed to be auto-hibernated (tier 1)? */
+  private hibernatable(tab: Tab): boolean {
+    return this.discardable(tab) && !tab.hibernated
+  }
+
+  /** Periodically hibernate then unload idle background tabs (tiered). */
   startMemorySaver(): void {
     if (this.saverTimer) clearInterval(this.saverTimer)
     this.saverTimer = setInterval(() => {
       const minutes = mergedSettings().memorySaver
       if (!minutes || minutes <= 0) return
-      const cutoff = Date.now() - minutes * 60_000
+      const now = Date.now()
       let changed = false
       for (const tab of [...this.tabs.values()]) {
-        if (this.discardable(tab) && tab.lastActiveAt < cutoff) {
+        const idleMin = (now - tab.lastActiveAt) / 60_000
+        const tier = tierFor(idleMin, minutes)
+        if (tier === 'discard' && this.discardable(tab)) {
           console.log(`[memory-saver] discarding idle tab ${tab.id} (${tab.url})`)
+          tab.hibernated = false
           this.discard(tab.id)
+          changed = true
+        } else if (tier === 'hibernate' && this.hibernatable(tab)) {
+          this.hibernate(tab.id)
           changed = true
         }
       }
@@ -407,6 +506,11 @@ export class TabManager {
   stopMemorySaver(): void {
     if (this.saverTimer) clearInterval(this.saverTimer)
     this.saverTimer = null
+  }
+
+  /** Move this tab out into its own window (window manager does the work). */
+  popout(id: number): void {
+    if (this.hooks.popout) this.hooks.popout(this.win, id)
   }
 
   closeOthers(id: number): void {
@@ -515,7 +619,8 @@ export class TabManager {
         pinned: t.pinned,
         muted: t.muted,
         audible: t.audible,
-        discarded: t.discarded
+        discarded: t.discarded,
+        hibernated: t.hibernated
       }))
     return { tabs, activeId: this.activeId }
   }

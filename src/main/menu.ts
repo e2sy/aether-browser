@@ -1,14 +1,11 @@
 import { app, Menu, MenuItemConstructorOptions, clipboard, shell } from 'electron'
 import type { WebContents } from 'electron'
 import type { TabManager } from './tabs'
+import { focusedEntry, createBrowserWindow, popoutTab } from './windows'
 import { contextMenuItems } from './extensions'
 
-interface Deps {
-  getTabs: () => TabManager | undefined
-}
-
-export function buildMenu(deps: Deps): Menu {
-  const tabs = (): TabManager | undefined => deps.getTabs()
+export function buildMenu(): Menu {
+  const tabs = (): TabManager | undefined => focusedEntry()?.tabs
   const activeId = (): number | null => tabs()?.activeId ?? null
   const withActive = (fn: (tm: TabManager, id: number) => void): void => {
     const tm = tabs()
@@ -27,6 +24,21 @@ export function buildMenu(deps: Deps): Menu {
       label: 'File',
       submenu: [
         { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => tabs()?.create() },
+        {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: (): void => {
+            createBrowserWindow()
+          }
+        },
+        {
+          label: 'Move Tab to New Window',
+          click: (): void => {
+            const entry = focusedEntry()
+            const id = entry?.tabs.activeId
+            if (entry && typeof id === 'number') popoutTab(entry.win.id, id)
+          }
+        },
         {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
@@ -150,7 +162,7 @@ export function buildMenu(deps: Deps): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '1.0.0',
+              applicationVersion: '1.1.0',
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()

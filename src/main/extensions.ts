@@ -16,8 +16,35 @@ import type { ExtensionInfo, ExtensionRecord } from '../shared/types'
 import { mergedSettings, settings } from './store'
 
 let exts: ElectronChromeExtensions | null = null
-let tabsRef: TabManager | null = null
-let winRef: BrowserWindow | null = null
+
+/**
+ * Multi-window: every browser window registers its TabManager here, so the
+ * extensions host can resolve tabs regardless of which window they live in.
+ */
+const tabManagers = new Set<TabManager>()
+
+export function registerTabManager(tm: TabManager): void {
+  tabManagers.add(tm)
+}
+
+export function unregisterTabManager(tm: TabManager): void {
+  tabManagers.delete(tm)
+}
+
+export function tabManagerCount(): number {
+  return tabManagers.size
+}
+
+function findByWebContentsAny(wc: WebContents): { tab: ReturnType<TabManager['get']>; tm: TabManager } | null {
+  for (const tm of tabManagers) {
+    const tab = tm.findByWebContents(wc)
+    if (tab) return { tab, tm }
+  }
+  return null
+}
+
+/** Where should an extension-created tab open? The focused window. */
+let targetResolver: (() => { tabs: TabManager; win: BrowserWindow } | undefined) | null = null
 
 /** Minimal shape of the PopupView emitted with 'browser-action-popup-created'. */
 interface PopupLike {
@@ -25,9 +52,10 @@ interface PopupLike {
   destroy(): void
 }
 
-export function initExtensions(win: BrowserWindow, tabs: TabManager): ElectronChromeExtensions {
-  winRef = win
-  tabsRef = tabs
+export function initExtensions(
+  target: () => { tabs: TabManager; win: BrowserWindow } | undefined
+): ElectronChromeExtensions {
+  targetResolver = target
   const ses = session.defaultSession
 
   exts = new ElectronChromeExtensions({
@@ -35,25 +63,28 @@ export function initExtensions(win: BrowserWindow, tabs: TabManager): ElectronCh
     // bundled main can't rely on __dirname — point at the real module folder
     modulePath: path.join(app.getAppPath(), 'node_modules/electron-chrome-extensions'),
     createTab: async (details) => {
+      const target0 = targetResolver?.()
+      if (!target0) throw new Error('No browser window available')
       const url =
         typeof details.url === 'string' && /^(https?|aether|chrome-extension):/i.test(details.url)
           ? details.url
           : undefined
-      const id = tabs.create(url, details.active !== false)
-      const tab = tabs.get(id)
+      const id = target0.tabs.create(url, details.active !== false)
+      const tab = target0.tabs.get(id)
       if (!tab?.view) throw new Error('Failed to create tab for extension')
-      return [tab.view.webContents, win]
+      return [tab.view.webContents, target0.win]
     },
     selectTab: (wc: WebContents) => {
-      const tab = tabs.findByWebContents(wc)
-      if (tab) tabs.activate(tab.id)
+      const found = findByWebContentsAny(wc)
+      if (found?.tab) found.tm.activate(found.tab.id)
     },
     removeTab: (wc: WebContents) => {
-      const tab = tabs.findByWebContents(wc)
-      if (tab) tabs.close(tab.id)
+      const found = findByWebContentsAny(wc)
+      if (found?.tab) found.tm.close(found.tab.id)
     },
     assignTabDetails: (details, wc) => {
-      const tab = tabs.findByWebContents(wc)
+      const found = findByWebContentsAny(wc)
+      const tab = found?.tab
       if (!tab) return
       details.title = tab.title
       details.url = tab.url
@@ -167,24 +198,33 @@ export async function listExtensionInfos(): Promise<ExtensionInfo[]> {
 
 /** Ask for a folder and load it as an unpacked extension. */
 export async function addExtensionFromDialog(): Promise<ExtensionInfo | null> {
-  if (!winRef || winRef.isDestroyed()) throw new Error('No window')
-  const res = await dialog.showOpenDialog(winRef, {
+  const res = await dialog.showOpenDialog({
     title: 'Load unpacked extension',
     buttonLabel: 'Load extension',
     properties: ['openDirectory'],
     defaultPath: app.getPath('downloads')
   })
   if (res.canceled || !res.filePaths.length) return null
-  const dir = res.filePaths[0]
-  if (!fs.existsSync(path.join(dir, 'manifest.json'))) {
+  return installFromFolder(res.filePaths[0])
+}
+
+/**
+ * Shared installer used by “Load unpacked…”, the .crx/.zip one-click flow and
+ * extension imports: validates the folder, avoids duplicates, loads + records.
+ */
+export async function installFromFolder(dir: string): Promise<ExtensionInfo> {
+  const target = path.resolve(String(dir || ''))
+  if (!fs.existsSync(path.join(target, 'manifest.json'))) {
     throw new Error('Not an extension folder — manifest.json not found')
   }
   const ses = session.defaultSession
   const existing = records()
-  if (existing.some((r) => r.path === dir)) throw new Error('This extension folder is already installed')
-  const ext = await ses.loadExtension(dir, { allowFileAccess: true })
-  saveRecords([...existing, { path: dir, enabled: true }])
-  return toInfo({ path: dir, enabled: true }, ext)
+  if (existing.some((r) => path.resolve(r.path) === target)) {
+    throw new Error('This extension folder is already installed')
+  }
+  const ext = await ses.loadExtension(target, { allowFileAccess: true })
+  saveRecords([...existing, { path: target, enabled: true }])
+  return toInfo({ path: target, enabled: true }, ext)
 }
 
 /** Enable/disable by folder path (disabled = unloaded but remembered). */

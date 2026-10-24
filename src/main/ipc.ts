@@ -1,7 +1,8 @@
-import { ipcMain, IpcMainEvent, IpcMainInvokeEvent, BrowserWindow } from 'electron'
+import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
+import { entryForSender, applyLayout } from './windows'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
 import {
   settings,
@@ -20,7 +21,7 @@ import {
   DEFAULT_SETTINGS
 } from './store'
 import { applyAdblockSetting } from './adblock'
-import { ollamaHealth, listModels, pickDefaultModel, friendlyError, OllamaMessage } from './ollama'
+import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama'
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
@@ -30,14 +31,15 @@ import {
   revokePermission,
   clearPermissions
 } from './permissions'
-import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro } from './macros'
-import { installDownloadHandler, cancelDownload, revealDownload } from './downloads'
+import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
+import { cancelDownload, revealDownload } from './downloads'
 import {
   listExtensionInfos,
   addExtensionFromDialog,
   toggleExtension,
   removeExtension
 } from './extensions'
+import { installExtensionFromDialog, installExtensionFromFile } from './crx'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
@@ -48,18 +50,7 @@ import type { MacroStep } from '../shared/types'
 
 const HISTORY_WINDOW = 20
 
-interface Deps {
-  getWindow: () => BrowserWindow | null
-  getTabs: () => TabManager | undefined
-  ui: { sidebarOpen: boolean }
-  applyLayout: () => void
-}
-
 const aborts = new Map<string, AbortController>()
-
-function isChrome(e: IpcMainEvent | IpcMainInvokeEvent, win: BrowserWindow | null): boolean {
-  return Boolean(win && e.sender === win.webContents)
-}
 
 function isInternal(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
   try {
@@ -69,49 +60,38 @@ function isInternal(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
   }
 }
 
-function privileged(e: IpcMainEvent | IpcMainInvokeEvent, win: BrowserWindow | null): boolean {
-  return isChrome(e, win) || isInternal(e)
-}
-
 /** Guard helper — throws for unauthorized senders so pages can't drive the browser. */
-function guard(e: IpcMainEvent | IpcMainInvokeEvent, win: BrowserWindow | null, who: string): void {
-  if (!privileged(e, win)) {
-    throw new Error(`Unauthorized IPC call to ${who} from ${e.sender.getURL() || 'unknown'}`)
+function guard(e: IpcMainEvent | IpcMainInvokeEvent, who: string): void {
+  try {
+    if (isInternal(e)) return
+  } catch {
+    /* fall through */
   }
+  throw new Error(`Unauthorized IPC call to ${who} from ${e.sender.getURL() || 'unknown'}`)
 }
 
-function requireTab(tm: TabManager | undefined, id: number) {
-  const tab = tm?.get(id)
-  if (!tab) throw new Error('Tab not found: ' + id)
-  return tab
-}
-
-export function registerIpc(deps: Deps): void {
-  const { getWindow, getTabs, ui, applyLayout } = deps
-  const win = (): BrowserWindow | null => getWindow()
-  const tm = (): TabManager | undefined => getTabs()
-
-  // ---------- tabs ----------
+export function registerIpc(): void {
+  // ---------- tabs (routed to the sender's own window) ----------
   ipcMain.handle('tabs:create', (e, url?: string) => {
-    guard(e, win(), 'tabs:create')
-    return tm()?.create(url && /^https?:\/\//i.test(url) ? url : undefined)
+    guard(e, 'tabs:create')
+    return fromSender(e)?.tabs.create(url && /^https?:\/\//i.test(url) ? url : undefined)
   })
 
   ipcMain.handle('tabs:list', (e) => {
-    guard(e, win(), 'tabs:list')
-    return tm()?.getState()
+    guard(e, 'tabs:list')
+    return fromSender(e)?.tabs.getState()
   })
 
   ipcMain.handle('tabs:omnibox', (e, id: number, text: string) => {
-    guard(e, win(), 'tabs:omnibox')
-    tm()?.navigate(Number(id), String(text || ''))
+    guard(e, 'tabs:omnibox')
+    fromSender(e)?.tabs.navigate(Number(id), String(text || ''))
   })
 
-  const simple = (channel: string, fn: (t: TabManager, id: number) => void): void => {
+  const simple = (channel: string, fn: (m: TabManager, id: number) => void): void => {
     ipcMain.handle(channel, (e, id: number) => {
-      guard(e, win(), channel)
-      const manager = tm()
-      if (manager) fn(manager, Number(id))
+      guard(e, channel)
+      const entry = fromSender(e)
+      if (entry) fn(entry.tabs, Number(id))
     })
   }
   simple('tabs:close', (m, id) => m.close(id))
@@ -122,73 +102,83 @@ export function registerIpc(deps: Deps): void {
   simple('tabs:stop', (m, id) => m.stop(id))
 
   ipcMain.handle('tabs:reorder', (e, from: number, to: number) => {
-    guard(e, win(), 'tabs:reorder')
-    tm()?.reorder(Number(from), Number(to))
+    guard(e, 'tabs:reorder')
+    fromSender(e)?.tabs.reorder(Number(from), Number(to))
   })
 
-  // tab extras: pin / mute / duplicate / discard / bulk close
+  // tab extras: pin / mute / duplicate / discard / hibernate / popout / bulk close
   ipcMain.handle('tabs:setPinned', (e, id: number, pinned: boolean) => {
-    guard(e, win(), 'tabs:setPinned')
-    tm()?.setPinned(Number(id), Boolean(pinned))
+    guard(e, 'tabs:setPinned')
+    fromSender(e)?.tabs.setPinned(Number(id), Boolean(pinned))
   })
   ipcMain.handle('tabs:toggleMuted', (e, id: number) => {
-    guard(e, win(), 'tabs:toggleMuted')
-    tm()?.toggleMuted(Number(id))
+    guard(e, 'tabs:toggleMuted')
+    fromSender(e)?.tabs.toggleMuted(Number(id))
   })
   ipcMain.handle('tabs:duplicate', (e, id: number) => {
-    guard(e, win(), 'tabs:duplicate')
-    return tm()?.duplicate(Number(id))
+    guard(e, 'tabs:duplicate')
+    return fromSender(e)?.tabs.duplicate(Number(id))
   })
   ipcMain.handle('tabs:discard', (e, id: number) => {
-    guard(e, win(), 'tabs:discard')
-    tm()?.discard(Number(id))
+    guard(e, 'tabs:discard')
+    fromSender(e)?.tabs.discard(Number(id))
+  })
+  ipcMain.handle('tabs:hibernate', (e, id: number) => {
+    guard(e, 'tabs:hibernate')
+    fromSender(e)?.tabs.toggleHibernated(Number(id))
+  })
+  ipcMain.handle('tabs:popout', (e, id: number) => {
+    guard(e, 'tabs:popout')
+    fromSender(e)?.tabs.popout(Number(id))
   })
   ipcMain.handle('tabs:closeOthers', (e, id: number) => {
-    guard(e, win(), 'tabs:closeOthers')
-    tm()?.closeOthers(Number(id))
+    guard(e, 'tabs:closeOthers')
+    fromSender(e)?.tabs.closeOthers(Number(id))
   })
   ipcMain.handle('tabs:closeRight', (e, id: number) => {
-    guard(e, win(), 'tabs:closeRight')
-    tm()?.closeRight(Number(id))
+    guard(e, 'tabs:closeRight')
+    fromSender(e)?.tabs.closeRight(Number(id))
   })
 
   // per-site zoom
   ipcMain.handle('tabs:zoom', (e, action: 'in' | 'out' | 'reset') => {
-    guard(e, win(), 'tabs:zoom')
+    guard(e, 'tabs:zoom')
     const a = action === 'reset' ? 'reset' : action === 'out' ? 'out' : 'in'
-    tm()?.zoomForActive(a)
+    fromSender(e)?.tabs.zoomForActive(a)
   })
 
   // ---------- window chrome ----------
   ipcMain.handle('ui:setSidebar', (e, open: boolean) => {
-    guard(e, win(), 'ui:setSidebar')
-    ui.sidebarOpen = Boolean(open)
-    applyLayout()
+    guard(e, 'ui:setSidebar')
+    const entry = fromSender(e)
+    if (!entry) return
+    entry.ui.sidebarOpen = Boolean(open)
+    applyLayout(entry)
   })
 
   ipcMain.handle('win:minimize', (e) => {
-    guard(e, win(), 'win:minimize')
-    win()?.minimize()
+    guard(e, 'win:minimize')
+    fromSender(e)?.win.minimize()
   })
   ipcMain.handle('win:maximizeToggle', (e) => {
-    guard(e, win(), 'win:maximizeToggle')
-    const w = win()
-    if (!w) return
-    if (w.isMaximized()) w.unmaximize()
-    else w.maximize()
+    guard(e, 'win:maximizeToggle')
+    const entry = fromSender(e)
+    if (!entry) return
+    if (entry.win.isMaximized()) entry.win.unmaximize()
+    else entry.win.maximize()
   })
   ipcMain.handle('win:close', (e) => {
-    guard(e, win(), 'win:close')
-    win()?.close()
+    guard(e, 'win:close')
+    fromSender(e)?.win.close()
   })
 
   // ---------- settings / bookmarks / history ----------
   ipcMain.handle('settings:get', (e) => {
-    guard(e, win(), 'settings:get')
+    guard(e, 'settings:get')
     return mergedSettings()
   })
   ipcMain.handle('settings:set', (e, patch: Partial<Settings>) => {
-    guard(e, win(), 'settings:set')
+    guard(e, 'settings:set')
     settings.data = { ...DEFAULT_SETTINGS, ...settings.data, ...patch }
     settings.save()
     if (patch.adblock !== undefined) {
@@ -198,53 +188,53 @@ export function registerIpc(deps: Deps): void {
   })
 
   ipcMain.handle('bookmarks:toggle', (e, entry: { url: string; title: string }) => {
-    guard(e, win(), 'bookmarks:toggle')
+    guard(e, 'bookmarks:toggle')
     return toggleBookmark(entry)
   })
   ipcMain.handle('bookmarks:is', (e, url: string) => isBookmarked(String(url || '')))
   ipcMain.handle('bookmarks:list', (e) => bookmarks.data)
   ipcMain.handle('bookmarks:remove', (e, url: string) => {
-    guard(e, win(), 'bookmarks:remove')
+    guard(e, 'bookmarks:remove')
     removeBookmark(String(url || ''))
   })
   ipcMain.handle('bookmarks:search', (e, q: string) => {
-    guard(e, win(), 'bookmarks:search')
+    guard(e, 'bookmarks:search')
     return searchBookmarks(String(q || ''), 300)
   })
   ipcMain.handle('history:recent', (e) => {
-    guard(e, win(), 'history:recent')
+    guard(e, 'history:recent')
     return recentHistory(30)
   })
   ipcMain.handle('history:search', (e, q: string) => {
-    guard(e, win(), 'history:search')
+    guard(e, 'history:search')
     return searchHistory(String(q || ''), 300)
   })
   ipcMain.handle('history:remove', (e, url: string) => {
-    guard(e, win(), 'history:remove')
+    guard(e, 'history:remove')
     deleteHistory(String(url || ''))
   })
   ipcMain.handle('history:clear', (e) => {
-    guard(e, win(), 'history:clear')
+    guard(e, 'history:clear')
     clearHistory()
   })
   ipcMain.handle('omnibox:suggest', (e, q: string) => {
-    guard(e, win(), 'omnibox:suggest')
+    guard(e, 'omnibox:suggest')
     return searchOmnibox(String(q || ''), 5)
   })
 
   // ---------- AI: health / models (chrome + internal pages only) ----------
   ipcMain.handle('ai:health', async (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'ai:health')
     return { ok: await ollamaHealth() }
   })
 
   ipcMain.handle('ai:status', async (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'ai:status')
     return aiStatus()
   })
 
   ipcMain.handle('ai:models', async (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'ai:models')
     try {
       return { models: await listModels() }
     } catch (err) {
@@ -254,7 +244,7 @@ export function registerIpc(deps: Deps): void {
 
   // ---------- AI: model library (add ANY Ollama model in-app) ----------
   ipcMain.handle('models:detailed', async (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'models:detailed')
     try {
       return { models: await listModelsDetailed() }
     } catch (err) {
@@ -263,12 +253,12 @@ export function registerIpc(deps: Deps): void {
   })
 
   ipcMain.handle('models:catalog', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'models:catalog')
     return { catalog: MODEL_CATALOG }
   })
 
   ipcMain.handle('models:pull', (e, name: string) => {
-    guard(e, win(), 'models:pull')
+    guard(e, 'models:pull')
     const model = String(name || '').trim()
     if (!/^[a-zA-Z0-9._\/:-]{1,120}$/.test(model)) {
       throw new Error('Invalid model name — use an Ollama tag like "qwen3.5:4b"')
@@ -277,28 +267,28 @@ export function registerIpc(deps: Deps): void {
   })
 
   ipcMain.handle('models:pull-cancel', (e, pullId: string) => {
-    guard(e, win(), 'models:pull-cancel')
+    guard(e, 'models:pull-cancel')
     return cancelPull(String(pullId || ''))
   })
 
   ipcMain.handle('models:pulls', (e) => {
-    guard(e, win(), 'models:pulls')
+    guard(e, 'models:pulls')
     return { pulls: activePulls() }
   })
 
   ipcMain.handle('models:delete', async (e, name: string) => {
-    guard(e, win(), 'models:delete')
+    guard(e, 'models:delete')
     await deleteModel(String(name || ''))
     return { ok: true }
   })
 
   ipcMain.handle('models:show', async (e, name: string) => {
-    guard(e, win(), 'models:show')
+    guard(e, 'models:show')
     return modelInfo(String(name || ''))
   })
 
   ipcMain.handle('models:ps', async (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'models:ps')
     try {
       return { running: await runningModels() }
     } catch {
@@ -307,8 +297,8 @@ export function registerIpc(deps: Deps): void {
   })
 
   ipcMain.handle('ai:pageContext', async (e) => {
-    guard(e, win(), 'ai:pageContext')
-    const view = tm()?.activeView()
+    guard(e, 'ai:pageContext')
+    const view = fromSender(e)?.tabs.activeView()
     if (!view) return null
     return extractPage(view)
   })
@@ -316,7 +306,7 @@ export function registerIpc(deps: Deps): void {
   ipcMain.handle(
     'ai:chat',
     async (e, payload: { requestId: string; messages: ChatMsg[]; usePageContext?: boolean; model?: string }) => {
-      guard(e, win(), 'ai:chat')
+      guard(e, 'ai:chat')
       const requestId = String(payload.requestId)
       const sender: WebContents = e.sender
       const ctrl = new AbortController()
@@ -340,13 +330,13 @@ export function registerIpc(deps: Deps): void {
         return { error: msg }
       }
 
-      // page context + per-domain memory notes
+      // page context + per-domain memory notes (from the sender's own window)
       let memoryHost = ''
       let memoryUrl = ''
       let memoryTitle = ''
       const messages: OllamaMessage[] = []
       if (payload.usePageContext) {
-        const view = tm()?.activeView()
+        const view = fromSender(e)?.tabs.activeView()
         if (view) {
           const page = await extractPage(view)
           if (page) {
@@ -389,21 +379,21 @@ export function registerIpc(deps: Deps): void {
   )
 
   ipcMain.handle('ai:abort', (e, requestId: string) => {
-    guard(e, win(), 'ai:abort')
+    guard(e, 'ai:abort')
     aborts.get(String(requestId))?.abort()
   })
 
   // ---------- AI: agent ----------
   ipcMain.handle('agent:run', async (e, payload: { task: string; record?: boolean }) => {
-    guard(e, win(), 'agent:run')
-    const manager = tm()
-    const view = manager?.activeView()
-    if (!manager || !view) throw new Error('No active tab')
+    guard(e, 'agent:run')
+    const entry = fromSender(e)
+    const view = entry?.tabs.activeView()
+    if (!entry || !view) throw new Error('No active tab')
     const task = typeof payload === 'string' ? payload : String(payload?.task || '')
     const record = typeof payload === 'object' && payload !== null && Boolean(payload.record)
     // fire and forget — progress streams via 'agent:event'
     agentRunner
-      .run(task, view, manager, e.sender, { record })
+      .run(task, view, entry.tabs, e.sender, { record })
       .catch((err) => {
         console.error('[agent] crashed', err)
       })
@@ -411,142 +401,168 @@ export function registerIpc(deps: Deps): void {
   })
 
   ipcMain.handle('agent:respond', (e, requestId: string, approved: boolean) => {
-    guard(e, win(), 'agent:respond')
+    guard(e, 'agent:respond')
     agentRunner.respondConfirm(String(requestId), Boolean(approved))
   })
 
   ipcMain.handle('agent:answer', (e, requestId: string, text: string) => {
-    guard(e, win(), 'agent:answer')
+    guard(e, 'agent:answer')
     agentRunner.answer(String(requestId), String(text || ''))
   })
 
   ipcMain.handle('agent:cancel', (e, requestId: string) => {
-    guard(e, win(), 'agent:cancel')
+    guard(e, 'agent:cancel')
     agentRunner.cancel(String(requestId))
   })
 
   // ---------- find in page (Ctrl+F) ----------
   ipcMain.handle('find:start', (e, tabId: number, query: string, forward?: boolean) => {
-    guard(e, win(), 'find:start')
-    tm()?.find(Number(tabId), String(query || ''), forward !== false)
+    guard(e, 'find:start')
+    fromSender(e)?.tabs.find(Number(tabId), String(query || ''), forward !== false)
   })
 
   ipcMain.handle('find:stop', (e, tabId: number) => {
-    guard(e, win(), 'find:stop')
-    tm()?.stopFind(Number(tabId))
+    guard(e, 'find:stop')
+    fromSender(e)?.tabs.stopFind(Number(tabId))
   })
 
   // ---------- per-site permissions ----------
   ipcMain.handle('perms:respond', (e, requestId: string, allow: boolean, remember: boolean) => {
-    guard(e, win(), 'perms:respond')
+    guard(e, 'perms:respond')
     respondPermission(String(requestId || ''), Boolean(allow), Boolean(remember))
   })
 
   ipcMain.handle('perms:list', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'perms:list')
     return listPermissions()
   })
 
   ipcMain.handle('perms:revoke', (e, origin: string, permission: string) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'perms:revoke')
     revokePermission(String(origin || ''), String(permission || ''))
   })
 
   ipcMain.handle('perms:clear', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'perms:clear')
     clearPermissions()
   })
 
   // ---------- page memory (local, per-domain) ----------
   ipcMain.handle('memory:list', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'memory:list')
     return listMemory()
   })
 
   ipcMain.handle('memory:remove', (e, id: string) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'memory:remove')
     removeMemory(String(id || ''))
   })
 
   ipcMain.handle('memory:clear', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'memory:clear')
     clearMemory()
   })
 
-  // ---------- agent macros (record / replay) ----------
+  // ---------- agent macros (record / replay / import / export) ----------
   ipcMain.handle('macros:list', (e) => {
-    guard(e, win(), 'macros:list')
+    guard(e, 'macros:list')
     return listMacros()
   })
 
   ipcMain.handle('macros:save', (e, payload: { name: string; task: string; steps: MacroStep[] }) => {
-    guard(e, win(), 'macros:save')
+    guard(e, 'macros:save')
     const res = saveMacro(payload?.name || '', payload?.task || '', Array.isArray(payload?.steps) ? payload.steps : [])
     if (res.error) throw new Error(res.error)
     return { macro: res.macro }
   })
 
   ipcMain.handle('macros:delete', (e, id: string) => {
-    guard(e, win(), 'macros:delete')
+    guard(e, 'macros:delete')
     deleteMacro(String(id || ''))
   })
 
   ipcMain.handle(
     'macros:update',
     (e, id: string, patch: { name?: string; task?: string; steps?: MacroStep[] }) => {
-      guard(e, win(), 'macros:update')
+      guard(e, 'macros:update')
       const res = updateMacro(String(id || ''), patch || {})
       if (res.error) throw new Error(res.error)
       return { macro: res.macro }
     }
   )
 
+  ipcMain.handle('macros:export', async (e, id: string) => {
+    guard(e, 'macros:export')
+    const path = await exportMacro(String(id || ''), fromSender(e)?.win)
+    return { path }
+  })
+
+  ipcMain.handle('macros:import', async (e) => {
+    guard(e, 'macros:import')
+    const res = await importMacro(fromSender(e)?.win)
+    return res
+  })
+
+  ipcMain.handle('macros:run', (e, id: string) => {
+    guard(e, 'macros:run')
+    const entry = fromSender(e)
+    const view = entry?.tabs.activeView()
+    const macro = getMacro(String(id || ''))
+    if (!entry || !view) throw new Error('No active tab')
+    if (!macro) throw new Error('Macro not found')
+    agentRunner.runMacro(macro, view, entry.tabs, e.sender).catch((err) => {
+      console.error('[macro] crashed', err)
+    })
+    return { started: true }
+  })
+
   // ---------- downloads ----------
   ipcMain.handle('downloads:cancel', (e, id: string) => {
-    guard(e, win(), 'downloads:cancel')
+    guard(e, 'downloads:cancel')
     cancelDownload(String(id || ''))
   })
 
   ipcMain.handle('downloads:reveal', (e, path: string) => {
-    guard(e, win(), 'downloads:reveal')
+    guard(e, 'downloads:reveal')
     revealDownload(String(path || ''))
   })
 
-  // ---------- extensions (unpacked, via electron-chrome-extensions) ----------
+  // ---------- extensions (unpacked + .crx/.zip one-click) ----------
   ipcMain.handle('extensions:list', (e) => {
-    if (!privileged(e, win())) throw new Error('Unauthorized')
+    guard(e, 'extensions:list')
     return listExtensionInfos()
   })
 
   ipcMain.handle('extensions:add', async (e) => {
-    guard(e, win(), 'extensions:add')
+    guard(e, 'extensions:add')
     const info = await addExtensionFromDialog()
     return { info }
   })
 
+  ipcMain.handle('extensions:installFile', async (e) => {
+    guard(e, 'extensions:installFile')
+    const info = await installExtensionFromDialog(fromSender(e)?.win)
+    return { info }
+  })
+
+  /** drag & drop install — the renderer resolves the dropped File's path via webUtils */
+  ipcMain.handle('extensions:installPath', async (e, path: string) => {
+    guard(e, 'extensions:installPath')
+    const clean = String(path || '').trim()
+    if (!/\.(crx|zip)$/i.test(clean)) throw new Error('Only .crx and .zip packages are supported')
+    return installExtensionFromFile(clean)
+  })
+
   ipcMain.handle('extensions:toggle', async (e, path: string) => {
-    guard(e, win(), 'extensions:toggle')
+    guard(e, 'extensions:toggle')
     await toggleExtension(String(path || ''))
     return listExtensionInfos()
   })
 
   ipcMain.handle('extensions:remove', async (e, path: string) => {
-    guard(e, win(), 'extensions:remove')
+    guard(e, 'extensions:remove')
     await removeExtension(String(path || ''))
     return listExtensionInfos()
-  })
-
-  ipcMain.handle('macros:run', (e, id: string) => {
-    guard(e, win(), 'macros:run')
-    const manager = tm()
-    const view = manager?.activeView()
-    const macro = getMacro(String(id || ''))
-    if (!manager || !view) throw new Error('No active tab')
-    if (!macro) throw new Error('Macro not found')
-    agentRunner.runMacro(macro, view, manager, e.sender).catch((err) => {
-      console.error('[macro] crashed', err)
-    })
-    return { started: true }
   })
 
   // ---------- internal pages (aether://) ----------
@@ -623,3 +639,11 @@ function buildSearchMessages(q: string, results: SearchResult[]): OllamaMessage[
 }
 
 export type { SidebarInject }
+
+// ---------- multi-window routing ----------
+
+function fromSender(e: IpcMainEvent | IpcMainInvokeEvent) {
+  const entry = entryForSender(e.sender)
+  if (!entry) throw new Error('This window is no longer available')
+  return entry
+}

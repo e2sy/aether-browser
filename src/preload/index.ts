@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { injectBrowserAction } from 'electron-chrome-extensions/dist/browser-action'
 
 /**
@@ -75,6 +75,10 @@ const api = {
     toggleMuted: (id: number) => ipcRenderer.invoke('tabs:toggleMuted', id),
     duplicate: (id: number) => ipcRenderer.invoke('tabs:duplicate', id),
     discard: (id: number) => ipcRenderer.invoke('tabs:discard', id),
+    /** tier 1: mute + throttle a background tab (instant wake) */
+    hibernate: (id: number) => ipcRenderer.invoke('tabs:hibernate', id),
+    /** move a tab out into its own window */
+    popout: (id: number) => ipcRenderer.invoke('tabs:popout', id),
     closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
     closeRight: (id: number) => ipcRenderer.invoke('tabs:closeRight', id),
     zoom: (action: 'in' | 'out' | 'reset') => ipcRenderer.invoke('tabs:zoom', action)
@@ -163,7 +167,11 @@ const api = {
     update: (id: string, patch: { name?: string; task?: string; steps?: Array<{ tool: string; args: Record<string, unknown> }> }) =>
       ipcRenderer.invoke('macros:update', id, patch),
     remove: (id: string) => ipcRenderer.invoke('macros:delete', id),
-    run: (id: string) => ipcRenderer.invoke('macros:run', id)
+    run: (id: string) => ipcRenderer.invoke('macros:run', id),
+    /** write a macro to a .json file and share it */
+    export: (id: string) => ipcRenderer.invoke('macros:export', id),
+    /** import a shared .macro.json file */
+    import: () => ipcRenderer.invoke('macros:import')
   },
 
   /** file downloads */
@@ -172,12 +180,21 @@ const api = {
     reveal: (path: string) => ipcRenderer.invoke('downloads:reveal', path)
   },
 
-  /** unpacked Chrome extensions */
+  /** unpacked Chrome extensions + .crx/.zip one-click install */
   extensions: {
     list: () => ipcRenderer.invoke('extensions:list'),
     add: () => ipcRenderer.invoke('extensions:add'),
+    /** install a .crx or .zip package via a file dialog */
+    installFile: () => ipcRenderer.invoke('extensions:installFile'),
+    /** install a dropped .crx/.zip by absolute path (resolved via webUtils) */
+    installPath: (path: string) => ipcRenderer.invoke('extensions:installPath', path),
     toggle: (path: string) => ipcRenderer.invoke('extensions:toggle', path),
     remove: (path: string) => ipcRenderer.invoke('extensions:remove', path)
+  },
+
+  /** absolute path of a dropped/picked File object (sandbox-safe) */
+  files: {
+    pathFor: (file: File) => webUtils.getPathForFile(file)
   },
 
   settings: {

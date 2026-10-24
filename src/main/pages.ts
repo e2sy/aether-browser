@@ -50,7 +50,7 @@ export const NEW_TAB_HTML = pageShell(
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
-    Aether Browser 1.0.0 — local AI, open source
+    Aether Browser 1.1.0 — local AI, open source
   </div>
   `,
   `
@@ -348,9 +348,9 @@ export const SETTINGS_HTML = pageShell(
         <label><input type="checkbox" id="adblock" /> Block ads &amp; trackers (EasyList + EasyPrivacy)</label>
         <label><input type="checkbox" id="stripElectronUA" /> Identify as regular Chrome (better Google / YouTube compatibility)</label>
       </div>
-      <div class="hint" style="margin-top:10px">Memory saver unloads idle background tabs to cut RAM. Pinned and playing-audio tabs are never discarded; click an unloaded tab to reload it.</div>
+      <div class="hint" style="margin-top:10px">Tiered memory saver: idle background tabs are hibernated (muted, throttled — instant wake) after the delay, then fully unloaded after 3× that. Pinned and playing-audio tabs are never touched.</div>
       <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
-        <label style="font-size:13px; color:#e8eaf0">Discard idle tabs after</label>
+        <label style="font-size:13px; color:#e8eaf0">Hibernate idle tabs after</label>
         <select id="memorySaver" style="width:140px">
           <option value="0">Never</option>
           <option value="15">15 minutes</option>
@@ -361,13 +361,15 @@ export const SETTINGS_HTML = pageShell(
     </div>
 
     <div class="sec">
-      <div class="label">Extensions (unpacked)</div>
-      <div class="hint" style="margin-bottom:10px">Load a folder containing a <span class="mono">manifest.json</span> — MV2/MV3 content scripts, popups and browser actions run via electron-chrome-extensions. Disabled extensions are remembered but not loaded.</div>
+      <div class="label">Extensions</div>
+      <div class="hint" style="margin-bottom:10px">Install a .crx / .zip package in one click, or load a folder containing a <span class="mono">manifest.json</span> (MV2/MV3 content scripts, popups and browser actions run via electron-chrome-extensions). Disabled extensions are remembered but not loaded.</div>
       <div id="exts" style="display:flex; flex-direction:column; gap:6px"></div>
       <div class="row-btns" style="margin-top:10px">
-        <button class="save-btn" id="extAdd">Load unpacked…</button>
+        <button class="save-btn" id="extAddFile">Install from .crx / .zip…</button>
+        <button class="muted-btn" id="extAdd">Load unpacked…</button>
         <span id="extMsg" style="font-size:11.5px;color:#7d828f;align-self:center"></span>
       </div>
+      <div id="extDrop" class="ext-drop">…or drop a <b>.crx</b> / <b>.zip</b> here</div>
     </div>
 
     <div class="sec">
@@ -400,7 +402,7 @@ export const SETTINGS_HTML = pageShell(
       </div>
     </div>
 
-    <div class="hint" style="margin-top:26px">Aether 1.0.0 — everything is stored locally on this device.</div>
+    <div class="hint" style="margin-top:26px">Aether 1.1.0 — everything is stored locally on this device.</div>
   </div>
   <style>
     .sec { margin-bottom:24px; }
@@ -434,6 +436,9 @@ export const SETTINGS_HTML = pageShell(
     .ext-row .badge { flex:none; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
     .ext-row .badge.on { color:#4ade80; background:#4ade8018; }
     .ext-row .badge.off { color:#9aa0ae; background:#9aa0ae18; }
+    .ext-drop { margin-top:10px; padding:14px; text-align:center; font-size:12px; color:#7d828f;
+      border:1.5px dashed #33363f; border-radius:10px; transition: border-color .15s, background .15s; }
+    .ext-drop.over { border-color:#7c8cff; background:#7c8cff14; color:#aeb4ff; }
     .ext-row button { flex:none; width:24px; height:24px; border:none; border-radius:7px;
       background:transparent; color:#565b66; font-size:12px; cursor:pointer; }
     .ext-row button:hover { background:#23262d; color:#e8eaf0; }
@@ -543,6 +548,47 @@ export const SETTINGS_HTML = pageShell(
       msg.textContent = String(err && err.message || err)
     })
   })
+  document.getElementById('extAddFile').addEventListener('click', function () {
+    var msg = document.getElementById('extMsg')
+    msg.style.color = '#7d828f'
+    msg.textContent = 'Pick a .crx or .zip package…'
+    window.aether.extensions.installFile().then(function (r) {
+      if (r && r.info) { msg.style.color = '#4ade80'; msg.textContent = 'Installed ' + r.info.name + ' ✓' }
+      else { msg.textContent = '' }
+      loadExts()
+    }).catch(function (err) {
+      msg.style.color = '#ff6b6b'
+      msg.textContent = String(err && err.message || err)
+    })
+  })
+  var drop = document.getElementById('extDrop')
+  if (drop) {
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over') })
+    drop.addEventListener('dragleave', function () { drop.classList.remove('over') })
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault()
+      drop.classList.remove('over')
+      var msg = document.getElementById('extMsg')
+      var files = Array.prototype.slice.call(e.dataTransfer.files).filter(function (f) { return /\.(crx|zip)$/i.test(f.name) })
+      if (!files.length) { msg.style.color = '#ff6b6b'; msg.textContent = 'Drop a .crx or .zip file'; return }
+      msg.style.color = '#7d828f'
+      msg.textContent = 'Installing ' + files[0].name + '…'
+      var next = function (i) {
+        if (i >= files.length) { loadExts(); return }
+        var path = window.aether.files.pathFor(files[i])
+        window.aether.extensions.installPath(path).then(function (info) {
+          msg.style.color = '#4ade80'
+          msg.textContent = 'Installed ' + info.name + ' ✓'
+          next(i + 1)
+        }).catch(function (err) {
+          msg.style.color = '#ff6b6b'
+          msg.textContent = String(err && err.message || err)
+          next(i + 1)
+        })
+      }
+      next(0)
+    })
+  }
   function save(patch) { window.aether.settings.set(patch) }
   document.getElementById('model').addEventListener('change', function (e) { save({ model: e.target.value || null }) })
   var radios = document.querySelectorAll('input[name=sm]')

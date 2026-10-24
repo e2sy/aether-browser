@@ -6,21 +6,21 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.0.0-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.0-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.0.0)
+## ✨ Features (v1.1.0)
 
 | Feature | What it does |
 |---|---|
-| 🌐 **Full browser** | Tabs (drag to reorder, **pin, mute, duplicate, discard** + full tab context menu), omnibox with **live suggestions** (history, bookmarks, search), back/forward, **per-site zoom** with Chrome-style bubble, **download shelf** (progress / cancel / reveal), **find-in-page bar (Ctrl+F)** |
+| 🌐 **Full browser** | **Multi-window** (Ctrl+N, move/drag tabs out into their own window), tabs (drag to reorder, **pin, mute, duplicate, discard, hibernate** + full tab context menu), omnibox with **live suggestions** (history, bookmarks, search), back/forward, **per-site zoom** with Chrome-style bubble, **download shelf** (progress / cancel / reveal), **find-in-page bar (Ctrl+F)** |
 | 💬 **Chat with any page** | The sidebar reads the page via Readability, converts to clean Markdown, and answers grounded questions — streamed token-by-token |
 | 🧠 **Page memory** | Sidebar conversations are remembered **per site** (locally), so follow-up visits start with prior context — toggleable, clearable |
 | 🤖 **Web automation agent** | Give it a task; it navigates, clicks, types, screenshots, lists tabs and **asks you questions** when unsure — with a confirmation gate before every mutating action (configurable). v0.4 adds **stable element refs + DOM diffing** (less tokens, fewer mis-clicks) and **one-click retry** on model hiccups |
-| ⏺ **Agent macros** | Tick "Record as macro" before a run, then replay the recorded actions **without the model** — elements are re-located by CSS path, confirm gate still applies. **Step editor**: rename, reorder, edit args, add/remove steps |
-| 🧩 **Chrome extensions** | Load **unpacked MV2/MV3 extensions** (content scripts, background pages, popups, `chrome.contextMenus`) via `electron-chrome-extensions`; browser-action icons live in the toolbar, manage / disable / remove in Settings |
-| 💤 **Memory saver** | Idle background tabs are **discarded** (view unloaded, URL kept) after a configurable timeout; pinned and audio-playing tabs are exempt, clicking an unloaded tab instantly reloads it |
+| ⏺ **Agent macros** | Tick "Record as macro" before a run, then replay the recorded actions **without the model** — elements are re-located by CSS path, confirm gate still applies. **Step editor**: rename, reorder, edit args, add/remove steps. **Import / export** macros as `.macro.json` files to share or back them up |
+| 🧩 **Chrome extensions** | **One-click install of .crx / .zip packages** (file dialog, drag-and-drop onto Settings, or "Open with Aether" from your OS — .crx is a registered file type on Windows), plus **unpacked MV2/MV3 folders** (content scripts, background pages, popups, `chrome.contextMenus`) via `electron-chrome-extensions`; browser-action icons live in the toolbar, manage / disable / remove in Settings |
+| 💤 **Tiered memory saver** | Idle background tabs first **hibernate** (muted + throttled to 1 fps — instant wake, no reload), then fully **discard** after 3× the delay (view unloaded, URL kept). Pinned and audio-playing tabs are exempt |
 | 🔍 **AI search page** | The omnibox opens `aether://search` — free DuckDuckGo results + a cited local-AI answer side by side (Perplexity-style, but local) |
 | ✍️ **Write helpers** | Select text on any page → right-click → Ask / Summarize / Rewrite / Translate into your sidebar |
 | 🛡️ **Ad & tracker blocking** | EasyList + EasyPrivacy via `@cliqz/adblocker-electron`, filters cached on disk after first download, toggle in Settings |
@@ -136,7 +136,8 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v0.3 — **in-app model manager** (pull ANY Ollama tag with live progress, cancel, delete, active-model switch)
 - [x] v0.4 — **find-in-page bar, per-site permissions UI, agent reliability (stable refs + DOM diffing + retries), page memory, agent macros (record/replay), optional cloud fallback (OpenAI-compatible)**
 - [x] v1.0 — **extension support via electron-chrome-extensions, memory saver / tab discarding (+ pin, mute, duplicate, tab context menu), per-site zoom with bubble, download shelf, macro step editor, docs site**
-- [ ] v1.1 — extension store one-click install (CRX), tab hibernation tiers, multi-window, per-tab agent sessions
+- [x] v1.1 — **multi-window support (Ctrl+N, move/drag tab to new window), one-click CRX/ZIP extension install (dialog, drag-drop, "open with Aether"), tiered memory saver (hibernate → discard), macro import/export**
+- [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
 

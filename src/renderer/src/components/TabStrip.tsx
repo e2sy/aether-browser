@@ -88,10 +88,16 @@ export default function TabStrip(): JSX.Element {
       disabled: t.discarded
     },
     {
+      label: t.hibernated ? 'Wake tab' : 'Hibernate (light sleep)',
+      action: () => window.aether.tabs.hibernate(t.id),
+      disabled: t.discarded || t.id === activeId
+    },
+    {
       label: 'Discard (free memory)',
       action: () => window.aether.tabs.discard(t.id),
       disabled: t.discarded || t.pinned || t.id === activeId
     },
+    { label: 'Move to new window', action: () => window.aether.tabs.popout(t.id), disabled: t.discarded },
     { label: '', sep: true },
     { label: 'Close tab', action: () => window.aether.tabs.close(t.id) },
     { label: 'Close other tabs', action: () => window.aether.tabs.closeOthers(t.id) },
@@ -106,7 +112,7 @@ export default function TabStrip(): JSX.Element {
             key={t.id}
             className={`tab ${t.id === activeId ? 'active' : ''} ${t.pinned ? 'pinned' : ''} ${
               t.discarded ? 'discarded' : ''
-            }`}
+            } ${t.hibernated ? 'hibernated' : ''}`}
             draggable={!t.pinned}
             onDragStart={(e) => {
               dragIdx.current = idx
@@ -136,17 +142,26 @@ export default function TabStrip(): JSX.Element {
             title={
               t.discarded
                 ? `${t.title}\nUnloaded to save memory — click to reload`
-                : t.muted
-                  ? `${t.title}\nMuted`
-                  : t.title
+                : t.hibernated
+                  ? `${t.title}\nHibernated — click to wake instantly`
+                  : t.muted
+                    ? `${t.title}\nMuted`
+                    : t.title
             }
           >
             {favicon(t)}
             {!t.pinned && (
               <span className="tab-title">
-                {t.loading ? 'Loading…' : t.discarded ? `${t.title} (unloaded)` : t.title || 'New Tab'}
+                {t.loading
+                  ? 'Loading…'
+                  : t.discarded
+                    ? `${t.title} (unloaded)`
+                    : t.hibernated
+                      ? `${t.title} (asleep)`
+                      : t.title || 'New Tab'}
               </span>
             )}
+            {t.hibernated && <span className="tab-hibernated" title="Hibernated — wakes instantly">🌙</span>}
             {t.muted && <span className="tab-muted" title="Muted">🔇</span>}
             {t.audible && !t.muted && <span className="tab-audible" title="Playing audio">♪</span>}
             {!t.pinned && (
