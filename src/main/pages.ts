@@ -127,6 +127,7 @@ export const SEARCH_HTML = pageShell(
         background:#5b6cff; border:none; border-radius:12px; cursor:pointer;">Search</button>
     </div>
     <div id="status" style="margin-top:26px; color:#9aa0ae; font-size:13px;"></div>
+    <div id="gfallback" style="margin-top:14px; display:none;"></div>
     <div id="answer" style="margin-top:14px; font-size:14.5px; line-height:1.65; white-space:pre-wrap;
       background:#1e2026; border:1px solid #2e313a; border-radius:14px; padding:20px; display:none;"></div>
     <div id="sources" style="margin-top:18px; display:none;"></div>
@@ -134,22 +135,52 @@ export const SEARCH_HTML = pageShell(
   `,
   `
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  var gotData = false
+  function showGoogle(q, url) {
+    var wrap = document.getElementById('gfallback')
+    wrap.innerHTML = ''
+    var btn = document.createElement('a')
+    btn.href = '#'
+    btn.style.cssText = 'display:inline-block;padding:10px 18px;font-size:13px;font-weight:600;color:#fff;background:#5b6cff;border-radius:10px;cursor:pointer;text-decoration:none'
+    btn.textContent = 'Search on Google instead'
+    btn.addEventListener('click', function (e) {
+      e.preventDefault()
+      window.aether.internal.open(url || ('https://www.google.com/search?q=' + encodeURIComponent(q)))
+    })
+    wrap.appendChild(btn)
+    wrap.style.display = 'block'
+  }
+  function setError(msg, q) {
+    var status = document.getElementById('status')
+    status.textContent = msg
+    status.style.color = '#ff8a8a'
+    showGoogle(q, '')
+  }
   function run(q) {
     if (!q) return
     document.getElementById('q').value = q
     var status = document.getElementById('status')
     var answer = document.getElementById('answer')
     var sources = document.getElementById('sources')
+    var gf = document.getElementById('gfallback')
+    status.style.color = ''
     status.textContent = 'Searching the web…'
     answer.style.display = 'none'
     sources.style.display = 'none'
     sources.innerHTML = ''
+    gf.style.display = 'none'
+    gf.innerHTML = ''
     answer.textContent = ''
+    gotData = false
+    var watchdog = setTimeout(function () {
+      if (!gotData) setError('The search engines did not respond in time. Try again, or use Google below.', q)
+    }, 25000)
     var req = window.aether.internal.ask(q)
     req.onData(function (d) {
+      gotData = true
       if (d.sources) {
-        status.textContent = ''
-        sources.style.display = 'block'
+        status.textContent = d.sources.length ? '' : 'No web results found for this query.'
+        sources.style.display = d.sources.length ? 'block' : 'none'
         d.sources.forEach(function (r, i) {
           var card = document.createElement('a')
           card.href = '#'
@@ -162,15 +193,22 @@ export const SEARCH_HTML = pageShell(
           sources.appendChild(card)
         })
       }
+      if (d.googleFallback) showGoogle(q, d.googleFallback)
       if (d.delta) {
         answer.style.display = 'block'
         answer.textContent += d.delta
+        if (status.textContent !== 'No web results found for this query.') status.textContent = ''
       }
       if (d.error) {
         status.textContent = d.error
+        status.style.color = '#ff8a8a'
       }
+      if (d.done) clearTimeout(watchdog)
     })
-    req.result.catch(function (e) { status.textContent = String(e.message || e) })
+    req.result.then(function (r) {
+      clearTimeout(watchdog)
+      if (r && r.error && !gotData) setError(String(r.error), q)
+    })
   }
   document.getElementById('go').addEventListener('click', function () { run(document.getElementById('q').value.trim()) })
   document.getElementById('q').addEventListener('keydown', function (e) {

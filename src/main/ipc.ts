@@ -44,7 +44,7 @@ import { installExtensionFromDialog, installExtensionFromFile } from './crx'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
-import { webSearch } from './search'
+import { webSearch, googleSearchUrl } from './search'
 import { agentRunner } from './agent/executor'
 import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
 import type { MacroStep } from '../shared/types'
@@ -603,7 +603,13 @@ export function registerIpc(): void {
       try {
         sources = await webSearch(String(payload.q || ''))
       } catch (err) {
-        send({ error: 'Web search failed: ' + (err instanceof Error ? err.message : String(err)) })
+        send({
+          error:
+            'Web search failed: ' +
+            (err instanceof Error ? err.message : String(err)) +
+            ' — you can still open this search on Google below.',
+          googleFallback: googleSearchUrl(String(payload.q || ''))
+        })
         sources = []
       }
       send({ sources })
@@ -612,7 +618,7 @@ export function registerIpc(): void {
       if (!choice) {
         send({
           error:
-            'No AI brain available — Ollama is not reachable and no cloud fallback is configured. Install Ollama and pull a model, or add a cloud fallback in Settings. Showing web results only.'
+            'Web results are shown above. The AI answer needs Ollama running — start the Ollama app (check the tray near the clock) and try again. Or open Settings and switch Search mode to Google or DuckDuckGo to search without AI.'
         })
         return { ok: false }
       }

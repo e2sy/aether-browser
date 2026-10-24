@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.1.1</span>
+    <span class="badge">v1.1.3</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -161,8 +161,10 @@ npm run dev</code></pre>
            Turn page context off to chat freely. Conversations are remembered per site (local
            page memory) and reused as context on your next visit.</p></div>
       <div class="card"><b>🔍 AI search</b>
-        <p>Search from the omnibox opens <code>aether://search</code>: free DuckDuckGo results
-           next to a cited answer written by your local model. Perplexity-style, but private.</p></div>
+        <p>Search from the omnibox opens <code>aether://search</code>: free web results next to a
+           cited answer written by your local model. Results come from a resilient engine chain —
+           DuckDuckGo → DuckDuckGo Lite → Bing — so blocked or throttled engines never leave you
+           with an empty page. If everything fails, one click re-runs the search on Google.</p></div>
       <div class="card"><b>✍️ Write helpers</b>
         <p>Select text on any page → right-click → <i>Ask / Summarize / Rewrite / Translate</i>.
            The prompt lands in your sidebar.</p></div>
@@ -362,11 +364,20 @@ npm run dev</code></pre>
               (<code>npm run dev</code>) for the <code>[extensions]</code> log line.</td></tr>
       <tr><td>High RAM usage</td>
           <td>Enable the memory saver (Settings → 15/30 min), or right-click tabs → Discard.</td></tr>
+      <tr><td>Do I need Ollama running?</td>
+          <td>Only for the AI parts (sidebar chat, the AI answer on the search page, the agent).
+              Browsing and the web-results half of AI search work without it. Keep the Ollama app
+              running in the tray for the full experience, or switch Settings → Search mode to
+              Google / DuckDuckGo to skip AI entirely.</td></tr>
+      <tr><td>AI search shows “No web results”</td>
+          <td>v1.1.3 falls back across DuckDuckGo → Lite → Bing automatically; if all three are
+              unreachable from your network, use the “Search on Google instead” button shown on
+              the page.</td></tr>
     </table>
   </section>
 
   <footer>
-    Aether Browser v1.1.1 — GPL-3.0 ·
+    Aether Browser v1.1.3 — GPL-3.0 ·
     <a href="https://github.com/">GitHub</a> ·
     Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
   </footer>

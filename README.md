@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.1-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.3-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.1)
+## ✨ Features (v1.1.3)
 
 | Feature | What it does |
 |---|---|
@@ -21,7 +21,7 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | ⏺ **Agent macros** | Tick "Record as macro" before a run, then replay the recorded actions **without the model** — elements are re-located by CSS path, confirm gate still applies. **Step editor**: rename, reorder, edit args, add/remove steps. **Import / export** macros as `.macro.json` files to share or back them up |
 | 🧩 **Chrome extensions** | **One-click install of .crx / .zip packages** (file dialog, drag-and-drop onto Settings, or "Open with Aether" from your OS — .crx is a registered file type on Windows), plus **unpacked MV2/MV3 folders** (content scripts, background pages, popups, `chrome.contextMenus`) via `electron-chrome-extensions`; browser-action icons live in the toolbar, manage / disable / remove in Settings |
 | 💤 **Tiered memory saver** | Idle background tabs first **hibernate** (muted + throttled to 1 fps — instant wake, no reload), then fully **discard** after 3× the delay (view unloaded, URL kept). Pinned and audio-playing tabs are exempt |
-| 🔍 **AI search page** | The omnibox opens `aether://search` — free DuckDuckGo results + a cited local-AI answer side by side (Perplexity-style, but local) |
+| 🔍 **AI search page** | The omnibox opens `aether://search` — free web results (DuckDuckGo → DuckDuckGo Lite → **Bing** automatic fallback chain) + a cited local-AI answer side by side (Perplexity-style, but local). If every engine fails, one click re-runs the search on Google |
 | ✍️ **Write helpers** | Select text on any page → right-click → Ask / Summarize / Rewrite / Translate into your sidebar |
 | 🛡️ **Ad & tracker blocking** | EasyList + EasyPrivacy via `@cliqz/adblocker-electron`, filters cached on disk after first download, toggle in Settings |
 | 🔐 **Site permissions** | Chrome-style prompts for camera / mic / location / notifications with **remember per site**; manage or forget every grant in Settings |
@@ -30,6 +30,21 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🔍 v1.1.3 — search that actually searches
+
+- **Root cause fixed:** DuckDuckGo serves an HTTP-202 "anomaly" page to many networks (very common in India) —
+  the old code silently parsed it to **zero results**, so the AI search page looked broken with no error
+- **Multi-engine fallback chain:** DuckDuckGo → DuckDuckGo Lite → **Bing** (parses Bing's `ck/a` base64url
+  redirects back to real URLs) — first engine that returns real results wins, verified live: DDG 202 →
+  Bing answers in ~1s
+- **Never a dead end:** if every engine fails, the search page shows the reason per engine plus a
+  **"Search on Google instead"** button; a watchdog replaces the old infinite "Searching the web…" hang
+- **Clearer no-Ollama state:** web results always display; the AI-answer-unavailable message now explains
+  exactly what to start (Ollama in the tray) or how to switch search modes
+- New-tab search box now resolves input exactly like the omnibox (typing `youtube.com` opens the site — v1.1.2)
+- Regression suite `scripts/test-v113.mjs`: 19 tests covering anomaly fallthrough, Bing parsing,
+  engine ordering, all-fail errors and search routing
 
 ## 🩹 v1.1.1 — bugfix release
 
@@ -61,6 +76,11 @@ npm run dev
 > **No CLI? No problem.** Once Ollama is running, open the sidebar → **Models** (or `Ctrl+Shift+M`) and pull any
 > model from inside the browser — including the 4B class for smaller machines. First model pulled automatically
 > becomes the default brain.
+>
+> **Do I need Ollama running?** Only for the **AI parts** — the sidebar chat, the AI answer on the search page,
+> and the web agent. Regular browsing and the web-results half of AI search work without it. Leave the Ollama
+> app running in the tray (it starts with Windows by default) and everything AI just works. No Ollama? Switch
+> Settings → Search mode to Google or DuckDuckGo and use Aether as a plain fast browser.
 
 **Windows 11 / 10 one-shot setup** — installs dependencies, auto-repairs the Electron binary if its
 download was interrupted (antivirus / flaky network), and checks Ollama for you:
@@ -142,7 +162,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 │  ├─ Memory      — per-domain page memory (local JSON)    │
 │  ├─ Permissions — per-site prompts + remembered grants   │
 │  ├─ Extract     — Readability + turndown → MD            │
-│  ├─ Search      — DDG HTML + cited AI answers            │
+│  ├─ Search      — DDG → Lite → Bing chain + cited AI answers │
 │  ├─ Adblock     — EasyList/EasyPrivacy, cached engine    │
 │  └─ Store       — settings / history / bookmarks (JSON)  │
 ├──────────────────────────────────────────────────────────┤
@@ -159,6 +179,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v0.4 — **find-in-page bar, per-site permissions UI, agent reliability (stable refs + DOM diffing + retries), page memory, agent macros (record/replay), optional cloud fallback (OpenAI-compatible)**
 - [x] v1.0 — **extension support via electron-chrome-extensions, memory saver / tab discarding (+ pin, mute, duplicate, tab context menu), per-site zoom with bubble, download shelf, macro step editor, docs site**
 - [x] v1.1 — **multi-window support (Ctrl+N, move/drag tab to new window), one-click CRX/ZIP extension install (dialog, drag-drop, "open with Aether"), tiered memory saver (hibernate → discard), macro import/export**
+- [x] v1.1.2/1.1.3 — **new-tab omnibox parity, resilient multi-engine search (DDG → Lite → Bing + Google fallback), Windows Electron auto-repair, NTFS-safe downloads, global shortcuts**
 - [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
@@ -181,14 +202,14 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 
 PRs welcome! Good first issues: per-extension permission prompts, macro import/export,
 tab hibernation tiers, multi-window support.
-Run `npm run typecheck` before committing. Unit tests: `node scripts/test-v04.mjs && node scripts/test-v10.mjs`.
+Run `npm run typecheck` before committing. Unit tests: `npm test` (all suites).
 
 **Headless checks** (used by CI — typecheck, build, boot + internal pages + discard/wake, unit tests):
 
 ```bash
 npm run typecheck && npm run build
 AETHER_HEADLESS=1 AETHER_SMOKE=1 xvfb-run -a npx electron .
-node scripts/test-v04.mjs && node scripts/test-v10.mjs
+npm test
 ```
 
 **Renaming the project:** search-replace `aether`/`Aether` across `package.json`,
