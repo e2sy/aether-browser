@@ -9,6 +9,7 @@
  */
 import { BrowserWindow, app } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import { TabManager } from './tabs'
 import { registerTabManager, unregisterTabManager } from './extensions'
 
@@ -61,6 +62,9 @@ export function applyLayout(entry: WindowEntry): void {
 }
 
 export function createBrowserWindow(url?: string): WindowEntry {
+  // app icon for the taskbar / title bar in dev & unpackaged runs (packaged
+  // builds get their icon from electron-builder, so a missing file is fine)
+  const iconPath = path.join(__dirname, '../../build/icon.png')
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -69,6 +73,7 @@ export function createBrowserWindow(url?: string): WindowEntry {
     frame: process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : undefined,
     backgroundColor: '#16171b',
+    ...(process.platform !== 'darwin' && fs.existsSync(iconPath) ? { icon: iconPath } : {}),
     show: false
   })
 

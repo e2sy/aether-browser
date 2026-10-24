@@ -62,7 +62,15 @@ export async function pickDefaultModel(): Promise<string | null> {
 export function friendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
   if (/ECONNREFUSED|fetch failed|ENOTFOUND/i.test(msg)) {
-    return 'Ollama is not reachable at ' + BASE + '. Install it from https://ollama.com, then run:  ollama serve   and pull a model:  ollama pull qwen3.5:9b'
+    const start =
+      process.platform === 'win32'
+        ? 'Start the Ollama app from the Start menu (it lives in the system tray), then verify http://127.0.0.1:11434 says "Ollama is running".'
+        : 'Install it from https://ollama.com, then run:  ollama serve'
+    return (
+      `Ollama is not reachable at ${BASE}. ` +
+      start +
+      '  Pull a model with:  ollama pull qwen3.5:9b'
+    )
   }
   return msg
 }

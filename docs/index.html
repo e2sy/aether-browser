@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.1.0</span>
+    <span class="badge">v1.1.1</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -314,6 +314,10 @@ npm run dev</code></pre>
     <table>
       <tr><th>Shortcut</th><th>Action</th></tr>
       <tr><td><kbd>Ctrl+T</kbd> / <kbd>Ctrl+W</kbd></td><td>New / close tab</td></tr>
+      <tr><td><kbd>Ctrl+Shift+T</kbd></td><td>Reopen last closed tab</td></tr>
+      <tr><td><kbd>Ctrl+Tab</kbd> / <kbd>Ctrl+Shift+Tab</kbd></td><td>Next / previous tab</td></tr>
+      <tr><td><kbd>Ctrl+1</kbd> … <kbd>Ctrl+8</kbd>, <kbd>Ctrl+9</kbd></td><td>Jump to tab 1–8 / last tab</td></tr>
+      <tr><td><kbd>F5</kbd></td><td>Reload page</td></tr>
       <tr><td><kbd>Ctrl+N</kbd></td><td>New browser window</td></tr>
       <tr><td><kbd>Ctrl+Shift+D</kbd></td><td>Duplicate tab</td></tr>
       <tr><td><kbd>Ctrl+Shift+P</kbd></td><td>Pin / unpin tab</td></tr>
@@ -334,6 +338,14 @@ npm run dev</code></pre>
     <h2>Troubleshooting</h2>
     <table>
       <tr><th>Problem</th><th>Fix</th></tr>
+      <tr><td>“Electron failed to install correctly” (Windows)</td>
+          <td>The ~110&nbsp;MB Electron download was interrupted (antivirus or flaky network).
+              Aether now auto-repairs this after every <code>npm install</code>; if it still fails,
+              run <code>npm run repair:electron</code> or the one-shot
+              <code>npm run setup:win</code>, and add an antivirus exclusion for the project folder.</td></tr>
+      <tr><td>“Ollama not reachable” (Windows)</td>
+          <td>Start the Ollama app from the Start menu (it lives in the system tray). Check that
+              <code>http://127.0.0.1:11434</code> says “Ollama is running”.</td></tr>
       <tr><td>“Ollama not reachable”</td>
           <td>Start Ollama (<code>ollama serve</code> or the menu bar app). Check the URL in
               Settings → model section. The sidebar health dot turns green when connected.</td></tr>
@@ -354,7 +366,7 @@ npm run dev</code></pre>
   </section>
 
   <footer>
-    Aether Browser v1.1.0 — GPL-3.0 ·
+    Aether Browser v1.1.1 — GPL-3.0 ·
     <a href="https://github.com/">GitHub</a> ·
     Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
   </footer>

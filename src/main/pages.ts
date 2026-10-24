@@ -1,8 +1,13 @@
 /**
  * Internal pages served over the aether:// protocol.
  * Kept as inline HTML strings so packaging needs zero static file handling.
- * NOTE: page scripts are plain ES5-ish and must NOT contain backticks or ${.
+ * NOTE: page scripts are plain ES5-ish and must NOT contain backticks or ${
+ * (outside the template placeholders below).
  */
+import { app } from 'electron'
+
+/** Live version — no more hardcoded footer drift between releases. */
+const VER = app.getVersion()
 
 const BASE_CSS = `
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -50,7 +55,7 @@ export const NEW_TAB_HTML = pageShell(
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
-    Aether Browser 1.1.0 — local AI, open source
+    Aether Browser ${VER} — local AI, open source
   </div>
   `,
   `
@@ -402,7 +407,7 @@ export const SETTINGS_HTML = pageShell(
       </div>
     </div>
 
-    <div class="hint" style="margin-top:26px">Aether 1.1.0 — everything is stored locally on this device.</div>
+    <div class="hint" style="margin-top:26px">Aether ${VER} — everything is stored locally on this device.</div>
   </div>
   <style>
     .sec { margin-bottom:24px; }

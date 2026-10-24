@@ -67,6 +67,15 @@ export default function Toolbar(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // menu → Focus Address Bar (works even when a web page has keyboard focus)
+  useEffect(() => {
+    const unsub = window.aether.state.onOmniboxFocus(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+    return unsub
+  }, [])
+
   const toggleSidebar = (): void => {
     const next = !useApp.getState().sidebarOpen
     set({ sidebarOpen: next })

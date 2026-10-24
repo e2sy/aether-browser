@@ -13,7 +13,8 @@ import {
   createBrowserWindow,
   focusedEntry,
   allEntries,
-  popoutTab
+  popoutTab,
+  focusAnyWindow
 } from './windows'
 import { installCrxFromArgv } from './crx'
 
@@ -29,11 +30,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 }
 app.on('second-instance', () => {
-  const entry = focusedEntry()
-  if (entry) {
-    if (entry.win.isMinimized()) entry.win.restore()
-    entry.win.focus()
-  }
+  focusAnyWindow()
 })
 
 app.whenReady().then(() => {

@@ -44,6 +44,13 @@ export function buildMenu(): Menu {
           accelerator: 'CmdOrCtrl+W',
           click: () => withActive((tm, id) => tm.close(id))
         },
+        {
+          label: 'Reopen Closed Tab',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click: (): void => {
+            tabs()?.reopenClosedTab()
+          }
+        },
         { type: 'separator' },
         {
           label: 'Settings',
@@ -90,6 +97,17 @@ export function buildMenu(): Menu {
           label: 'Find in Page',
           accelerator: 'CmdOrCtrl+F',
           click: (): void => tabs()?.sendToChrome('find:show', {})
+        },
+        { type: 'separator' },
+        {
+          label: 'Focus Address Bar',
+          accelerator: 'CmdOrCtrl+L',
+          click: (): void => tabs()?.sendToChrome('omnibox:focus', {})
+        },
+        {
+          label: 'Toggle AI Sidebar',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: (): void => tabs()?.sendToChrome('sidebar:toggle', {})
         }
       ]
     },
@@ -101,7 +119,23 @@ export function buildMenu(): Menu {
           accelerator: 'CmdOrCtrl+R',
           click: () => withActive((tm, id) => tm.reload(id))
         },
+        {
+          label: 'Reload Page (F5)',
+          accelerator: 'F5',
+          click: () => withActive((tm, id) => tm.reload(id))
+        },
         { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Show Next Tab',
+          accelerator: 'CmdOrCtrl+Tab',
+          click: (): void => tabs()?.cycleTab(1)
+        },
+        {
+          label: 'Show Previous Tab',
+          accelerator: 'CmdOrCtrl+Shift+Tab',
+          click: (): void => tabs()?.cycleTab(-1)
+        },
         { type: 'separator' },
         {
           label: 'Zoom In',
@@ -137,6 +171,14 @@ export function buildMenu(): Menu {
         },
         { type: 'separator' },
         {
+          label: 'Go to Tab',
+          submenu: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+            label: n === 9 ? 'Last Tab' : `Tab ${n}`,
+            accelerator: `CmdOrCtrl+${n}`,
+            click: (): void => tabs()?.activateIndex(n)
+          }))
+        },
+        {
           label: 'Browse History',
           accelerator: 'CmdOrCtrl+H',
           click: (): void => openInternal('aether://history')
@@ -162,7 +204,7 @@ export function buildMenu(): Menu {
           click: (): void => {
             app.setAboutPanelOptions({
               applicationName: 'Aether Browser',
-              applicationVersion: '1.1.0',
+              applicationVersion: app.getVersion(),
               credits: 'Open-source AI browser powered by your local model.'
             })
             app.showAboutPanel()

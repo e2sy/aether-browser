@@ -21,6 +21,7 @@ const hostOf = (url: string): string => {
 
 const ZOOM_STEP = 0.5
 const ZOOM_MAX = 5.5
+const CLOSED_STACK_MAX = 10
 
 /**
  * Pure tier decision for the memory saver (unit-tested):
@@ -47,6 +48,8 @@ export class TabManager {
   private nextId = 1
   private bounds: Rectangle = { x: 0, y: 84, width: 1280, height: 700 }
   private saverTimer: NodeJS.Timeout | null = null
+  /** URLs of recently closed tabs, most recent last — drives Ctrl+Shift+T. */
+  private closedStack: string[] = []
   activeId: number | null = null
 
   constructor(
@@ -239,9 +242,40 @@ export class TabManager {
     this.emit()
   }
 
+  /** Reopen the most recently closed tab (Ctrl+Shift+T). Returns false if the stack is empty. */
+  reopenClosedTab(): boolean {
+    const url = this.closedStack.pop()
+    if (!url) return false
+    this.create(url, true)
+    return true
+  }
+
+  canReopenClosedTab(): boolean {
+    return this.closedStack.length > 0
+  }
+
+  /** Activate the next (delta=1) or previous (delta=-1) tab in visual order (Ctrl+Tab). */
+  cycleTab(delta: number): void {
+    if (this.order.length < 2) return
+    const idx = this.activeId !== null ? this.order.indexOf(this.activeId) : -1
+    const next = this.order[(idx + delta + this.order.length) % this.order.length]
+    this.activate(next)
+  }
+
+  /** Jump to the n-th tab in visual order; n = 9 means the last tab (Ctrl+1..9). */
+  activateIndex(n: number): void {
+    if (!this.order.length) return
+    const idx = n >= 9 ? this.order.length - 1 : Math.min(Math.max(n - 1, 0), this.order.length - 1)
+    this.activate(this.order[idx])
+  }
+
   close(id: number): void {
     const tab = this.tabs.get(id)
     if (!tab) return
+    if (/^(https?|aether):\/\//i.test(tab.url || '') && tab.url !== 'aether://newtab') {
+      this.closedStack.push(tab.url)
+      if (this.closedStack.length > CLOSED_STACK_MAX) this.closedStack.shift()
+    }
     this.destroyView(tab)
     this.tabs.delete(id)
     const idx = this.order.indexOf(id)

@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.0-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.1-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.0)
+## ✨ Features (v1.1.1)
 
 | Feature | What it does |
 |---|---|
@@ -30,6 +30,16 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🩹 v1.1.1 — bugfix release
+
+- **Windows:** downloads with illegal names (`report:.pdf`, `CON`, trailing dots) no longer fail — filenames are sanitized for NTFS
+- **Windows:** window now shows the Aether icon in the taskbar/title bar during dev & unpackaged runs
+- **Windows:** "Ollama not reachable" hint now points to the Start-menu app instead of `ollama serve`
+- **Auto-repair:** `npm install` now detects a broken Electron download and fixes it automatically (`npm run repair:electron` to trigger manually, `npm run setup:win` for the full Windows setup)
+- **Shortcuts that work everywhere:** Ctrl+L (address bar) and Ctrl+Shift+A (AI sidebar) now fire even when a web page has keyboard focus; new: **Ctrl+Shift+T** reopen closed tab, **Ctrl+Tab / Ctrl+Shift+Tab** cycle tabs, **Ctrl+1–9** jump to tab, **F5** reload
+- **Search:** AI search now falls back to DuckDuckGo Lite when the HTML endpoint fails
+- Version footers no longer drift (About panel + internal pages use the live version); second-instance lock properly focuses/creates a window
 
 ## 🚀 Quickstart
 
@@ -51,6 +61,18 @@ npm run dev
 > **No CLI? No problem.** Once Ollama is running, open the sidebar → **Models** (or `Ctrl+Shift+M`) and pull any
 > model from inside the browser — including the 4B class for smaller machines. First model pulled automatically
 > becomes the default brain.
+
+**Windows 11 / 10 one-shot setup** — installs dependencies, auto-repairs the Electron binary if its
+download was interrupted (antivirus / flaky network), and checks Ollama for you:
+
+```powershell
+npm run setup:win        # or: powershell -ExecutionPolicy Bypass -File scripts\setup-windows.ps1
+npm run dev
+```
+
+The Electron auto-repair also runs automatically after every `npm install` (`postinstall`), so
+"Electron failed to install correctly" fixes itself; you can also trigger it manually with
+`npm run repair:electron`.
 
 **Package installers** (NSIS / dmg / AppImage / deb):
 

@@ -1,15 +1,19 @@
 {
   "name": "aether-browser",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Open-source AI browser — full Chromium compatibility, powered by your local Ollama model. Multi-window, CRX one-click install, tiered memory saver.",
   "main": "out/main/index.js",
   "author": "Aether Browser contributors",
   "license": "GPL-3.0",
   "scripts": {
+    "postinstall": "node scripts/ensure-electron.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit",
     "preview": "electron-vite preview",
+    "test": "node scripts/test-v04.mjs && node scripts/test-v10.mjs && node scripts/test-v11.mjs && node scripts/test-v111.mjs",
+    "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
+    "repair:electron": "node scripts/ensure-electron.mjs",
     "dist": "electron-vite build && electron-builder",
     "dist:dir": "electron-vite build && electron-builder --dir"
   },

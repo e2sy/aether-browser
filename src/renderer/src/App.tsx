@@ -24,6 +24,10 @@ export default function App(): JSX.Element {
       const sidebarMode = mode === 'models' ? 'models' : mode === 'agent' ? 'agent' : 'chat'
       set({ sidebarOpen: true, sidebarMode })
     })
+    const unsubToggle = window.aether.state.onSidebarToggle(() => {
+      const open = useApp.getState().sidebarOpen
+      set({ sidebarOpen: !open })
+    })
     const unsubZoom = window.aether.state.onZoom((raw) => {
       const z = raw as { percent?: number } | null
       if (z && typeof z.percent === 'number') set({ zoom: { percent: z.percent, ts: Date.now() } })
@@ -36,6 +40,7 @@ export default function App(): JSX.Element {
       unsub()
       unsubMax()
       unsubShow()
+      unsubToggle()
       unsubZoom()
       unsubDl()
     }

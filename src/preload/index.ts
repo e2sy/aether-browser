@@ -54,6 +54,10 @@ const api = {
     onSidebarInject: subscribe('sidebar:inject'),
     onSidebarShow: subscribe('sidebar:show'),
     onFindShow: subscribe('find:show'),
+    /** menu → focus the omnibox (works even when a web page has focus) */
+    onOmniboxFocus: subscribe('omnibox:focus'),
+    /** menu → toggle the AI sidebar (works even when a web page has focus) */
+    onSidebarToggle: subscribe('sidebar:toggle'),
     /** per-site zoom feedback for the zoom bubble */
     onZoom: subscribe('zoom:changed'),
     /** download progress for the download bar */

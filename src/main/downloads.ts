@@ -17,9 +17,28 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/** Windows reserved device names — cannot be filenames on NTFS. */
+const WIN_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i
+
+/**
+ * Make a download filename safe for the host filesystem.
+ * Strips path separators, Windows-illegal characters (< > : " | ? * and
+ * control chars), trailing dots/spaces, and prefixes reserved device names
+ * (CON, NUL, COM1…) so saves never fail on Windows 11.
+ */
+export function sanitizeFilename(name: string): string {
+  let clean = String(name || '')
+    .replace(/[\\/]/g, '_')
+    .replace(/[<>:"|?*\u0000-\u001f]/g, '')
+    .replace(/[\s.]+$/g, '')
+    .trim()
+  if (WIN_RESERVED.test(clean)) clean = '_' + clean
+  return clean || 'download'
+}
+
 /** Pick a non-colliding path inside the downloads folder. */
 export function uniquePath(dir: string, filename: string): string {
-  const clean = filename.replace(/[\\/]/g, '_').trim() || 'download'
+  const clean = sanitizeFilename(filename)
   const ext = path.extname(clean)
   const base = path.basename(clean, ext)
   let candidate = path.join(dir, clean)
