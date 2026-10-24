@@ -1830,3 +1830,175 @@ browser-action-list::part(action):hover {
 .macro-edit-btns button.primary:hover {
   filter: brightness(1.1);
 }
+
+/* ---------------- Aether Shields (v1.2.0) ---------------- */
+.shields-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.shields-btn {
+  position: relative;
+}
+.shields-btn.on {
+  color: #7ee2a8;
+}
+.shields-btn.off {
+  opacity: 0.45;
+}
+.shields-count {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #e5534b;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+.shields-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -6px;
+  z-index: 90;
+  width: 268px;
+  background: var(--bg2, #1e2026);
+  border: 1px solid var(--border, #2e313a);
+  border-radius: 10px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  padding: 12px;
+  color: var(--fg, #e8eaf0);
+  user-select: none;
+}
+.shields-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.shields-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.shields-dot.up {
+  background: #46c07a;
+  box-shadow: 0 0 8px rgba(70, 192, 122, 0.7);
+}
+.shields-dot.down {
+  background: #e5534b;
+}
+.shields-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.shields-host {
+  font-size: 11px;
+  opacity: 0.65;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shields-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--bg3, #262932);
+  border: 1px solid var(--border, #2e313a);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.shields-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.shields-toggle .knob {
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: #55596a;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.shields-toggle .knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.shields-toggle.on .knob {
+  background: #46c07a;
+}
+.shields-toggle.on .knob::after {
+  left: 12px;
+}
+.shields-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.shields-stat {
+  flex: 1;
+  background: var(--bg3, #262932);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+.shields-stat b {
+  display: block;
+  font-size: 17px;
+  color: #7ee2a8;
+}
+.shields-stat span {
+  font-size: 10px;
+  opacity: 0.65;
+}
+.shields-offenders {
+  margin-top: 10px;
+}
+.shields-sub {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+.shields-offender {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 0;
+  opacity: 0.85;
+}
+.shields-link {
+  margin-top: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #7c8cff;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  padding: 2px 0;
+}
+.shields-link:hover {
+  text-decoration: underline;
+}

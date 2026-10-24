@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.7-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.2.0-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.7)
+## ✨ Features (v1.2.0)
 
 | Feature | What it does |
 |---|---|
@@ -30,6 +30,36 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🦁 v1.2.0 — Brave-style Shields (the adblocker grows up)
+
+- **THE root cause of the YouTube blank (and the "adblocker all over the web" request):** the old
+  integration injected **30 anti-adblock scriptlets** into youtube.com — they hijack the page's own
+  JS plumbing (JSON-response rewriting, fetch/XHR wrapping) and on Electron timing they killed
+  YouTube's bootstrap entirely: the document ended up as a single 257&nbsp;KB `<script>` node with no
+  title, no body and zero console output. Diagnosed with a new site-probe tool (`AETHER_PROBE=<url>`
+  dumps navigation events, responses, DOM snapshots and console) and a 4-way bisection
+  (`AETHER_SHIELDS_NO_CSP / NO_COSMETICS / NO_RULES / NO_SCRIPTLETS`)
+- **Brave's answer, adopted: two shield tiers.** **Standard (default)** = network blocking
+  (EasyList + EasyPrivacy) + cosmetic CSS hiding (CSP-safe) — YouTube loads fully while 5+
+  ad/tracker requests are neutralized on boot. **Aggressive (opt-in toggle)** = adds the scriptlet
+  tier for anti-adblock walls, with a warning that heavy sites can break (and the per-site toggle
+  as the recovery button)
+- **Per-site Shields popup in the toolbar** (Brave parity): shield button with a live blocked-count
+  badge, one-click **shields on/off per site** (persisted, page reloads on apply), per-site +
+  total counters, top blocked hosts, and the Aggressive toggle
+- **Custom filter lists:** curated uBlock presets (Ads / Privacy / Badware) plus any
+  user-supplied `https://` filter-list URL in Settings → Shields — fetched fresh at boot, cached
+  for offline, network AND cosmetic rules from custom lists apply (main + custom engines are
+  matched together)
+- **Full pipeline control:** the Ghostery engine is now driven directly instead of its
+  all-or-nothing adapter — one `onBeforeRequest` pipeline (main frame never blocked → the v1.1.6
+  error page stays truthful), per-site gating, per-site counters, `$csp=` directive merging, and
+  the engine's own sandboxed cosmetic preload. The AI pipeline is immune (Node fetch never
+  touches session webRequest)
+- **Proven end-to-end:** 35 new shields-policy unit tests (236 total), the smoke suite now asserts
+  the shields IPC state AND a deterministic engine-level block+counter, and a real
+  YouTube probe verifies: full render + 5 blocked trackers in one boot
 
 ## 🧯 v1.1.7 — a locked profile cache used to kill the browser silently
 
@@ -259,7 +289,8 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.1.5 — **IPC trust fix: the chrome UI is trusted by identity (dev Vite URL + prod file://), address bar & toolbar fully functional again, smoke proves suggest + Enter-navigation from the UI**
 - [x] v1.1.6 — **visible error pages for every failed/crashed page load (reason + Try again + ad-blocker recovery), Chrome-like omnibox/history/reload behavior**
 - [x] v1.1.7 — **single-instance lock that can't be ignored + cache-lock auto-recovery (profile relocates, exact reclaim steps printed), survives zombie electron.exe / AV / OneDrive locks**
-- [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
+- [x] v1.2.0 — **Brave-style Shields: two tiers (Standard default / Aggressive opt-in scriptlets), per-site toolbar popup with live counters, custom filter lists (uBlock presets + any URL), YouTube-blank root cause fixed**
+- [ ] v1.3 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
 

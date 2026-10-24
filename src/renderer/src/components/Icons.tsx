@@ -102,3 +102,10 @@ export const IconSend = (p: IconProps) => (
     <path d="M22 2l-7 20-4-9-9-4 20-7z" />
   </Svg>
 )
+
+export const IconShield = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 2l8 3v6c0 5-3.4 8.7-8 11-4.6-2.3-8-6-8-11V5l8-3z" />
+    <path d="M9 12l2 2 4-4" />
+  </Svg>
+)

@@ -21,7 +21,7 @@ import {
   mergedSettings,
   DEFAULT_SETTINGS
 } from './store'
-import { applyAdblockSetting } from './adblock'
+import { applyAdblockSetting, shieldsState, toggleSiteShields, addFilterList, removeFilterList } from './adblock'
 import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama'
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
@@ -624,6 +624,38 @@ export function registerIpc(): void {
     console.log('[adblock] disabled from the error-page recovery button')
     const target = String(url || '')
     if (/^https?:\/\//i.test(target)) e.sender.loadURL(target)
+    return mergedSettings()
+  })
+
+  // ---- AETHER SHIELDS (v1.2.0) ------------------------------------------
+  // Toolbar popup: live state for the current site + per-site toggle.
+  // The URL comes from the UI's own tab record, so the guard is the
+  // chrome-UI identity check (web pages can never call these).
+  ipcMain.handle('shields:state', (e, pageUrl?: string) => {
+    guard(e, 'shields:state')
+    return shieldsState(typeof pageUrl === 'string' ? pageUrl : '')
+  })
+
+  ipcMain.handle('shields:toggle-site', async (e, pageUrl: string, on: boolean) => {
+    guard(e, 'shields:toggle-site')
+    await toggleSiteShields(String(pageUrl || ''), Boolean(on))
+    return mergedSettings()
+  })
+
+  // Settings page: custom filter list management (strict aether-only pages).
+  ipcMain.handle('internal:adblock-lists', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return shieldsState('')
+  })
+
+  ipcMain.handle('internal:adblock-add-list', async (e, url: string) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return addFilterList(String(url || ''))
+  })
+
+  ipcMain.handle('internal:adblock-remove-list', async (e, url: string) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    await removeFilterList(String(url || ''))
     return mergedSettings()
   })
 

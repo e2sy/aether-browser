@@ -34,6 +34,14 @@ export interface Settings {
   confirmAgentActions: boolean
   searchMode: 'ai' | 'google' | 'duckduckgo'
   adblock: boolean
+  /** Hosts where the user turned shields off for that site (toolbar popup) */
+  shieldsOffHosts: string[]
+  /** Aggressive tier: also inject anti-adblock scriptlets (may break heavy SPAs) */
+  shieldsAggressive: boolean
+  /** Extra filter lists — checked curated preset ids (see shields-core) */
+  filterPresetIds: string[]
+  /** Extra filter lists — user-supplied https:// URLs to .txt filter files */
+  filterLists: string[]
   stripElectronUA: boolean
   /** Remember per-domain notes from sidebar chats and reuse them as context */
   pageMemory: boolean

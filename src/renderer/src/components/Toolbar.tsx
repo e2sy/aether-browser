@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
-import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar } from './Icons'
+import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar, IconShield } from './Icons'
+
+interface ShieldsInfo {
+  enabled: boolean
+  aggressive: boolean
+  totalBlocked: number
+  siteHost: string
+  siteShieldsOn: boolean
+  siteBlocked: number
+  topOffenders: Array<{ host: string; count: number }>
+}
 
 interface Sug {
   kind: 'search' | 'url' | 'history' | 'bookmark'
@@ -27,6 +37,8 @@ export default function Toolbar(): JSX.Element {
   const [bookmarked, setBookmarked] = useState(false)
   const [sugs, setSugs] = useState<Sug[]>([])
   const [sugIdx, setSugIdx] = useState(-1)
+  const [shields, setShields] = useState<ShieldsInfo | null>(null)
+  const [shieldsOpen, setShieldsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -75,6 +87,42 @@ export default function Toolbar(): JSX.Element {
     })
     return unsub
   }, [])
+
+  // shields popup: live counters for the current site (Brave-style)
+  useEffect(() => {
+    if (!shieldsOpen) return
+    let dead = false
+    const load = (): void => {
+      window.aether.shields
+        .state(tab?.url)
+        .then((s) => {
+          if (!dead) setShields(s as ShieldsInfo)
+        })
+        .catch(() => undefined)
+    }
+    load()
+    const timer = setInterval(load, 1500) // blocked counts tick live
+    return () => {
+      dead = true
+      clearInterval(timer)
+    }
+  }, [shieldsOpen, tab?.url])
+
+  const toggleSiteShields = async (): Promise<void> => {
+    if (!shields || !tab) return
+    await window.aether.shields.toggleSite(tab.url, !shields.siteShieldsOn)
+    setShields({ ...shields, siteShieldsOn: !shields.siteShieldsOn })
+    // Brave parity: applying a shields change reloads the page
+    window.aether.tabs.reload(tab.id)
+  }
+
+  const toggleAggressive = async (): Promise<void> => {
+    if (!shields) return
+    const next = !shields.aggressive
+    await window.aether.settings.set({ shieldsAggressive: next })
+    setShields({ ...shields, aggressive: next })
+    if (tab) window.aether.tabs.reload(tab.id) // scriptlet tier applies on next load
+  }
 
   const toggleSidebar = (): void => {
     const next = !useApp.getState().sidebarOpen
@@ -226,6 +274,66 @@ export default function Toolbar(): JSX.Element {
       </div>
 
       <browser-action-list />
+
+      <div className="shields-wrap">
+        <button
+          className={`icon-btn shields-btn ${shields && shields.enabled && shields.siteShieldsOn ? 'on' : 'off'}`}
+          onClick={() => setShieldsOpen((o) => !o)}
+          title="Shields — ads & trackers blocked"
+        >
+          <IconShield size={15} />
+          {shields && shields.siteBlocked > 0 && <span className="shields-count">{shields.siteBlocked > 99 ? '99+' : shields.siteBlocked}</span>}
+        </button>
+        {shieldsOpen && shields && (
+          <div className="shields-popup">
+            <div className="shields-head">
+              <span className={`shields-dot ${shields.enabled && shields.siteShieldsOn ? 'up' : 'down'}`} />
+              <div>
+                <div className="shields-title">{shields.enabled && shields.siteShieldsOn ? 'Shields are UP' : 'Shields are DOWN'}</div>
+                <div className="shields-host">{shields.siteHost || 'this page'}</div>
+              </div>
+            </div>
+            <button className={`shields-toggle ${shields.siteShieldsOn ? 'on' : ''}`} onClick={toggleSiteShields} disabled={!shields.siteHost}>
+              <span className="knob" />
+              <span>{shields.siteShieldsOn ? 'Turn shields off for this site' : 'Turn shields on for this site'}</span>
+            </button>
+            <button className={`shields-toggle ${shields.aggressive ? 'on' : ''}`} onClick={toggleAggressive} title="Also inject anti-adblock scriptlets. Stronger blocking, but can break heavy sites like YouTube — the per-site toggle recovers them.">
+              <span className="knob" />
+              <span>Aggressive mode (anti-adblock scriptlets)</span>
+            </button>
+            <div className="shields-stats">
+              <div className="shields-stat">
+                <b>{shields.siteBlocked}</b>
+                <span>blocked on this site</span>
+              </div>
+              <div className="shields-stat">
+                <b>{shields.totalBlocked}</b>
+                <span>blocked in total</span>
+              </div>
+            </div>
+            {shields.topOffenders.length > 0 && (
+              <div className="shields-offenders">
+                <div className="shields-sub">Top blocked</div>
+                {shields.topOffenders.map((o) => (
+                  <div key={o.host} className="shields-offender">
+                    <span>{o.host}</span>
+                    <b>{o.count}</b>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              className="shields-link"
+              onClick={() => {
+                setShieldsOpen(false)
+                if (tab) window.aether.tabs.omnibox(tab.id, 'aether://settings')
+              }}
+            >
+              Filter lists &amp; settings →
+            </button>
+          </div>
+        )}
+      </div>
 
       <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+Shift+A)">
         <IconSidebar />

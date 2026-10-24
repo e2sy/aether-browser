@@ -4,6 +4,7 @@ import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
 import { onContextMenu } from './menu'
 import { resolveInput } from './resolve'
 import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './errmap'
+import { noteSiteHost, forgetSiteHost } from './adblock'
 import { notifyTabAdded, notifyTabRemoved, notifyTabSelected } from './extensions'
 
 interface Tab extends TabMeta {
@@ -134,6 +135,8 @@ export class TabManager {
       tab.url = failed ? originalUrlFromErrorPage(url) : url
       tab.canGoBack = wc.navigationHistory.canGoBack()
       tab.canGoForward = wc.navigationHistory.canGoForward()
+      // shields: this webContents now belongs to this site (per-site gating)
+      noteSiteHost(wc.id, url)
       // failed loads never enter history, and error pages get no zoom
       if (!failed) addHistory(tab.url, tab.title)
       this.emit()
@@ -143,6 +146,7 @@ export class TabManager {
       tab.url = url
       tab.canGoBack = wc.navigationHistory.canGoBack()
       tab.canGoForward = wc.navigationHistory.canGoForward()
+      noteSiteHost(wc.id, url)
       addHistory(url, tab.title)
       this.applyStoredZoom(tab)
       this.emit()
@@ -314,6 +318,7 @@ export class TabManager {
   private destroyView(tab: Tab): void {
     if (tab.view) {
       notifyTabRemoved(tab.view.webContents)
+      forgetSiteHost(tab.view.webContents.id)
       try {
         this.win.contentView.removeChildView(tab.view)
       } catch {

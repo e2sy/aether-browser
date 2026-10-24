@@ -207,6 +207,11 @@ export const api = {
     set: (patch: Record<string, unknown>) => ipcRenderer.invoke('settings:set', patch)
   },
 
+  shields: {
+    state: (url?: string) => ipcRenderer.invoke('shields:state', url),
+    toggleSite: (url: string, on: boolean) => ipcRenderer.invoke('shields:toggle-site', url, on)
+  },
+
   bookmarks: {
     toggle: (entry: { url: string; title: string }) => ipcRenderer.invoke('bookmarks:toggle', entry),
     is: (url: string) => ipcRenderer.invoke('bookmarks:is', url),
@@ -227,6 +232,9 @@ export const api = {
     open: (url: string) => ipcRenderer.invoke('internal:open', url),
     startup: () => ipcRenderer.invoke('internal:startup'),
     disableAdblock: (url: string) => ipcRenderer.invoke('internal:disable-adblock', url),
+    adblockLists: () => ipcRenderer.invoke('internal:adblock-lists'),
+    addAdblockList: (url: string) => ipcRenderer.invoke('internal:adblock-add-list', url),
+    removeAdblockList: (url: string) => ipcRenderer.invoke('internal:adblock-remove-list', url),
     ask: (q: string) => stream('internal:ask', 'search:chunk', { q })
   }
 }

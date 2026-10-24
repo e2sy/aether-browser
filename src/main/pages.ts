@@ -442,6 +442,21 @@ export const SETTINGS_HTML = pageShell(
           <option value="60">1 hour</option>
         </select>
       </div>
+      <div class="label" style="margin-top:18px">Shields — blocking strength</div>
+      <div class="opts">
+        <label><input type="checkbox" id="shieldsAggressive" /> Aggressive mode — also inject anti-adblock scriptlets (stronger, but can break heavy sites like YouTube; use the toolbar shields popup to turn shields off per site)</label>
+      </div>
+      <div class="label" style="margin-top:14px">Shields — filter lists</div>
+      <div class="opts" id="shieldPresets">
+        <label style="display:none"><input type="checkbox" class="shield-preset" value="" /> placeholder</label>
+      </div>
+      <div class="hint" style="margin-top:8px">Extra filter lists on top of the built-in EasyList + EasyPrivacy engine (fetched fresh at boot, cached for offline). Cosmetic rules (hiding ad placeholders) and scriptlets from these lists apply too.</div>
+      <div style="display:flex; gap:8px; margin-top:10px">
+        <input id="listUrl" type="url" placeholder="https://example.com/my-filters.txt" style="flex:1" />
+        <button id="listAdd" class="btn">Add list</button>
+      </div>
+      <div id="listStatus" class="hint" style="margin-top:6px"></div>
+      <div id="listTable" style="margin-top:8px"></div>
     </div>
 
     <div class="sec">
@@ -538,8 +553,11 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('usePageContext').checked = !!s.usePageContext
       document.getElementById('pageMemory').checked = s.pageMemory !== false
       document.getElementById('adblock').checked = !!s.adblock
+      document.getElementById('shieldsAggressive').checked = !!s.shieldsAggressive
       document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
       document.getElementById('memorySaver').value = String(s.memorySaver || 0)
+      renderShieldPresets(s)
+      renderShieldLists()
       var cf = s.cloudFallback || {}
       document.getElementById('cfEnabled').checked = !!cf.enabled
       document.getElementById('cfUrl').value = cf.baseUrl || ''
@@ -683,6 +701,75 @@ export const SETTINGS_HTML = pageShell(
   document.getElementById('usePageContext').addEventListener('change', function (e) { save({ usePageContext: e.target.checked }) })
   document.getElementById('pageMemory').addEventListener('change', function (e) { save({ pageMemory: e.target.checked }) })
   document.getElementById('adblock').addEventListener('change', function (e) { save({ adblock: e.target.checked }) })
+  document.getElementById('shieldsAggressive').addEventListener('change', function (e) { save({ shieldsAggressive: e.target.checked }) })
+
+  function renderShieldPresets(s) {
+    var wrap = document.getElementById('shieldPresets')
+    if (!wrap || !s.presets) return
+    wrap.innerHTML = ''
+    s.presets.forEach(function (p) {
+      var label = document.createElement('label')
+      var box = document.createElement('input')
+      box.type = 'checkbox'
+      box.className = 'shield-preset'
+      box.value = p.id
+      box.checked = !!p.enabled
+      box.addEventListener('change', function () {
+        save({ filterPresetIds: currentPresetIds() }).then(function () { renderShieldLists() })
+      })
+      label.appendChild(box)
+      label.appendChild(document.createTextNode(' ' + p.name))
+      wrap.appendChild(label)
+    })
+  }
+  function currentPresetIds() {
+    var ids = []
+    var boxes = document.querySelectorAll('.shield-preset')
+    for (var i = 0; i < boxes.length; i++) if (boxes[i].checked) ids.push(boxes[i].value)
+    return ids
+  }
+  function renderShieldLists() {
+    window.aether.internal.adblockLists().then(function (st) {
+      var table = document.getElementById('listTable')
+      var status = document.getElementById('listStatus')
+      if (!table) return
+      table.innerHTML = ''
+      var lists = st.lists || []
+      if (status) status.textContent = lists.length ? ('Custom lists active: ' + lists.filter(function (l) { return l.status !== 'error' }).length + '/' + lists.length) : 'No custom lists — the built-in EasyList + EasyPrivacy engine is active.'
+      lists.forEach(function (l) {
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px'
+        var name = document.createElement('span')
+        name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85'
+        name.textContent = l.url
+        name.title = l.url + ' (' + l.status + ')'
+        var badge = document.createElement('span')
+        badge.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:8px;' + (l.status === 'error' ? 'background:#5c2623;color:#ff9c96' : 'background:#1d3a2a;color:#7ee2a8')
+        badge.textContent = l.status
+        var rm = document.createElement('button')
+        rm.className = 'btn'
+        rm.textContent = 'Remove'
+        rm.addEventListener('click', function () {
+          window.aether.internal.removeAdblockList(l.url).then(function () { renderShieldLists() })
+        })
+        row.appendChild(name)
+        row.appendChild(badge)
+        row.appendChild(rm)
+        table.appendChild(row)
+      })
+    }).catch(function () {})
+  }
+  document.getElementById('listAdd').addEventListener('click', function () {
+    var input = document.getElementById('listUrl')
+    var url = input.value.trim()
+    if (!url) return
+    window.aether.internal.addAdblockList(url).then(function (res) {
+      input.value = ''
+      if (!res || !res.ok) window.alert(res && res.error ? res.error : 'Could not add that list')
+      renderShieldLists()
+    }).catch(function (err) { window.alert(String(err && err.message ? err.message : err)) })
+  })
+
   document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
   document.getElementById('memorySaver').addEventListener('change', function (e) { save({ memorySaver: Number(e.target.value) || 0 }) })
   document.getElementById('cfSave').addEventListener('click', function () {

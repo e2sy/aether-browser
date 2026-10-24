@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.1.7</span>
+    <span class="badge">v1.2.0</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -403,11 +403,20 @@ npm run dev</code></pre>
               (DNS, timeout, offline, blocked, crash) and a Try again button. If it says the ad blocker
               cancelled the page, use the “Turn off ad blocker &amp; retry” button (or Settings → Privacy).
               If it says DNS/offline, check your connection or whether your network blocks the site.</td></tr>
+      <tr><td>YouTube (or another heavy site) is blank with no error</td>
+          <td>Root cause found in v1.2.0: the ad blocker's anti-adblock scriptlets killed the page's
+              own JS. Shields now run in two tiers — <b>Standard (default)</b> blocks ads &amp; trackers
+              without touching page scripts (YouTube loads normally), <b>Aggressive</b> adds scriptlets
+              as an opt-in. If a site breaks: toolbar shield icon → “Turn shields off for this site”.</td></tr>
+      <tr><td>How do I add more filter lists (uBlock-style)?</td>
+          <td>Settings → Shields: tick the uBlock presets (Ads / Privacy / Badware) or paste any
+              <code>https://</code> filter-list URL. Lists are fetched at boot and cached for offline.
+              The toolbar shield popup shows live blocked counts per site.</td></tr>
     </table>
   </section>
 
   <footer>
-    Aether Browser v1.1.7 — GPL-3.0 ·
+    Aether Browser v1.2.0 — GPL-3.0 ·
     <a href="https://github.com/">GitHub</a> ·
     Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
   </footer>

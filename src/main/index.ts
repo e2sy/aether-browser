@@ -8,7 +8,7 @@ import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
 import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML } from './pages'
 import { isErrorPageUrl } from './errmap'
-import { applyAdblockSetting } from './adblock'
+import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
 import { installPermissionHandlers } from './permissions'
 import { initExtensions } from './extensions'
@@ -89,6 +89,70 @@ app.whenReady().then(() => {
   setUiPreloadPath(path.join(__dirname, '../preload/ui.js'))
   createBrowserWindow()
 
+  // AETHER_PROBE=<url> — boot, load the URL in a real tab, dump everything
+  // (navigation events, console messages, DOM state) then exit. The site
+  // diagnostics tool: "the page is blank" now comes with evidence.
+  if (process.env.AETHER_PROBE) {
+    const probeUrl = process.env.AETHER_PROBE
+    const probeMs = Number(process.env.AETHER_PROBE_MS || 15000)
+    setTimeout(async () => {
+      const entry = focusedEntry()
+      if (!entry) {
+        console.log('[probe] no window')
+        app.exit(1)
+        return
+      }
+      const id = entry.tabs.create(probeUrl, true)
+      const wc = entry.tabs.get(id)?.view?.webContents
+      if (!wc) {
+        console.log('[probe] no view')
+        app.exit(1)
+        return
+      }
+      const logs: string[] = []
+      wc.on('console-message', (_e, level, message, line, sourceId) => {
+        logs.push(`[L${level}] ${String(message).slice(0, 220)} (${String(sourceId || '').slice(0, 90)}:${line})`)
+      })
+      wc.on('did-fail-load', (_e, code, desc, u, main) => {
+        if (main) console.log(`[probe] did-fail-load code=${code} desc=${desc} url=${String(u).slice(0, 120)}`)
+      })
+      wc.on('did-finish-load', () => console.log('[probe] did-finish-load'))
+      wc.on('did-navigate', (_e, u) => console.log('[probe] did-navigate ->', String(u).slice(0, 120)))
+      // log every main-frame response (status + size) — separates "server sent
+      // something different" from "client failed to execute it"
+      session.defaultSession.webRequest.onCompleted({ urls: ['<all_urls>'] }, (d: any) => {
+        if (d.resourceType === 'mainFrame') {
+          console.log('[probe] mainFrame response:', d.statusCode, String(d.url).slice(0, 90), 'bytes=', d.contentLength ?? '?', 'fromCache=', d.fromCache)
+        }
+      })
+      console.log('[probe] probing', probeUrl, `for ${probeMs}ms`)
+      // time-lapse: does the document start big and get CLEARED mid-flight?
+      for (const delay of [2000, 5000, 10000]) {
+        setTimeout(async () => {
+          try {
+            const snap = await wc.executeJavaScript(
+              'JSON.stringify({ t: documentElement_tag(), len: (document.documentElement?document.documentElement.outerHTML.length:-1), de: document.documentElement ? document.documentElement.tagName : "?", title: document.title.slice(0,40) }); function documentElement_tag(){ return document.documentElement ? document.documentElement.tagName : "?" }'
+            ).catch(() => 'gone')
+            console.log(`[probe] +${delay}ms:`, snap)
+          } catch { console.log(`[probe] +${delay}ms: context gone`) }
+        }, delay)
+      }
+      setTimeout(async () => {
+        try {
+          const info = await wc.executeJavaScript(
+            '(function(){var h=(document.documentElement?document.documentElement.outerHTML:"");return JSON.stringify({ title: document.title, textLen: ((document.body && document.body.innerText) || "").length, htmlLen: h.length, markers: ["ytcfg","consent","Sign in","captcha","<title","polymer"].map(function(k){return k+":"+(h.indexOf(k)>=0)}), slice1: h.slice(0, 700).replace(/\\s+/g, " "), slice2: h.slice(Math.floor(h.length/2), Math.floor(h.length/2)+500).replace(/\\s+/g, " "), ytcfg: typeof window.ytcfg, scripts: document.scripts.length, ready: document.readyState, url: location.href.slice(0, 140)})})()'
+          )
+          console.log('[probe] DOM:', info)
+        } catch (err) {
+          console.log('[probe] DOM-ERR:', String(err))
+        }
+        console.log('[probe] console tail (last 15):')
+        logs.slice(-15).forEach((l) => console.log('  ', l))
+        app.exit(0)
+      }, probeMs)
+    }, 2200)
+  }
+
   // One-click .crx install: "Open with Aether" passes the file via argv
   // (Windows/Linux) or the open-file event (macOS).
   void installCrxFromArgv(process.argv)
@@ -100,7 +164,7 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
-    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false }
+    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false, shieldsState: false, shieldsBlock: false }
     // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
     // (A broken sandboxed preload used to leave window.aether undefined — the
     // whole browser looked fine but every click was dead.)
@@ -209,6 +273,42 @@ app.whenReady().then(() => {
         console.log('[smoke] error page on failed load: NO (' + String(err) + ')')
       }
     }, 6800)
+    // v1.2.0 regression: shields must actually BLOCK. The smoke rule engine
+    // matches any script fetched from 127.0.0.1 (the port is refused anyway —
+    // only the block decision + counter are verified), fully deterministic.
+    if (process.env.AETHER_SMOKE) installSmokeEngine('||127.0.0.1^$script\n')
+    setTimeout(async () => {
+      const entry = focusedEntry()
+      if (!entry) return
+      try {
+        const st = await entry.win.webContents.executeJavaScript(
+          'window.aether.shields.state("http://example.com/").then(function (r) { return !!r && r.siteShieldsOn === true && typeof r.totalBlocked === "number" }).catch(function (e) { return "ERR:" + e.message })'
+        )
+        smoke.shieldsState = st === true
+        console.log('[smoke] shields state ipc:', smoke.shieldsState ? 'YES' : 'NO (' + String(st) + ')')
+      } catch (err) {
+        console.log('[smoke] shields state ipc: NO (' + String(err) + ')')
+      }
+      try {
+        entry.tabs.create(
+          'data:text/html,<title>shieldprobe</title><script src="http://127.0.0.1:1/aetherblock.js"></script>',
+          true
+        )
+        let total = -1
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 500))
+          const n = await entry.win.webContents.executeJavaScript(
+            'window.aether.shields.state("data:text/html").then(function (r) { return r.totalBlocked }).catch(function () { return -1 })'
+          )
+          if (typeof n === 'number' && n >= 0) total = n
+          if (total >= 1) break
+        }
+        smoke.shieldsBlock = total >= 1
+        console.log('[smoke] shields blocked request:', smoke.shieldsBlock ? `YES (total=${total})` : `NO (total=${total})`)
+      } catch (err) {
+        console.log('[smoke] shields blocked request: NO (' + String(err) + ')')
+      }
+    }, 7300)
     let tHistory: number | undefined
     setTimeout(() => {
       const entry = focusedEntry()
@@ -270,9 +370,9 @@ app.whenReady().then(() => {
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
       const bridgesOk =
-        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage
+        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage && smoke.shieldsState && smoke.shieldsBlock
       app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
-    }, 8200)
+    }, 15000)
   }
 
   app.on('activate', () => {
