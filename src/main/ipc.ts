@@ -45,6 +45,7 @@ import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
 import { webSearch, googleSearchUrl } from './search'
+import { ipcGuardDecision, isAetherInternalSender } from './trust'
 import { agentRunner } from './agent/executor'
 import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
 import type { MacroStep } from '../shared/types'
@@ -53,22 +54,47 @@ const HISTORY_WINDOW = 20
 
 const aborts = new Map<string, AbortController>()
 
-function isInternal(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
+/** Guard helper — throws for unauthorized senders so pages can't drive the browser.
+ *
+ * Trusted senders (see trust.ts for the full policy):
+ *   1. The chrome-UI webContents of a registered browser window — proven by
+ *      IDENTITY (sender === entry.win.webContents), never by URL. In dev the
+ *      UI is served from the Vite dev server (http://localhost:5173/) and in
+ *      production from the app bundle (file://…); both must be allowed while
+ *      arbitrary pages on those schemes stay rejected.
+ *   2. aether:// pages served by our own protocol handler.
+ *
+ * Regression note: the multi-window refactor dropped the old isChrome() check
+ * and left only the aether:// rule, which locked the UI out of its own IPC —
+ * "Unauthorized IPC call to omnibox:suggest from http://localhost:5173/" on
+ * every keystroke, and a dead Enter key in the address bar. */
+function guard(e: IpcMainEvent | IpcMainInvokeEvent, who: string): void {
+  let url: string | null = null
+  let chromeUi = false
   try {
-    return (e.sender.getURL() || '').startsWith('aether://')
+    url = e.sender.getURL() || null
   } catch {
-    return false
+    url = null
+  }
+  try {
+    const entry = entryForSender(e.sender)
+    chromeUi = !!entry && !entry.win.isDestroyed() && entry.win.webContents === e.sender
+  } catch {
+    chromeUi = false
+  }
+  if (!ipcGuardDecision(url, chromeUi)) {
+    throw new Error(`Unauthorized IPC call to ${who} from ${url || 'unknown'}`)
   }
 }
 
-/** Guard helper — throws for unauthorized senders so pages can't drive the browser. */
-function guard(e: IpcMainEvent | IpcMainInvokeEvent, who: string): void {
+/** Strict aether://-only check for the internal:* handlers (see trust.ts).
+ *  Kept as a wrapper so the sender's getURL() can never throw past the guard. */
+function isInternal(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
   try {
-    if (isInternal(e)) return
+    return isAetherInternalSender(e.sender.getURL())
   } catch {
-    /* fall through */
+    return false
   }
-  throw new Error(`Unauthorized IPC call to ${who} from ${e.sender.getURL() || 'unknown'}`)
 }
 
 export function registerIpc(): void {

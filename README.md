@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.4-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.5-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.4)
+## ✨ Features (v1.1.5)
 
 | Feature | What it does |
 |---|---|
@@ -30,6 +30,22 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🛂 v1.1.5 — the UI could talk, but the browser refused to listen
+
+- **THE root cause of "still can't open the site":** the IPC security guard trusted only `aether://`
+  senders — but the browser's own chrome UI runs on the Vite dev server in dev (`http://localhost:5173/`)
+  and on `file://` in production, so **every call from the toolbar was rejected**:
+  `Unauthorized IPC call to omnibox:suggest from http://localhost:5173/` on every keystroke, and pressing
+  Enter in the address bar did **nothing**. (The multi-window refactor had dropped the old `isChrome()`
+  check; v1.1.4 restored the bridge, which finally exposed this second lock.)
+- **Fix:** the guard now trusts the chrome-UI window by **identity** — the sender must literally BE the
+  registered window's own webContents — which works identically in dev and production while a normal
+  `http(s)`/`file://` page opened in a tab still gets rejected. `aether://` internal pages keep the same
+  access as before, and the strict `internal:*` handlers stay aether-only
+- **Proven end-to-end:** the smoke suite now drives the exact user flow from the chrome UI's own execution
+  context — `omnibox.suggest()` resolves (no more Unauthorized spam) and **"type example.com + Enter" in the
+  top address bar opens the site** — plus 28 new trust-policy unit tests (149 total) green
 
 ## 🌉 v1.1.4 — the bridge fix (why every click was dead)
 
@@ -200,6 +216,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.1 — **multi-window support (Ctrl+N, move/drag tab to new window), one-click CRX/ZIP extension install (dialog, drag-drop, "open with Aether"), tiered memory saver (hibernate → discard), macro import/export**
 - [x] v1.1.2/1.1.3 — **new-tab omnibox parity, resilient multi-engine search (DDG → Lite → Bing + Google fallback), Windows Electron auto-repair, NTFS-safe downloads, global shortcuts**
 - [x] v1.1.4 — **UI bridge fix: sandbox-safe preload + chrome-UI preload, bridge alive in every renderer, new-tab form + clickable AI button + visible bridge-error banner**
+- [x] v1.1.5 — **IPC trust fix: the chrome UI is trusted by identity (dev Vite URL + prod file://), address bar & toolbar fully functional again, smoke proves suggest + Enter-navigation from the UI**
 - [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
@@ -208,7 +225,8 @@ The core trick that makes a **9B local model** a usable web agent is *context co
   are additionally `sandbox:true` with a preload bundle that requires only `electron` (enforced after every
   build by `scripts/patch-preload-sandbox.mjs`). The first-party chrome UI window runs `sandbox:false` so
   its preload can load the extension glue — `nodeIntegration` stays off and `window.aether` is its only bridge.
-- Tab/agent/settings/history IPC handlers verify the sender is the chrome UI; internal-page
+- Tab/agent/settings/history IPC handlers verify the sender is the chrome UI **by identity** (the sender must
+  be the registered window's own webContents — see `src/main/trust.ts` for the policy); internal-page
   handlers verify the sender URL is `aether://`. Ollama probing (`ai:health`, `ai:status`,
   `ai:models`) and the model library (`models:pull` / `delete` / …) are blocked for regular web pages.
 - **Permissions**: harmless capabilities (fullscreen, clipboard write) are auto-allowed; camera /

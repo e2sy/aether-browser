@@ -95,7 +95,7 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
-    const smoke = { chrome: false, tab: false, startup: false, enter: false }
+    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false }
     // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
     // (A broken sandboxed preload used to leave window.aether undefined — the
     // whole browser looked fine but every click was dead.)
@@ -140,6 +140,38 @@ app.whenReady().then(() => {
         console.log('[smoke] tab bridge: NO (' + String(err) + ')')
       }
     }, 1500)
+    // v1.1.5 regression: the IPC trust guard used to REJECT every call from the
+    // chrome-UI renderer ("Unauthorized IPC call to omnibox:suggest from
+    // http://localhost:5173/") — address bar suggestions, tab strip and all
+    // toolbar buttons were dead even though window.aether existed. Drive the
+    // exact user flow from the UI's own execution context: suggest + new tab +
+    // navigate (what typing in the top omnibox + Enter does).
+    setTimeout(async () => {
+      const entry = focusedEntry()
+      if (!entry) return
+      try {
+        const sug = await entry.win.webContents.executeJavaScript(
+          'window.aether.omnibox.suggest("exa").then(function (r) { return !!r && Array.isArray(r.history) && Array.isArray(r.bookmarks) }).catch(function (e) { return "ERR:" + e.message })'
+        )
+        smoke.uiSuggest = sug === true
+        console.log('[smoke] chrome ipc omnibox.suggest:', smoke.uiSuggest ? 'YES' : 'NO (' + String(sug) + ')')
+      } catch (err) {
+        console.log('[smoke] chrome ipc omnibox.suggest: NO (' + String(err) + ')')
+      }
+      try {
+        const id = await entry.win.webContents.executeJavaScript(
+          'window.aether.tabs.create("aether://newtab").then(function (id) { return window.aether.tabs.omnibox(id, "example.com").then(function () { return id }) }).catch(function (e) { return "ERR:" + e.message })'
+        )
+        const tabId = typeof id === 'number' ? id : undefined
+        if (tabId === undefined) throw new Error(String(id))
+        await new Promise((r) => setTimeout(r, 2200))
+        const url = entry.tabs.get(tabId)?.url || ''
+        smoke.uiNav = url.startsWith('https://example.com')
+        console.log('[smoke] chrome ipc tabs.omnibox -> navigate:', smoke.uiNav ? 'YES' : 'NO (' + url + ')')
+      } catch (err) {
+        console.log('[smoke] chrome ipc tabs.omnibox: NO (' + String(err) + ')')
+      }
+    }, 2600)
     let tHistory: number | undefined
     setTimeout(() => {
       const entry = focusedEntry()
@@ -200,7 +232,8 @@ app.whenReady().then(() => {
       console.log('[smoke] settings page loaded:', settingsLoaded ? 'YES' : 'NO')
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
-      const bridgesOk = smoke.chrome && smoke.tab && smoke.startup && smoke.enter
+      const bridgesOk =
+        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav
       app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
     }, 8200)
   }
