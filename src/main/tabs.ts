@@ -3,6 +3,7 @@ import type { TabMeta, TabsState } from '../shared/types'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
 import { onContextMenu } from './menu'
 import { resolveInput } from './resolve'
+import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './errmap'
 import { notifyTabAdded, notifyTabRemoved, notifyTabSelected } from './extensions'
 
 interface Tab extends TabMeta {
@@ -127,11 +128,14 @@ export class TabManager {
       this.emit()
     })
     wc.on('did-navigate', (_e, url) => {
-      tab.url = url
+      // If the main frame landed on the internal error page, keep showing the
+      // URL the user actually asked for in the omnibox/history (Chrome-like).
+      const failed = isErrorPageUrl(url)
+      tab.url = failed ? originalUrlFromErrorPage(url) : url
       tab.canGoBack = wc.navigationHistory.canGoBack()
       tab.canGoForward = wc.navigationHistory.canGoForward()
-      addHistory(url, tab.title)
-      this.applyStoredZoom(tab)
+      // failed loads never enter history, and error pages get no zoom
+      if (!failed) addHistory(tab.url, tab.title)
       this.emit()
     })
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
@@ -144,15 +148,26 @@ export class TabManager {
       this.emit()
     })
     wc.on('did-fail-load', (_e, code, desc, validated, isMainFrame) => {
-      if (isMainFrame && code !== -3) {
-        tab.title = 'Can\u2019t reach this page'
-        console.error(`[tab] failed to load ${validated}: ${code} ${desc}`)
-        this.emit()
-      }
+      // v1.1.6: render a real error page instead of an infinite blank view.
+      // ERR_ABORTED (-3) is a superseded/stopped navigation, not a failure;
+      // subframe failures never replace the page.
+      if (!shouldShowErrorPage(code, isMainFrame)) return
+      const failedUrl = validated || tab.url
+      if (!/^https?:/i.test(failedUrl)) return // only web pages get the error screen
+      console.error(`[tab] failed to load ${failedUrl}: ${code} ${desc}`)
+      tab.title = 'Can\u2019t reach this page'
+      this.emit()
+      wc.loadURL(errorPageUrl(failedUrl, code, desc)).catch(() => undefined)
     })
-    wc.on('render-process-gone', () => {
+    wc.on('render-process-gone', (_e, details) => {
+      console.error(`[tab] renderer gone (${details?.reason || 'unknown'}): ${tab.url}`)
       tab.title = 'Tab crashed'
       this.emit()
+      const failedUrl = /^https?:/i.test(tab.url) ? tab.url : ''
+      if (failedUrl) {
+        // the error page explains the crash and offers a Retry button
+        wc.loadURL(errorPageUrl(failedUrl, CRASH_CODE, 'render-process-gone: ' + String(details?.reason || ''))).catch(() => undefined)
+      }
     })
     wc.on('media-started-playing', () => {
       tab.audible = true
@@ -360,7 +375,16 @@ export class TabManager {
     const hist = wc.navigationHistory
     if (action === 'back' && hist.canGoBack()) hist.goBack()
     else if (action === 'forward' && hist.canGoForward()) hist.goForward()
-    else if (action === 'reload') wc.reload()
+    else if (action === 'reload') {
+      // On an error page, Ctrl+R / the reload button retries the ORIGINAL
+      // address (Chrome behavior), not the aether://error screen itself.
+      const current = (() => { try { return wc.getURL() } catch { return '' } })()
+      if (isErrorPageUrl(current) && tab.url && /^https?:/i.test(tab.url)) {
+        wc.loadURL(tab.url).catch(() => undefined)
+      } else {
+        wc.reload()
+      }
+    }
     else if (action === 'stop') wc.stop()
   }
 

@@ -2,7 +2,8 @@ import { app, Menu, protocol, session } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
-import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML } from './pages'
+import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML } from './pages'
+import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting } from './adblock'
 import { mergedSettings } from './store'
 import { installPermissionHandlers } from './permissions'
@@ -40,7 +41,8 @@ app.whenReady().then(() => {
     newtab: NEW_TAB_HTML,
     history: HISTORY_HTML,
     bookmarks: BOOKMARKS_HTML,
-    settings: SETTINGS_HTML
+    settings: SETTINGS_HTML,
+    error: ERROR_HTML
   }
   protocol.handle('aether', (req) => {
     const url = new URL(req.url)
@@ -95,7 +97,7 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
-    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false }
+    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false }
     // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
     // (A broken sandboxed preload used to leave window.aether undefined — the
     // whole browser looked fine but every click was dead.)
@@ -172,6 +174,38 @@ app.whenReady().then(() => {
         console.log('[smoke] chrome ipc tabs.omnibox: NO (' + String(err) + ')')
       }
     }, 2600)
+    // v1.1.6 regression: main-frame load failures used to leave an infinite
+    // blank view (only a console line + tab title). Now the tab must land on
+    // the aether://error page while the omnibox keeps the original URL.
+    // http://127.0.0.1:9/ fails fast with ERR_CONNECTION_REFUSED — no network needed.
+    setTimeout(async () => {
+      const entry = focusedEntry()
+      if (!entry) return
+      try {
+        const id = entry.tabs.create('http://127.0.0.1:9/', true)
+        await new Promise((r) => setTimeout(r, 1100))
+        const rec = entry.tabs.get(id)
+        const wc = rec?.view?.webContents
+        const landed = wc ? (() => { try { return wc.getURL() } catch { return '' } })() : ''
+        const okErrBase =
+          !!rec &&
+          isErrorPageUrl(landed) &&
+          rec.url === 'http://127.0.0.1:9/' &&
+          rec.title === 'Can\u2019t reach this page'
+        // the page must actually render: title filled + Retry button present
+        const dom = await wc!.executeJavaScript(
+          'document.getElementById("err-title").textContent + "|" + (document.getElementById("err-retry") ? "retry" : "no-retry")'
+        ).catch(() => 'DOM-ERR')
+        const okErr = okErrBase && typeof dom === 'string' && dom.indexOf('Can\u2019t reach this page') === 0 && dom.endsWith('|retry')
+        smoke.errorPage = okErr
+        console.log(
+          '[smoke] error page on failed load:',
+          okErr ? 'YES' : 'NO (landed=' + landed.slice(0, 60) + ' url=' + rec?.url + ' title=' + rec?.title + ')'
+        )
+      } catch (err) {
+        console.log('[smoke] error page on failed load: NO (' + String(err) + ')')
+      }
+    }, 6800)
     let tHistory: number | undefined
     setTimeout(() => {
       const entry = focusedEntry()
@@ -233,7 +267,7 @@ app.whenReady().then(() => {
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
       const bridgesOk =
-        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav
+        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage
       app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
     }, 8200)
   }

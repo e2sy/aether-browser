@@ -717,3 +717,105 @@ export const SETTINGS_HTML = pageShell(
   load()
   `
 )
+
+export const ERROR_HTML = pageShell(
+  'Can\u2019t reach this page',
+  `
+  <div style="width:min(620px,90vw); margin-top:14vh;">
+    <div style="font-size:46px; line-height:1;">🌐</div>
+    <h1 id="err-title" style="margin-top:18px; font-size:24px; font-weight:600;">Can\u2019t reach this page</h1>
+    <p id="err-detail" style="margin-top:10px; color:#9aa0ae; font-size:14px; line-height:1.6;"></p>
+    <div id="err-url" style="margin-top:14px; padding:10px 14px; background:#1e2026; border:1px solid #2e313a;
+      border-radius:10px; color:#c6cad4; font-size:12px; -webkit-user-select:text; user-select:text;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+    <div style="margin-top:26px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="err-retry" style="padding:11px 22px; font-size:14px; color:#16171b; background:#7c8cff;
+        border:none; border-radius:10px; cursor:pointer; font-weight:600;">Try again</button>
+      <button id="err-noadblock" style="display:none; padding:11px 22px; font-size:14px; color:#e8eaf0;
+        background:#2a2d36; border:1px solid #3a3e4a; border-radius:10px; cursor:pointer;">Turn off ad blocker &amp; retry</button>
+      <button id="err-newtab" style="padding:11px 22px; font-size:14px; color:#9aa0ae; background:transparent;
+        border:1px solid #2e313a; border-radius:10px; cursor:pointer;">New tab</button>
+    </div>
+    <p id="err-hint" style="margin-top:22px; color:#565b66; font-size:12px; line-height:1.7;"></p>
+    <div id="err-bridge" style="display:none; margin-top:16px; padding:12px 16px; background:#2a1c1c;
+      border:1px solid #3a2a2a; border-radius:10px; color:#ff8a8a; font-size:13px; line-height:1.5;"></div>
+    <div style="margin-top:26px; color:#565b66; font-size:11px;">Aether Browser ${VER}</div>
+  </div>
+  `,
+  `
+  var params = new URLSearchParams(location.search)
+  var u = params.get('u') || ''
+  var c = parseInt(params.get('c') || '0', 10)
+  var d = params.get('d') || ''
+
+  var TITLES = {}
+  TITLES['-6'] = ['File not found', 'The address points to a file that does not exist on this site.']
+  TITLES['-7'] = ['Took too long to load', 'The server did not respond in time. It may be down or your connection is too slow.']
+  TITLES['-10'] = ['Access denied', 'The server refused to serve this page to this browser.']
+  TITLES['-20'] = ['Blocked by the ad blocker', 'The built-in ad blocker cancelled this page request. If this site is a false positive, turn the blocker off and retry.']
+  TITLES['-21'] = ['Blocked', 'Something on this device or network blocked the page request.']
+  TITLES['-100'] = ['Connection closed', 'The connection was closed unexpectedly while loading. The site may be down.']
+  TITLES['-101'] = ['Connection reset', 'The connection was reset — the site or your network dropped it. A VPN or firewall can cause this.']
+  TITLES['-102'] = ['Server refused the connection', 'Nothing is accepting connections at that address right now. The site may be down, or your network blocks it.']
+  TITLES['-103'] = ['Connection aborted', 'The connection was aborted mid-transfer.']
+  TITLES['-104'] = ['Connection failed', 'Could not establish a connection to the site.']
+  TITLES['-105'] = ['Address not found (DNS)', 'This domain could not be resolved. Check the spelling, your internet connection, and whether your network or ISP blocks this site — college and office Wi-Fi often do.']
+  TITLES['-106'] = ['No internet connection', 'Your device appears to be offline. Check Wi-Fi / ethernet, then try again.']
+  TITLES['-109'] = ['Address unreachable', 'The host was reached but the address could not be connected to — often a VPN, proxy or routing problem.']
+  TITLES['-118'] = ['Connection timed out', 'The server took too long to accept the connection. It may be down, or your network is blocking or throttling it.']
+  TITLES['-130'] = ['Proxy related failure', 'The configured proxy could not load this page. Check your proxy or VPN.']
+  TITLES['-200'] = ['Certificate error', 'The site\u2019s security certificate does not match its name.']
+  TITLES['-201'] = ['Certificate error', 'The site\u2019s security certificate is expired or not yet valid.']
+  TITLES['-202'] = ['Certificate error', 'The site\u2019s certificate was issued by an unknown authority. Do not enter passwords on this site.']
+  TITLES['-310'] = ['Too many redirects', 'The site redirected in a loop. Clearing cookies for the site in Settings can help.']
+  TITLES['-324'] = ['Empty response', 'The server closed the connection without sending any data.']
+  TITLES['-50'] = ['Insecure response', 'The server sent a response that failed security validation.']
+
+  var entry = TITLES[String(c)]
+  var crash = c === -1000
+  document.getElementById('err-title').textContent = crash
+    ? 'This page crashed'
+    : (entry ? entry[0] : 'Can\u2019t reach this page')
+  var detail = crash
+    ? 'The page\u2019s renderer stopped unexpectedly — usually a site bug, rarely a browser problem. Retrying usually fixes it.'
+    : (entry ? entry[1] : 'The page failed to load. Retrying may help; the technical reason is shown below.')
+  if (d) detail += '  (' + d + ' — code ' + c + ')'
+  document.getElementById('err-detail').textContent = detail
+  document.getElementById('err-url').textContent = u || '(unknown address)'
+
+  var hint = document.getElementById('err-hint')
+  var hints = []
+  if (c === -20 || c === -21) {
+    hints.push('Turned the blocker off by mistake before? You can re-enable it anytime in Settings → Privacy.')
+  } else {
+    hints.push('If the site opens but looks broken or stuck, the built-in ad blocker can occasionally interfere — toggle it in Settings → Privacy and reload.')
+  }
+  if (u && u.indexOf('https://www.youtube.com') === 0) {
+    hints.push('YouTube tip: sign-in walls and rare regional blocks can also cause empty pages. If "Try again" does not help, test the same address in another browser to rule out your network.')
+  }
+  hint.textContent = hints.join(' ')
+
+  var bridge = document.getElementById('err-bridge')
+  function bridgeDown(msg) { bridge.style.display = 'block'; bridge.textContent = msg }
+  if (typeof window.aether === 'undefined') {
+    bridgeDown('UI bridge unavailable — buttons cannot talk to the browser. Fully quit Aether and start it again; if it keeps happening, run: npm run build')
+  }
+  document.getElementById('err-retry').addEventListener('click', function () {
+    if (!u) return
+    try { window.aether.internal.open(u) } catch (e) { bridgeDown('Browser bridge unavailable (' + (e && e.message) + ').') }
+  })
+  var noad = document.getElementById('err-noadblock')
+  if (c === -20 || c === -21) {
+    noad.style.display = 'inline-block'
+    noad.addEventListener('click', function () {
+      if (!u) return
+      try {
+        window.aether.internal.disableAdblock(u)
+      } catch (e) { bridgeDown('Browser bridge unavailable (' + (e && e.message) + ').') }
+    })
+  }
+  document.getElementById('err-newtab').addEventListener('click', function () {
+    try { window.aether.tabs.create('aether://newtab') } catch (e) { bridgeDown('Browser bridge unavailable (' + (e && e.message) + ').') }
+  })
+  `
+)

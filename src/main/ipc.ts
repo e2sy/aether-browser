@@ -614,6 +614,19 @@ export function registerIpc(): void {
     return { topSites: topSites(8), bookmarks: bookmarks.data.slice(0, 6) }
   })
 
+  // Error-page recovery: "Turn off ad blocker & retry" — persists the setting
+  // (so the Settings page and next boot agree) and reloads the failed URL.
+  ipcMain.handle('internal:disable-adblock', (e, url: string) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    settings.data = { ...DEFAULT_SETTINGS, ...settings.data, adblock: false }
+    settings.save()
+    void applyAdblockSetting(false)
+    console.log('[adblock] disabled from the error-page recovery button')
+    const target = String(url || '')
+    if (/^https?:\/\//i.test(target)) e.sender.loadURL(target)
+    return mergedSettings()
+  })
+
   ipcMain.handle('internal:ask', async (e, payload: { requestId: string; q: string }) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
     const requestId = String(payload.requestId)

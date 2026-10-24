@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.1.5</span>
+    <span class="badge">v1.1.6</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -382,11 +382,16 @@ npm run dev</code></pre>
           <td>Fixed in v1.1.5 — the IPC guard used to reject the browser's own UI (the multi-window
               refactor dropped the chrome-UI check). The UI is now trusted by identity in dev and
               production, while normal pages stay blocked. Update to v1.1.5+ and restart.</td></tr>
+      <tr><td>A site shows a blank page forever and nothing explains why</td>
+          <td>Fixed in v1.1.6 — every failed page load now shows an error screen with the exact reason
+              (DNS, timeout, offline, blocked, crash) and a Try again button. If it says the ad blocker
+              cancelled the page, use the “Turn off ad blocker &amp; retry” button (or Settings → Privacy).
+              If it says DNS/offline, check your connection or whether your network blocks the site.</td></tr>
     </table>
   </section>
 
   <footer>
-    Aether Browser v1.1.5 — GPL-3.0 ·
+    Aether Browser v1.1.6 — GPL-3.0 ·
     <a href="https://github.com/">GitHub</a> ·
     Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
   </footer>

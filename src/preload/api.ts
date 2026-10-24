@@ -226,6 +226,7 @@ export const api = {
     search: (q: string) => ipcRenderer.invoke('internal:search', q),
     open: (url: string) => ipcRenderer.invoke('internal:open', url),
     startup: () => ipcRenderer.invoke('internal:startup'),
+    disableAdblock: (url: string) => ipcRenderer.invoke('internal:disable-adblock', url),
     ask: (q: string) => stream('internal:ask', 'search:chunk', { q })
   }
 }
