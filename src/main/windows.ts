@@ -24,9 +24,15 @@ export interface WindowEntry {
 
 const entries = new Map<number, WindowEntry>()
 let preloadPath = ''
+let uiPreloadPath = ''
 
 export function setPreloadPath(p: string): void {
   preloadPath = p
+}
+
+/** Sandbox-free chrome-UI preload (bridge + extension browser-action glue). */
+export function setUiPreloadPath(p: string): void {
+  uiPreloadPath = p
 }
 
 export function allEntries(): WindowEntry[] {
@@ -73,6 +79,16 @@ export function createBrowserWindow(url?: string): WindowEntry {
     frame: process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : undefined,
     backgroundColor: '#16171b',
+    // The chrome UI is first-party code: sandbox:false lets its preload load
+    // the electron-chrome-extensions glue. contextIsolation stays ON and
+    // nodeIntegration stays OFF — window.aether remains the only bridge.
+    webPreferences: {
+      preload: uiPreloadPath || undefined,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: false
+    },
     ...(process.platform !== 'darwin' && fs.existsSync(iconPath) ? { icon: iconPath } : {}),
     show: false
   })

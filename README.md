@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.3-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.4-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.3)
+## ✨ Features (v1.1.4)
 
 | Feature | What it does |
 |---|---|
@@ -30,6 +30,25 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🌉 v1.1.4 — the bridge fix (why every click was dead)
+
+- **THE root cause of "can't search / can't open any site":** the UI bridge (`window.aether`) was never
+  loading. Two independent kills: (1) tab preloads run sandboxed, where Electron only allows
+  `require("electron")` — the preload's `electron-chrome-extensions` import threw "module not found" and
+  **died before exposing the bridge**; (2) the chrome-UI window had **no preload at all**. Result: pages
+  rendered, but the address bar, Enter-in-new-tab, buttons and sidebar all silently did nothing
+- **Fix:** clean two-preload architecture — tab views get a minimal sandbox-safe bridge (single file,
+  requires `electron` only, verified after every build by `scripts/patch-preload-sandbox.mjs`); the trusted
+  chrome UI gets a generated `ui.js` (same bridge + extension browser-action glue, legal there because the
+  chrome window runs `sandbox:false`)
+- **Proven end-to-end:** new headless smoke checks boot the real app and verify the bridge in BOTH
+  renderers, then **type a domain into the new-tab box, press Enter, and assert the site opened** —
+  plus 121 unit tests still green
+- **New-tab page hardening:** the box is a real form (Enter works under any keyboard/IME), the **AI badge
+  is now a clickable button** (opens the AI search page for your query), and if the bridge ever fails
+  again the page shows a **visible red error banner** with recovery steps instead of silently dying
+- v1.1.3's search engine chain (DuckDuckGo → Lite → Bing + Google fallback button) unchanged
 
 ## 🔍 v1.1.3 — search that actually searches
 
@@ -180,11 +199,15 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.0 — **extension support via electron-chrome-extensions, memory saver / tab discarding (+ pin, mute, duplicate, tab context menu), per-site zoom with bubble, download shelf, macro step editor, docs site**
 - [x] v1.1 — **multi-window support (Ctrl+N, move/drag tab to new window), one-click CRX/ZIP extension install (dialog, drag-drop, "open with Aether"), tiered memory saver (hibernate → discard), macro import/export**
 - [x] v1.1.2/1.1.3 — **new-tab omnibox parity, resilient multi-engine search (DDG → Lite → Bing + Google fallback), Windows Electron auto-repair, NTFS-safe downloads, global shortcuts**
+- [x] v1.1.4 — **UI bridge fix: sandbox-safe preload + chrome-UI preload, bridge alive in every renderer, new-tab form + clickable AI button + visible bridge-error banner**
 - [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
 
-- Renderers run with `contextIsolation`, `sandbox`, and no Node integration.
+- Renderers run with `contextIsolation` and no Node integration. Tab views (web pages + internal pages)
+  are additionally `sandbox:true` with a preload bundle that requires only `electron` (enforced after every
+  build by `scripts/patch-preload-sandbox.mjs`). The first-party chrome UI window runs `sandbox:false` so
+  its preload can load the extension glue — `nodeIntegration` stays off and `window.aether` is its only bridge.
 - Tab/agent/settings/history IPC handlers verify the sender is the chrome UI; internal-page
   handlers verify the sender URL is `aether://`. Ollama probing (`ai:health`, `ai:status`,
   `ai:models`) and the model library (`models:pull` / `delete` / …) are blocked for regular web pages.

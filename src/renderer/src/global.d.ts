@@ -1,4 +1,4 @@
-import type { AetherApi } from '../../preload/index'
+import type { AetherApi } from '../../preload/api'
 
 declare global {
   interface Window {

@@ -10,6 +10,7 @@ import { initExtensions } from './extensions'
 import { installDownloadHandler } from './downloads'
 import {
   setPreloadPath,
+  setUiPreloadPath,
   createBrowserWindow,
   focusedEntry,
   allEntries,
@@ -80,6 +81,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(buildMenu())
 
   setPreloadPath(path.join(__dirname, '../preload/index.js'))
+  setUiPreloadPath(path.join(__dirname, '../preload/ui.js'))
   createBrowserWindow()
 
   // One-click .crx install: "Open with Aether" passes the file via argv
@@ -93,6 +95,51 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
+    const smoke = { chrome: false, tab: false, startup: false, enter: false }
+    // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
+    // (A broken sandboxed preload used to leave window.aether undefined — the
+    // whole browser looked fine but every click was dead.)
+    setTimeout(async () => {
+      const entry = focusedEntry()
+      if (!entry) {
+        console.log('[smoke] chrome bridge: NO (no window)')
+        return
+      }
+      // chrome UI renderer (React shell, sandbox:false ui.js preload)
+      try {
+        const ui = await entry.win.webContents.executeJavaScript('typeof window.aether')
+        smoke.chrome = ui === 'object'
+        console.log('[smoke] chrome bridge:', smoke.chrome ? 'YES' : 'NO (' + String(ui) + ')')
+      } catch (err) {
+        console.log('[smoke] chrome bridge: NO (' + String(err) + ')')
+      }
+      // tab view (sandboxed index.js preload) — dedicated probe tab so the
+      // other smoke steps' navigations can't interfere; also exercises the
+      // real new-tab search box flow end-to-end: type a domain + Enter → navigates
+      try {
+        const probeId = entry.tabs.create('aether://newtab', true)
+        await new Promise((r) => setTimeout(r, 700))
+        const wc = entry.tabs.get(probeId)?.view?.webContents
+        if (!wc) throw new Error('probe tab has no view')
+        const bridge = await wc.executeJavaScript('typeof window.aether')
+        smoke.tab = bridge === 'object'
+        console.log('[smoke] tab bridge:', smoke.tab ? 'YES' : 'NO (' + String(bridge) + ')')
+        const startup = await wc.executeJavaScript(
+          'window.aether.internal.startup().then(function (d) { return Array.isArray(d.topSites) }).catch(function (e) { return "ERR:" + e.message })'
+        )
+        smoke.startup = startup === true
+        console.log('[smoke] internal.startup:', smoke.startup ? 'YES' : 'NO (' + String(startup) + ')')
+        await wc.executeJavaScript(
+          'var __q = document.getElementById("q"); __q.value = "example.com"; __q.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))'
+        )
+        await new Promise((r) => setTimeout(r, 3500))
+        const url = wc.getURL()
+        smoke.enter = url.startsWith('https://example.com')
+        console.log('[smoke] newtab enter-to-navigate:', smoke.enter ? 'YES' : 'NO (' + url + ')')
+      } catch (err) {
+        console.log('[smoke] tab bridge: NO (' + String(err) + ')')
+      }
+    }, 1500)
     let tHistory: number | undefined
     setTimeout(() => {
       const entry = focusedEntry()
@@ -153,7 +200,8 @@ app.whenReady().then(() => {
       console.log('[smoke] settings page loaded:', settingsLoaded ? 'YES' : 'NO')
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
-      app.exit(newtabLoaded && settingsLoaded && multiWindowOk ? 0 : 1)
+      const bridgesOk = smoke.chrome && smoke.tab && smoke.startup && smoke.enter
+      app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
     }, 8200)
   }
 

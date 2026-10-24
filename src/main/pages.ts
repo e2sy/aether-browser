@@ -42,12 +42,18 @@ export const NEW_TAB_HTML = pageShell(
   `
   <div style="margin-top:12vh; font-size:52px; font-weight:200;" id="clock">--:--</div>
   <div style="margin-top:6px; color:#9aa0ae;" id="greeting"></div>
-  <div style="margin-top:34px; width:min(560px,86vw); position:relative;">
-    <input id="q" type="text" placeholder="Search the web or type a URL"
-      style="width:100%; padding:16px 20px; font-size:15px; color:#e8eaf0;
+  <div id="bridge-error" style="display:none; margin-top:30px; width:min(560px,86vw); padding:12px 16px;
+    background:#2a1c1c; border:1px solid #3a2a2a; border-radius:10px; color:#ff8a8a; font-size:13px;
+    line-height:1.5; -webkit-user-select:text; user-select:text;"></div>
+  <form id="searchform" style="margin-top:34px; width:min(560px,86vw); position:relative;">
+    <input id="q" type="text" placeholder="Search the web or type a URL" autocomplete="off"
+      style="width:100%; padding:16px 64px 16px 20px; font-size:15px; color:#e8eaf0;
       background:#1e2026; border:1px solid #2e313a; border-radius:14px; outline:none;" />
-    <div style="position:absolute; right:14px; top:50%; transform:translateY(-50%); color:#7c8cff; font-size:12px; letter-spacing:.08em;">AI</div>
-  </div>
+    <button id="aibtn" type="button" title="Search with Aether AI"
+      style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#7c8cff; font-size:12px;
+      letter-spacing:.08em; background:#7c8cff1a; border:none; border-radius:8px; padding:6px 10px;
+      cursor:pointer;">AI</button>
+  </form>
   <div style="margin-top:44px; width:min(640px,88vw);">
     <div style="color:#9aa0ae; font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
     <div id="top" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
@@ -93,11 +99,41 @@ export const NEW_TAB_HTML = pageShell(
     document.getElementById('greeting').textContent = g + ' — everything you do here stays on this device.'
   }
   clock(); setInterval(clock, 30000)
+  function bridgeError(msg) {
+    var b = document.getElementById('bridge-error')
+    b.style.display = 'block'
+    b.textContent = msg
+  }
+  function go(q) {
+    if (!q) return
+    try {
+      window.aether.internal.search(q)
+    } catch (e) {
+      bridgeError('Browser bridge unavailable (' + (e && e.message) + ') — fully quit Aether and start it again. If it keeps happening, run: npm run build')
+    }
+  }
   var q = document.getElementById('q')
-  q.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && q.value.trim()) window.aether.internal.search(q.value.trim())
+  document.getElementById('searchform').addEventListener('submit', function (e) {
+    e.preventDefault()
+    go(q.value.trim())
   })
-  window.aether.internal.startup().then(function (data) {
+  q.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && q.value.trim()) { e.preventDefault(); go(q.value.trim()) }
+  })
+  document.getElementById('aibtn').addEventListener('click', function () {
+    var query = q.value.trim()
+    if (!query) return
+    try {
+      window.aether.internal.open('aether://search?q=' + encodeURIComponent(query))
+    } catch (e) {
+      bridgeError('Browser bridge unavailable (' + (e && e.message) + ') — fully quit Aether and start it again.')
+    }
+  })
+  if (typeof window.aether === 'undefined') {
+    bridgeError('UI bridge failed to load — keyboard and buttons cannot talk to the browser. Fully quit Aether (close every window) and start it again; if it keeps happening, run: npm run build')
+  }
+  try {
+    window.aether.internal.startup().then(function (data) {
     var top = document.getElementById('top')
     if (!data.topSites.length) {
       top.innerHTML = ''
@@ -109,7 +145,12 @@ export const NEW_TAB_HTML = pageShell(
     if (!data.bookmarks.length) {
       document.getElementById('bm-label').textContent = ''
     } else data.bookmarks.forEach(function (b) { bm.appendChild(bmRow(b)) })
-  })
+    }).catch(function (e) {
+      bridgeError('Could not load new-tab data: ' + (e && e.message ? e.message : e))
+    })
+  } catch (e) {
+    bridgeError('Browser bridge unavailable (' + (e && e.message) + ') — fully quit Aether and start it again. If it keeps happening, run: npm run build')
+  }
   `
 )
 
