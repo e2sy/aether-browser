@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.1.6</span>
+    <span class="badge">v1.1.7</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -382,6 +382,22 @@ npm run dev</code></pre>
           <td>Fixed in v1.1.5 — the IPC guard used to reject the browser's own UI (the multi-window
               refactor dropped the chrome-UI check). The UI is now trusted by identity in dev and
               production, while normal pages stay blocked. Update to v1.1.5+ and restart.</td></tr>
+      <tr><td>Console shows “Unable to move the cache: Access is denied. (0x5)” or
+              “Gpu Cache Creation failed: -2”, and sites won't load</td>
+          <td>Another process (an old Aether/electron.exe still running in the background, antivirus,
+              OneDrive) is locking your profile's cache folder. v1.1.7 fixes this two ways: a second
+              Aether now hard-exits and focuses the running one, and if the cache is locked Aether
+              automatically relocates the profile to <code>aether-browser-recovered</code> (old profile is
+              kept) and prints reclaim steps in the console. Manual fix: Task Manager (Ctrl+Shift+Esc) →
+              end every <code>electron.exe</code>/<code>Aether.exe</code>, then delete
+              <code>%APPDATA%\aether-browser</code> if you don't need the old bookmarks.</td></tr>
+      <tr><td>The dev server starts on port 5174 instead of 5173</td>
+          <td>An older Aether dev session is still alive and holding 5173. Close it (Task Manager →
+              end <code>node.exe</code>/<code>electron.exe</code> from the old folder) and start again —
+              with v1.1.7 a second Aether can't even boot over the old one anymore.</td></tr>
+      <tr><td>Console line “session.getPreloads is deprecated”</td>
+          <td>Harmless — it comes from the <code>electron-chrome-extensions</code> dependency, not from
+              Aether. Ignore it.</td></tr>
       <tr><td>A site shows a blank page forever and nothing explains why</td>
           <td>Fixed in v1.1.6 — every failed page load now shows an error screen with the exact reason
               (DNS, timeout, offline, blocked, crash) and a Try again button. If it says the ad blocker
@@ -391,7 +407,7 @@ npm run dev</code></pre>
   </section>
 
   <footer>
-    Aether Browser v1.1.6 — GPL-3.0 ·
+    Aether Browser v1.1.7 — GPL-3.0 ·
     <a href="https://github.com/">GitHub</a> ·
     Built with Electron, electron-chrome-extensions, Ollama, Readability &amp; React.
   </footer>

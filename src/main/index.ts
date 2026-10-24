@@ -1,3 +1,7 @@
+// PREBOOT MUST be the very first import: it acquires the single-instance
+// lock and (if needed) relocates a cache-locked profile BEFORE any other
+// module reads settings from userData or Chromium initializes its cache.
+import './preboot'
 import { app, Menu, protocol, session } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
@@ -28,9 +32,8 @@ protocol.registerSchemesAsPrivileged([
 // headless / CI environments (AETHER_HEADLESS=1 xvfb-run electron .)
 if (process.env.AETHER_HEADLESS) app.disableHardwareAcceleration()
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit()
-}
+// The lock itself is acquired in ./preboot (with a hard exit for losers).
+// 'second-instance' only ever fires in the instance that HOLDS the lock.
 app.on('second-instance', () => {
   focusAnyWindow()
 })

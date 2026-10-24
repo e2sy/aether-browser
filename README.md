@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.1.6-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.1.7-blue) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.1.6)
+## ✨ Features (v1.1.7)
 
 | Feature | What it does |
 |---|---|
@@ -30,6 +30,30 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🧯 v1.1.7 — a locked profile cache used to kill the browser silently
+
+- **THE root cause of `Unable to move the cache: Access is denied. (0x5)` + `Gpu Cache Creation failed: -2` +
+  pages refusing to load:** something else held a file lock on the profile's cache directories — usually
+  **an old Aether/electron.exe still running in the background** (in the reported incident the Vite dev
+  server had even moved from port 5173 to 5174 because the previous session still occupied it), but also
+  antivirus or OneDrive syncing `%APPDATA%`. Chromium couldn't build its cache and the network stack
+  degraded, with **zero explanation on screen**
+- **Fix 1 — a single-instance lock that actually locks:** the lock used to be enforced with `app.quit()`
+  *before* the app was ready, which Electron can silently ignore — the losing instance kept booting onto
+  the winner's locked profile. Now a second Aether **hard-exits** (`app.exit`) and the first window is
+  focused instead
+- **Fix 2 — cache-lock auto-recovery:** before anything touches the profile, Aether probes the cache
+  directory for writability. Locked? The whole profile relocates to a deterministic sibling
+  (`aether-browser-recovered`) so **the browser still works no matter who holds the lock** — and a console
+  banner names the old profile (kept, never deleted), the new one, and the exact Windows steps to reclaim
+  bookmarks/history once the locking process is closed
+- **Proven end-to-end:** a new CI run **simulates the exact incident** (`AETHER_SIMULATE_CACHE_LOCK=1`):
+  the app relocates, prints the reclaim banner, and the full smoke suite (bridge, Enter-to-navigate, error
+  pages, multi-window) still passes on the recovered profile — plus 24 new recovery-policy unit tests
+  (201 total) green
+- Note: the harmless `session.getPreloads is deprecated` console line comes from the
+  `electron-chrome-extensions` dependency — cosmetic noise, no action needed
 
 ## 🚨 v1.1.6 — pages that fail now TELL you why (no more infinite blank)
 
@@ -234,6 +258,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.1.4 — **UI bridge fix: sandbox-safe preload + chrome-UI preload, bridge alive in every renderer, new-tab form + clickable AI button + visible bridge-error banner**
 - [x] v1.1.5 — **IPC trust fix: the chrome UI is trusted by identity (dev Vite URL + prod file://), address bar & toolbar fully functional again, smoke proves suggest + Enter-navigation from the UI**
 - [x] v1.1.6 — **visible error pages for every failed/crashed page load (reason + Try again + ad-blocker recovery), Chrome-like omnibox/history/reload behavior**
+- [x] v1.1.7 — **single-instance lock that can't be ignored + cache-lock auto-recovery (profile relocates, exact reclaim steps printed), survives zombie electron.exe / AV / OneDrive locks**
 - [ ] v1.2 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
 
 ## 🔐 Security notes
