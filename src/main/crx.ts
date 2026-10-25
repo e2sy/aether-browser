@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { safeUnzip } from './safe-zip'
+import { MAX_EXT_PACKAGE_BYTES, validateManifestOnDisk } from './extsec'
 import type { ExtensionInfo } from '../shared/types'
 import { installFromFolder } from './extensions'
 
@@ -66,6 +67,13 @@ export async function installExtensionFromFile(filePath: string): Promise<Extens
   if (!/\.(crx|zip)$/i.test(clean)) throw new Error('Pick a .crx or .zip extension file')
   if (!fs.existsSync(clean)) throw new Error('File not found: ' + clean)
 
+  // package size cap — a giant archive is never a legitimate extension
+  const st = fs.statSync(clean)
+  if (!st.isFile()) throw new Error('Not a file: ' + clean)
+  if (st.size > MAX_EXT_PACKAGE_BYTES) {
+    throw new Error(`Package is ${Math.round(st.size / 1048576)} MB — the limit for extension packages is ${Math.round(MAX_EXT_PACKAGE_BYTES / 1048576)} MB`)
+  }
+
   const buf = fs.readFileSync(clean)
   let zip: Buffer
   if (/\.crx$/i.test(clean)) {
@@ -114,7 +122,23 @@ export async function installExtensionFromFile(filePath: string): Promise<Extens
     throw new Error('The archive has no manifest.json at its root — is it really an extension?')
   }
 
-  return installFromFolder(dir)
+  // Quarantine gate #2: validate the manifest BEFORE anything is loaded or
+  // enabled. A broken/hostile manifest means the staging dir never survives.
+  const verdict = validateManifestOnDisk(dir)
+  if (!verdict.ok) {
+    fs.rmSync(dir, { recursive: true, force: true })
+    throw new Error('Invalid extension manifest: ' + (verdict.error || 'rejected'))
+  }
+
+  // The consent screen lives inside installFromFolder (shared with the
+  // unpacked flow). Any failure here — declined consent, bad manifest,
+  // loader crash — wipes the staging dir we created.
+  try {
+    return await installFromFolder(dir, { ownStaging: true })
+  } catch (err) {
+    fs.rmSync(dir, { recursive: true, force: true })
+    throw err
+  }
 }
 
 /** File-picker flow behind Settings → “Install from .crx / .zip…”. */

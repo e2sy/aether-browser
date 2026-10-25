@@ -14,6 +14,7 @@ import type { ContextMenuParams } from 'electron'
 import type { TabManager } from './tabs'
 import type { ExtensionInfo, ExtensionRecord } from '../shared/types'
 import { mergedSettings, settings } from './store'
+import { validateManifestOnDisk, ensureExtensionConsent, type ManifestVerdict } from './extsec'
 
 let exts: ElectronChromeExtensions | null = null
 
@@ -210,21 +211,52 @@ export async function addExtensionFromDialog(): Promise<ExtensionInfo | null> {
 
 /**
  * Shared installer used by “Load unpacked…”, the .crx/.zip one-click flow and
- * extension imports: validates the folder, avoids duplicates, loads + records.
+ * extension imports: validates the folder, shows the Chrome-style consent
+ * screen, avoids duplicates, loads + records.
+ *
+ * opts.ownStaging — the caller created this folder (CRX/ZIP flow) and wants
+ * it wiped on any failure. Never pass it for a user-chosen source folder.
  */
-export async function installFromFolder(dir: string): Promise<ExtensionInfo> {
+export async function installFromFolder(
+  dir: string,
+  opts: { ownStaging?: boolean; skipConsentDialog?: boolean } = {}
+): Promise<ExtensionInfo> {
   const target = path.resolve(String(dir || ''))
-  if (!fs.existsSync(path.join(target, 'manifest.json'))) {
-    throw new Error('Not an extension folder — manifest.json not found')
+  const fail = (msg: string): Error => {
+    if (opts.ownStaging) fs.rmSync(target, { recursive: true, force: true })
+    return new Error(msg)
   }
+  if (!fs.existsSync(path.join(target, 'manifest.json'))) {
+    throw fail('Not an extension folder — manifest.json not found')
+  }
+
+  // Quarantine gate: validate the manifest before touching the loader.
+  const verdict: ManifestVerdict = validateManifestOnDisk(target)
+  if (!verdict.ok) {
+    throw fail('Invalid extension manifest: ' + (verdict.error || 'rejected'))
+  }
+
   const ses = session.defaultSession
   const existing = records()
   if (existing.some((r) => path.resolve(r.path) === target)) {
-    throw new Error('This extension folder is already installed')
+    throw fail('This extension folder is already installed')
   }
-  const ext = await ses.loadExtension(target, { allowFileAccess: true })
-  saveRecords([...existing, { path: target, enabled: true }])
-  return toInfo({ path: target, enabled: true }, ext)
+
+  // Chrome-style permission consent (Master Plan #5) — the dialog lists what
+  // the extension can do; the user must accept before it ever runs. A changed
+  // version re-prompts. Decline = abort with nothing left behind.
+  const consented = await ensureExtensionConsent(target, verdict, { skipDialog: opts.skipConsentDialog })
+  if (!consented) {
+    throw fail(`“${verdict.name}” was not added — you declined its permissions`)
+  }
+
+  try {
+    const ext = await ses.loadExtension(target, { allowFileAccess: true })
+    saveRecords([...existing, { path: target, enabled: true }])
+    return toInfo({ path: target, enabled: true }, ext)
+  } catch (err) {
+    throw fail('Could not load the extension: ' + (err instanceof Error ? err.message : String(err)))
+  }
 }
 
 /** Enable/disable by folder path (disabled = unloaded but remembered). */

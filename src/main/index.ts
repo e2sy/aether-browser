@@ -10,7 +10,8 @@ import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML,
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
-import { installPermissionHandlers } from './permissions'
+import { installPermissionHandlers, sweepExpiredGrants } from './permissions'
+import { installCertificateHandlers } from './certs'
 import { initExtensions } from './extensions'
 import { installDownloadHandler } from './downloads'
 import {
@@ -88,6 +89,13 @@ app.whenReady().then(() => {
 
   // ad & tracker blocking (best-effort, cached filters)
   void applyAdblockSetting(mergedSettings().adblock !== false)
+
+  // certificate-error policy: deny by default, typed consent, 24h per-host
+  // memo for the exact certificate (main/certs.ts — Master Plan #14)
+  installCertificateHandlers()
+
+  // drop site-permission grants that went idle past the TTL (Master Plan #13)
+  sweepExpiredGrants()
 
   // one-time global extensions host — resolves tabs across all windows
   initExtensions(() => {

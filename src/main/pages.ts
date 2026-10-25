@@ -1099,6 +1099,21 @@ export const SETTINGS_HTML = pageShell(
       </div>
       <div id="listStatus" class="hint" style="margin-top:6px"></div>
       <div id="listTable" style="margin-top:8px"></div>
+      <div class="label" style="margin-top:18px">Site permissions</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
+        <label style="font-size:13px; color:var(--ax-fg)">Re-ask for camera, mic, location… after</label>
+        <select id="grantTtl" style="width:140px">
+          <option value="0">Never re-ask</option>
+          <option value="30">30 days</option>
+          <option value="90">90 days</option>
+          <option value="180">180 days (recommended)</option>
+          <option value="365">1 year</option>
+        </select>
+      </div>
+      <div class="hint" style="margin-top:6px">Remembered grants quietly expire after this idle time — the next visit prompts again (Master Plan #13).</div>
+      <div class="label" style="margin-top:18px">Certificate exceptions</div>
+      <div class="hint" style="margin-bottom:8px">Sites you chose “Proceed anyway” on are remembered for 24 hours, for that exact certificate only. There is no permanent bypass.</div>
+      <button class="muted-btn" id="certForget">Forget remembered certificate exceptions</button>
     </div>
 
     <div class="sec">
@@ -1244,6 +1259,7 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('shieldsAggressive').checked = !!s.shieldsAggressive
       document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
       document.getElementById('memorySaver').value = String(s.memorySaver || 0)
+      document.getElementById('grantTtl').value = String(s.grantTtlDays ?? 180)
       renderShieldPresets(s)
       renderShieldLists()
       var cf = s.cloudFallback || {}
@@ -1542,6 +1558,15 @@ export const SETTINGS_HTML = pageShell(
 
   document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
   document.getElementById('memorySaver').addEventListener('change', function (e) { save({ memorySaver: Number(e.target.value) || 0 }) })
+  document.getElementById('grantTtl').addEventListener('change', function (e) { save({ grantTtlDays: Number(e.target.value) || 0 }) })
+  document.getElementById('certForget').addEventListener('click', async function () {
+    try {
+      const n = await window.aether.certs.forget()
+      this.textContent = n > 0 ? 'Forgot ' + n + ' exception' + (n === 1 ? '' : 's') : 'Nothing to forget'
+    } catch (err) { this.textContent = 'Failed' }
+    const btn = this
+    setTimeout(function () { btn.textContent = 'Forget remembered certificate exceptions' }, 2500)
+  })
   document.getElementById('cfSave').addEventListener('click', function () {
     save({
       cloudFallback: {

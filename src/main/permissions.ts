@@ -9,8 +9,55 @@
  */
 import { session } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { JsonStore } from './store'
+import { JsonStore, mergedSettings } from './store'
 import type { PermissionEntry } from '../shared/types'
+
+/** Default re-prompt cadence for remembered grants (Master Plan #13).
+ *  0 disables expiry. Overridable in Settings → Privacy. */
+export const DEFAULT_GRANT_TTL_DAYS = 180
+
+const DAY_MS = 86_400_000
+
+/** Pure: has a remembered grant gone stale enough to re-ask? */
+export function isGrantExpired(entry: PermissionEntry, now: number, ttlDays: number): boolean {
+  if (!Number.isFinite(ttlDays) || ttlDays <= 0) return false
+  if (typeof entry?.ts !== 'number') return true
+  return now - entry.ts > ttlDays * DAY_MS
+}
+
+/** Pure: drop stale grants from a permissions map, returns [cleaned, count]. */
+export function sweepGrantData(
+  data: Record<string, PermissionEntry>,
+  now: number,
+  ttlDays: number
+): [Record<string, PermissionEntry>, number] {
+  const out: Record<string, PermissionEntry> = {}
+  let n = 0
+  for (const [k, v] of Object.entries(data)) {
+    if (isGrantExpired(v, now, ttlDays)) {
+      n++
+      continue
+    }
+    out[k] = v
+  }
+  return [out, n]
+}
+
+function grantTtlDays(): number {
+  const s = mergedSettings() as { grantTtlDays?: number }
+  const v = Number(s.grantTtlDays)
+  return Number.isFinite(v) ? v : DEFAULT_GRANT_TTL_DAYS
+}
+
+/** Drop all stale grants; returns how many were removed. */
+export function sweepExpiredGrants(now = Date.now()): number {
+  const [cleaned, n] = sweepGrantData(store.data, now, grantTtlDays())
+  if (n > 0) {
+    store.data = cleaned
+    store.save()
+  }
+  return n
+}
 
 const store = new JsonStore<Record<string, PermissionEntry>>('permissions.json', {})
 
@@ -60,8 +107,14 @@ export function installPermissionHandlers(askChrome: (payload: { requestId: stri
     }
     const saved = store.data[keyOf(origin, permission)]
     if (saved) {
-      cb(saved.decision === 'allow')
-      return
+      if (isGrantExpired(saved, Date.now(), grantTtlDays())) {
+        // idle-grant expiry: forget the stale decision and re-prompt
+        delete store.data[keyOf(origin, permission)]
+        store.save()
+      } else {
+        cb(saved.decision === 'allow')
+        return
+      }
     }
 
     // interactive prompt via the chrome UI — first requester wins
@@ -125,6 +178,10 @@ export function revokePermission(origin: string, permission: string): void {
 export function clearPermissions(): void {
   store.data = {}
   store.save()
+}
+
+export function countPermissions(): number {
+  return Object.keys(store.data).length
 }
 
 export function permissionLabel(permission: string): string {

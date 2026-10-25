@@ -53,8 +53,10 @@ import {
   respondPermission,
   listPermissions,
   revokePermission,
-  clearPermissions
+  clearPermissions,
+  sweepExpiredGrants
 } from './permissions'
+import { forgetCertMemos } from './certs'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -565,6 +567,17 @@ export function registerIpc(): void {
   ipcMain.handle('perms:clear', (e) => {
     guard(e, 'perms:clear')
     clearPermissions()
+  })
+
+  // Master Plan #13/#14 — maintenance from Settings → Privacy & security
+  ipcMain.handle('perms:sweep', (e) => {
+    guard(e, 'perms:sweep')
+    return sweepExpiredGrants()
+  })
+
+  ipcMain.handle('certs:forget', (e) => {
+    guard(e, 'certs:forget')
+    return forgetCertMemos()
   })
 
   // ---------- page memory (local, per-domain) ----------

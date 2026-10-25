@@ -49,7 +49,8 @@ export const DEFAULT_SETTINGS: Settings = {
   extensions: [],
   appearance: DEFAULT_APPEARANCE,
   restoreSession: true,
-  showBookmarksBar: true
+  showBookmarksBar: true,
+  grantTtlDays: 180
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

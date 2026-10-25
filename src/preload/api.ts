@@ -164,7 +164,13 @@ export const api = {
     list: () => ipcRenderer.invoke('perms:list'),
     revoke: (origin: string, permission: string) => ipcRenderer.invoke('perms:revoke', origin, permission),
     clear: () => ipcRenderer.invoke('perms:clear'),
+    sweep: () => ipcRenderer.invoke('perms:sweep'),
     onRequest: subscribe('perm:request')
+  },
+
+  /** certificate-exception memory (24h, per host — see main/certs.ts) */
+  certs: {
+    forget: () => ipcRenderer.invoke('certs:forget')
   },
 
   /** local per-domain page memory */

@@ -71,6 +71,8 @@ export interface Settings {
   restoreSession: boolean
   /** v1.5.0 — show the bookmarks bar under the toolbar */
   showBookmarksBar: boolean
+  /** v1.7.0 — re-ask remembered site-permission grants after N days (0 = never) */
+  grantTtlDays: number
 }
 
 /** A loaded unpacked extension (persisted across boots). */
