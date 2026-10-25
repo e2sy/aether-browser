@@ -6,6 +6,9 @@ files:
   - out/**
 asar: true
 npmRebuild: false
+# Stamp security fuses into the Electron binary (RunAsNode off, cookie
+# encryption on, ASAR integrity) — see scripts/apply-fuses.js
+afterPack: scripts/apply-fuses.js
 mac:
   category: public.app-category.productivity
   icon: build/icon.png

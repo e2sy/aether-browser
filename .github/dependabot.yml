@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Application + build dependencies: weekly, grouped, Monday mornings.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # Major bumps (electron, electron-builder) arrive as individual PRs —
+    # they deserve their own review + release-cycle attention.
+    open-pull-requests-limit: 8
+
+  # CI actions: weekly.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
