@@ -53,6 +53,19 @@ stubModule(
   'electron-chrome-extensions',
   `module.exports = class ElectronChromeExtensions { constructor() {} on() {} getContextMenuItems() { return [] } addTab() {} selectTab() {} }`
 )
+/* v1.2.0: tabs.ts -> adblock.ts drags the adblocker stack into the sandbox graph — stub it */
+stubModule(
+  '@cliqz/adblocker',
+  `module.exports = { FiltersEngine: class FiltersEngine { static deserialize() { return new FiltersEngine() } } }`
+)
+stubModule(
+  '@cliqz/adblocker-electron',
+  `module.exports = { ElectronBlocker: class ElectronBlocker {}, fromElectronDetails: () => ({}) }`
+)
+stubModule(
+  'tldts-experimental',
+  `module.exports = { parse: () => null }`
+)
 
 execSync(`cp -r ${APP}/src ${tmp}/src`, { stdio: 'pipe' })
 
