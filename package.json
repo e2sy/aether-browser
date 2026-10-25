@@ -3,7 +3,10 @@
   "version": "1.2.1",
   "description": "Open-source AI browser — full Chromium compatibility, powered by your local Ollama model. Multi-window, CRX one-click install, tiered memory saver.",
   "main": "out/main/index.js",
-  "author": "Aether Browser contributors",
+  "author": {
+    "name": "Aether Browser contributors",
+    "email": "e2sy@users.noreply.github.com"
+  },
   "license": "GPL-3.0",
   "homepage": "https://github.com/e2sy/aether-browser#readme",
   "repository": {
