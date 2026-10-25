@@ -18,6 +18,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { safeUnzip } from './safe-zip'
 import { MAX_EXT_PACKAGE_BYTES, validateManifestOnDisk } from './extsec'
+import { notify } from './osshell'
 import type { ExtensionInfo } from '../shared/types'
 import { installFromFolder } from './extensions'
 
@@ -166,12 +167,8 @@ export async function installCrxFromArgv(argv: string[]): Promise<void> {
   for (const file of crx) {
     try {
       const info = await installExtensionFromFile(file)
-      dialog.showMessageBox({
-        type: 'info',
-        message: `Extension installed: ${info.name}`,
-        detail: 'Manage it in Settings → Extensions.',
-        buttons: ['OK']
-      })
+      // native notification (#30) — click focuses the browser
+      notify('Extension installed', `${info.name} — manage it in Settings → Extensions.`)
     } catch (err) {
       dialog.showErrorBox('Extension install failed', String(err instanceof Error ? err.message : err))
     }

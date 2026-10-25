@@ -15,6 +15,8 @@ import { registerTabManager, unregisterTabManager } from './extensions'
 import { scheduleSessionSave, type SessionTab } from './session-restore'
 import { CHROME_SHELL_LOCK } from './navlock'
 import { canOpenAsTab } from './extproto'
+import { shouldHideToTray, isQuitting, isBootHidden, wakeFromBootHidden } from './osshell'
+import { mergedSettings } from './store'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -148,7 +150,21 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
     }
   )
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    // startup boost: boots stay hidden until the user asks for a window
+    // (tray click / second-instance link / dock click all call wake+focus)
+    if (isBootHidden()) return
+    win.show()
+  })
+  // close-to-tray (#28): swallow the close when enabled — Quit still works
+  // via tray menu / Ctrl+Q (those set quitting first)
+  win.on('close', (e) => {
+    if (shouldHideToTray(Boolean(mergedSettings().closeToTray), isQuitting())) {
+      e.preventDefault()
+      wakeFromBootHidden()
+      win.hide()
+    }
+  })
   win.webContents.on('did-finish-load', () => {
     if (entry.private && !win.isDestroyed()) win.webContents.send('win:private', true)
   })
@@ -225,11 +241,13 @@ export function firstEntry(): WindowEntry | undefined {
   return allEntries().find((e) => !e.win.isDestroyed())
 }
 
-/** Guard used by single-instance lock: focus an existing window instead. */
+/** Guard used by single-instance lock / tray: wake + focus an existing window. */
 export function focusAnyWindow(): void {
+  wakeFromBootHidden()
   const entry = firstEntry()
   if (entry) {
     if (entry.win.isMinimized()) entry.win.restore()
+    if (!entry.win.isVisible()) entry.win.show()
     entry.win.focus()
   } else {
     createBrowserWindow()
@@ -251,7 +269,9 @@ export function openUrlInRunningBrowser(url: string): void {
   if (entry && !entry.win.isDestroyed()) {
     try {
       entry.tabs.create(clean, true)
+      wakeFromBootHidden()
       if (entry.win.isMinimized()) entry.win.restore()
+      if (!entry.win.isVisible()) entry.win.show()
       entry.win.focus()
       return
     } catch (err) {

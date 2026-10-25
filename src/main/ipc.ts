@@ -58,6 +58,7 @@ import {
 } from './permissions'
 import { forgetCertMemos } from './certs'
 import { listExternalChoices, forgetExternalChoices } from './extproto'
+import { createTray, destroyTray, applyStartupBoost } from './osshell'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -271,6 +272,14 @@ export function registerIpc(): void {
     settings.save()
     if (patch.adblock !== undefined) {
       void applyAdblockSetting(Boolean(patch.adblock))
+    }
+    // OS-integration live effects (#28/#29) — tray + login item react instantly
+    if (patch.showTray !== undefined) {
+      if (patch.showTray) createTray()
+      else destroyTray()
+    }
+    if (patch.startupBoost !== undefined) {
+      applyStartupBoost(Boolean(patch.startupBoost))
     }
     // v1.4.0 — normalize the appearance blob and tell every chrome window live
     if (patch.appearance !== undefined) {

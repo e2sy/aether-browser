@@ -1117,6 +1117,13 @@ export const SETTINGS_HTML = pageShell(
       <div class="label" style="margin-top:18px">External apps</div>
       <div class="hint" style="margin-bottom:8px">When a site hands off a mailto:, magnet: or meeting link, Aether asks before launching the app — with an optional “remember my choice” per link type.</div>
       <button class="muted-btn" id="extprotoForget">Reset remembered app-launch choices</button>
+      <div class="label" style="margin-top:18px">OS integration</div>
+      <div class="opts" style="margin-top:6px">
+        <label><input type="checkbox" id="showTray" /> Show the quick-actions tray icon (new tab, private window, pause shields)</label>
+        <label><input type="checkbox" id="closeToTray" /> Closing the window keeps Aether running in the tray</label>
+        <label><input type="checkbox" id="startupBoost" /> Startup boost — start with my computer (hidden, for a warm first link)</label>
+        <label><input type="checkbox" id="notifyDownloads" /> Notify me when a download completes</label>
+      </div>
     </div>
 
     <div class="sec">
@@ -1263,6 +1270,10 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
       document.getElementById('memorySaver').value = String(s.memorySaver || 0)
       document.getElementById('grantTtl').value = String(s.grantTtlDays ?? 180)
+      document.getElementById('showTray').checked = s.showTray !== false
+      document.getElementById('closeToTray').checked = !!s.closeToTray
+      document.getElementById('startupBoost').checked = !!s.startupBoost
+      document.getElementById('notifyDownloads').checked = s.notifyDownloads !== false
       renderShieldPresets(s)
       renderShieldLists()
       var cf = s.cloudFallback || {}
@@ -1562,6 +1573,10 @@ export const SETTINGS_HTML = pageShell(
   document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
   document.getElementById('memorySaver').addEventListener('change', function (e) { save({ memorySaver: Number(e.target.value) || 0 }) })
   document.getElementById('grantTtl').addEventListener('change', function (e) { save({ grantTtlDays: Number(e.target.value) || 0 }) })
+  document.getElementById('showTray').addEventListener('change', function (e) { save({ showTray: e.target.checked }) })
+  document.getElementById('closeToTray').addEventListener('change', function (e) { save({ closeToTray: e.target.checked }) })
+  document.getElementById('startupBoost').addEventListener('change', function (e) { save({ startupBoost: e.target.checked }) })
+  document.getElementById('notifyDownloads').addEventListener('change', function (e) { save({ notifyDownloads: e.target.checked }) })
   document.getElementById('certForget').addEventListener('click', async function () {
     try {
       const n = await window.aether.certs.forget()

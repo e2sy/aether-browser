@@ -48,7 +48,12 @@ fs.writeFileSync(
     'const session = { defaultSession: {} }',
     'const BrowserWindow = Object.assign(function () {}, { getAllWindows: () => [] })',
     'class DownloadItem {}',
-    'export { app, shell, session, BrowserWindow, DownloadItem }'
+    // v1.7.0 build 9: oshell.ts (pulled in via downloads.ts) needs these too
+    'const Menu = { buildFromTemplate: () => ({}), setApplicationMenu() {} }',
+    'const Notification = { isSupported: () => false }',
+    'class Tray { destroy() {} setContextMenu() {} setToolTip() {} on() {} }',
+    'const nativeImage = { createFromPath: () => ({}), createFromBuffer: () => ({}) }',
+    'export { app, shell, session, BrowserWindow, DownloadItem, Menu, Notification, Tray, nativeImage }'
   ].join('\n').replaceAll('${TMP}', tmp.replace(/\\/g, '/')) + '\n'
 )
 fs.cpSync(path.join(APP, 'src'), path.join(tmp, 'src'), { recursive: true })

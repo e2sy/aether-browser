@@ -15,6 +15,15 @@ import { installCertificateHandlers } from './certs'
 import { initExtensions } from './extensions'
 import { installDownloadHandler } from './downloads'
 import {
+  installOsShell,
+  createTray,
+  destroyTray,
+  applyStartupBoost,
+  markQuitting,
+  setShieldToggleHook,
+  setWindowOps
+} from './osshell'
+import {
   initSessionRestore,
   loadSession,
   wasUncleanShutdown,
@@ -53,6 +62,9 @@ app.on('second-instance', (_e, argv) => {
   const { urls, packages } = parseLaunchArgs(argv)
   for (const u of urls) openUrlInRunningBrowser(u)
   if (packages.length) void installCrxFromArgv(argv)
+  // Windows jump-list / taskbar actions land here as flags (#27)
+  if ((argv ?? []).includes('--new-window')) createBrowserWindow()
+  if ((argv ?? []).includes('--private')) createBrowserWindow(undefined, { private: true })
 })
 
 // macOS default-browser flow: LaunchServices delivers picked-up links here
@@ -116,6 +128,14 @@ app.whenReady().then(() => {
 
   // downloads stream to every browser window
   installDownloadHandler()
+
+  // OS-integration chrome (#27/#28/#29/#31): jump list, dock menu, tray,
+  // opt-in login item. close-to-tray hides windows instead of destroying.
+  installOsShell()
+  setWindowOps({ focusAnyWindow, createBrowserWindow, focusedEntry, allEntries })
+  setShieldToggleHook(() => void applyAdblockSetting(!mergedSettings().adblock))
+  if (mergedSettings().showTray !== false) createTray()
+  applyStartupBoost(mergedSettings().startupBoost === true)
 
   registerIpc()
 
@@ -449,6 +469,7 @@ app.on('window-all-closed', () => {
 // v1.5.0 — write the session synchronously with the clean-exit marker so the
 // next boot knows this run ended on purpose (drives crash detection).
 app.on('before-quit', () => {
+  markQuitting() // close-to-tray must not swallow a real quit
   cancelScheduledSessionSave()
   flushSessionNow(allEntries(), true)
 })

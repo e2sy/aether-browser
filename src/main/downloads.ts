@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import fs from 'node:fs'
 import type { DownloadState } from '../shared/types'
+import { progressValue, setBadgeCount, notify } from './osshell'
+import { mergedSettings } from './store'
 
 const active = new Map<string, { item: DownloadItem; path: string }>()
 
@@ -155,6 +157,15 @@ export function installDownloadHandler(): void {
       record.received = st.received
       record.total = st.total
       broadcast('download:progress', st)
+      // OS taskbar progress + active-download badge (#27/#31)
+      try {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed()) w.setProgressBar(progressValue(st.received, st.total))
+        }
+      } catch {
+        /* progress is cosmetic */
+      }
+      setBadgeCount(active.size)
     })
     item.on('done', (_e, state) => {
       const final = stateOf(id, item, {
@@ -171,9 +182,21 @@ export function installDownloadHandler(): void {
       saveLog()
       broadcast('download:progress', final)
       broadcast('downloads:changed', {})
+      try {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed()) w.setProgressBar(progressValue(0, 0, true))
+        }
+      } catch {
+        /* cosmetic */
+      }
+      setBadgeCount(active.size)
+      if (state === 'completed' && mergedSettings().notifyDownloads !== false) {
+        notify('Download complete', record.filename || 'File saved')
+      }
     })
     log = capLog([...(log || []), record])
     broadcast('download:progress', stateOf(id, item))
+    setBadgeCount(active.size)
   })
 }
 

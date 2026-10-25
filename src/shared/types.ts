@@ -73,6 +73,14 @@ export interface Settings {
   showBookmarksBar: boolean
   /** v1.7.0 — re-ask remembered site-permission grants after N days (0 = never) */
   grantTtlDays: number
+  /** v1.7.0 (#28) — show the quick-actions tray icon (win/linux) */
+  showTray: boolean
+  /** v1.7.0 (#28) — closing the last window hides to tray instead of quitting */
+  closeToTray: boolean
+  /** v1.7.0 (#29) — opt-in login item, boots hidden for a warm start */
+  startupBoost: boolean
+  /** v1.7.0 (#30) — native notification when a download completes */
+  notifyDownloads: boolean
 }
 
 /** A loaded unpacked extension (persisted across boots). */

@@ -50,7 +50,11 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: DEFAULT_APPEARANCE,
   restoreSession: true,
   showBookmarksBar: true,
-  grantTtlDays: 180
+  grantTtlDays: 180,
+  showTray: true,
+  closeToTray: false,
+  startupBoost: false,
+  notifyDownloads: true
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
