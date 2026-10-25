@@ -28,6 +28,19 @@ export interface ChatMsg {
   content: string
 }
 
+export interface AppearanceSettings {
+  /** dark (default) / light / follow the OS */
+  theme: 'dark' | 'light' | 'system'
+  /** #rrggbb accent used for highlights, buttons, focus rings */
+  accent: string
+  /** UI zoom for internal pages + chrome (0.85 - 1.25) */
+  fontScale: number
+  /** new-tab background preset */
+  newtabBg: 'aurora' | 'midnight' | 'slate' | 'light' | 'solid'
+  /** show the clock + greeting on the new tab */
+  newtabClock: boolean
+}
+
 export interface Settings {
   model: string | null
   usePageContext: boolean
@@ -52,6 +65,8 @@ export interface Settings {
   memorySaver: number
   /** Unpacked extensions to load at boot */
   extensions: ExtensionRecord[]
+  /** v1.4.0 Customization Studio — themes, accent, fonts, new-tab look */
+  appearance: AppearanceSettings
 }
 
 /** A loaded unpacked extension (persisted across boots). */

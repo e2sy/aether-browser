@@ -1,4 +1,4 @@
-import { ipcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
+import { BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
@@ -27,6 +27,7 @@ import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './oll
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
 import { ENGINE_NAMES, tryEngine } from './search'
+import { normalizeAppearance } from './appearance'
 import {
   searchAll,
   instantAnswer,
@@ -217,6 +218,21 @@ export function registerIpc(): void {
     settings.save()
     if (patch.adblock !== undefined) {
       void applyAdblockSetting(Boolean(patch.adblock))
+    }
+    // v1.4.0 — normalize the appearance blob and tell every chrome window live
+    if (patch.appearance !== undefined) {
+      const nextAppearance = normalizeAppearance(patch.appearance, mergedSettings().appearance)
+      settings.data = { ...settings.data, appearance: nextAppearance }
+      settings.save()
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) {
+          try {
+            w.webContents.send('appearance:changed', nextAppearance)
+          } catch {
+            /* window racing shutdown */
+          }
+        }
+      }
     }
     return mergedSettings()
   })

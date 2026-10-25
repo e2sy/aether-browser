@@ -204,7 +204,13 @@ export const api = {
 
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
-    set: (patch: Record<string, unknown>) => ipcRenderer.invoke('settings:set', patch)
+    set: (patch: Record<string, unknown>) => ipcRenderer.invoke('settings:set', patch),
+    /** v1.4.0 — live appearance updates from the Customization Studio */
+    onAppearanceChanged: (cb: (a: unknown) => void) => {
+      const listener = (_e: unknown, a: unknown): void => cb(a)
+      ipcRenderer.on('appearance:changed', listener)
+      return () => ipcRenderer.removeListener('appearance:changed', listener)
+    }
   },
 
   shields: {

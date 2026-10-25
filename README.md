@@ -6,7 +6,7 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.3.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.4.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
@@ -29,6 +29,7 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🧭 **Manager pages** | `aether://history` (search, delete, clear), `aether://bookmarks`, `aether://settings` (model picker, search engine, **extensions manager**, **memory saver**, permissions manager, cloud fallback, privacy toggles) |
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
+| 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
 
 ## 🦁 v1.2.0 — Brave-style Shields (the adblocker grows up)

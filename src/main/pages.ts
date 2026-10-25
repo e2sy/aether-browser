@@ -4,7 +4,9 @@
  * NOTE: page scripts are plain ES5-ish and must NOT contain backticks or ${
  * (outside the template placeholders below).
  */
-import { app } from 'electron'
+import { app, nativeTheme } from 'electron'
+import { appearanceCss } from './appearance'
+import { mergedSettings } from './store'
 
 /** Live version — no more hardcoded footer drift between releases. */
 const VER = app.getVersion()
@@ -14,7 +16,7 @@ const BASE_CSS = `
   html,body { height:100%; }
   body {
     font-family: -apple-system, 'Segoe UI', Roboto, Ubuntu, 'Noto Sans', sans-serif;
-    background:#16171b; color:#e8eaf0;
+    background:var(--ax-bg); color:var(--ax-fg);
     display:flex; flex-direction:column; align-items:center;
     -webkit-user-select:none; user-select:none;
   }
@@ -29,6 +31,7 @@ function pageShell(title: string, body: string, script: string): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data:;">
 <title>${title}</title>
 <style>${BASE_CSS}</style>
+<style>${appearanceCss(mergedSettings().appearance, nativeTheme.shouldUseDarkColors)}</style>
 </head>
 <body>
 ${body}
@@ -40,27 +43,28 @@ ${body}
 export const NEW_TAB_HTML = pageShell(
   'New Tab',
   `
+  <style>body { background: var(--ax-ntbg, var(--ax-bg)); }</style>
   <div style="margin-top:12vh; font-size:52px; font-weight:200;" id="clock">--:--</div>
-  <div style="margin-top:6px; color:#9aa0ae;" id="greeting"></div>
+  <div style="margin-top:6px; color:var(--ax-muted);" id="greeting"></div>
   <div id="bridge-error" style="display:none; margin-top:30px; width:min(560px,86vw); padding:12px 16px;
-    background:#2a1c1c; border:1px solid #3a2a2a; border-radius:10px; color:#ff8a8a; font-size:13px;
+    background:var(--ax-danger-bg); border:1px solid var(--ax-danger-border); border-radius:10px; color:var(--ax-danger); font-size:13px;
     line-height:1.5; -webkit-user-select:text; user-select:text;"></div>
   <form id="searchform" style="margin-top:34px; width:min(560px,86vw); position:relative;">
     <input id="q" type="text" placeholder="Search the web or type a URL" autocomplete="off"
-      style="width:100%; padding:16px 64px 16px 20px; font-size:15px; color:#e8eaf0;
-      background:#1e2026; border:1px solid #2e313a; border-radius:14px; outline:none;" />
+      style="width:100%; padding:16px 64px 16px 20px; font-size:15px; color:var(--ax-fg);
+      background:var(--ax-card); border:1px solid var(--ax-border); border-radius:14px; outline:none;" />
     <button id="aibtn" type="button" title="Search with Aether AI"
-      style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#7c8cff; font-size:12px;
-      letter-spacing:.08em; background:#7c8cff1a; border:none; border-radius:8px; padding:6px 10px;
+      style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--ax-accent); font-size:12px;
+      letter-spacing:.08em; background:var(--ax-accent-soft); border:none; border-radius:8px; padding:6px 10px;
       cursor:pointer;">AI</button>
   </form>
   <div style="margin-top:44px; width:min(640px,88vw);">
-    <div style="color:#9aa0ae; font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
+    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
     <div id="top" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
-    <div style="color:#9aa0ae; font-size:12px; letter-spacing:.1em; margin:26px 0 14px;" id="bm-label">BOOKMARKS</div>
+    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin:26px 0 14px;" id="bm-label">BOOKMARKS</div>
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
-  <div style="margin-top:auto; padding:18px; color:#565b66; font-size:11px;">
+  <div style="margin-top:auto; padding:18px; color:var(--ax-faint); font-size:11px;">
     Aether Browser ${VER} — local AI, open source
   </div>
   `,
@@ -68,25 +72,25 @@ export const NEW_TAB_HTML = pageShell(
   function el(tag, cls) { var d = document.createElement(tag); if (cls) d.className = cls; return d }
   function site(a) {
     var card = el('a'); card.href = '#'
-    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px;background:#1e2026;border:1px solid #2e313a;border-radius:12px;overflow:hidden'
+    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px;background:var(--ax-card);border:1px solid var(--ax-border);border-radius:12px;overflow:hidden'
     var letter = document.createElement('div')
     var host = a.host || '?'
     letter.textContent = host.charAt(0).toUpperCase()
-    letter.style.cssText = 'width:34px;height:34px;border-radius:50%;background:#7c8cff22;color:#7c8cff;display:flex;align-items:center;justify-content:center;font-weight:600'
+    letter.style.cssText = 'width:34px;height:34px;border-radius:50%;background:var(--ax-accent-soft);color:var(--ax-accent);display:flex;align-items:center;justify-content:center;font-weight:600'
     var label = document.createElement('div')
     label.textContent = host.replace(/^www\\./, '')
-    label.style.cssText = 'font-size:11px;color:#c6cad4;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+    label.style.cssText = 'font-size:11px;color:var(--ax-fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
     card.appendChild(letter); card.appendChild(label)
     card.addEventListener('click', function (e) { e.preventDefault(); window.aether.internal.open(a.url) })
     return card
   }
   function bmRow(b) {
     var row = el('a'); row.href = '#'
-    row.style.cssText = 'display:flex;gap:10px;align-items:center;padding:10px 14px;background:#1e2026;border:1px solid #2e313a;border-radius:10px'
+    row.style.cssText = 'display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--ax-card);border:1px solid var(--ax-border);border-radius:10px'
     var t = document.createElement('div'); t.textContent = b.title || b.url
     t.style.cssText = 'font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
     var u = document.createElement('div'); u.textContent = (b.url || '').replace(/^https?:\\/\\//, '').split('/')[0]
-    u.style.cssText = 'font-size:11px;color:#9aa0ae;flex:none'
+    u.style.cssText = 'font-size:11px;color:var(--ax-muted);flex:none'
     row.appendChild(t); row.appendChild(u)
     row.addEventListener('click', function (e) { e.preventDefault(); window.aether.internal.open(b.url) })
     return row
@@ -99,6 +103,14 @@ export const NEW_TAB_HTML = pageShell(
     document.getElementById('greeting').textContent = g + ' — everything you do here stays on this device.'
   }
   clock(); setInterval(clock, 30000)
+  try {
+    window.aether.settings.get().then(function (s) {
+      if (s.appearance && s.appearance.newtabClock === false) {
+        document.getElementById('clock').style.display = 'none'
+        document.getElementById('greeting').style.display = 'none'
+      }
+    }).catch(function () {})
+  } catch (e) {}
   function bridgeError(msg) {
     var b = document.getElementById('bridge-error')
     b.style.display = 'block'
@@ -138,7 +150,7 @@ export const NEW_TAB_HTML = pageShell(
     if (!data.topSites.length) {
       top.innerHTML = ''
       var hint = el('div'); hint.textContent = 'Your most visited sites will appear here.'
-      hint.style.cssText = 'grid-column:1/-1;color:#565b66;font-size:13px;padding:6px 2px'
+      hint.style.cssText = 'grid-column:1/-1;color:var(--ax-faint);font-size:13px;padding:6px 2px'
       top.appendChild(hint)
     } else data.topSites.forEach(function (s) { top.appendChild(site(s)) })
     var bm = document.getElementById('bm')
@@ -160,33 +172,33 @@ export const SEARCH_HTML = pageShell(
   <div style="width:min(680px,90vw); margin-top:7vh;">
     <div style="display:flex; align-items:baseline; gap:10px;">
       <div style="font-size:24px; font-weight:700; letter-spacing:-0.02em;">
-        aether<span style="color:#7c8cff">Search</span>
+        aether<span style="color:var(--ax-accent)">Search</span>
       </div>
-      <div style="font-size:11.5px; color:#7d828f;">the open metasearch — every result says where it came from</div>
+      <div style="font-size:11.5px; color:var(--ax-muted2);">the open metasearch — every result says where it came from</div>
     </div>
     <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
-      <input id="q" type="text" style="flex:1; padding:13px 18px; font-size:14px; color:#e8eaf0;
-        background:#1e2026; border:1px solid #2e313a; border-radius:12px; outline:none;" />
+      <input id="q" type="text" style="flex:1; padding:13px 18px; font-size:14px; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:12px; outline:none;" />
       <button id="go" style="padding:13px 20px; font-size:13px; font-weight:600; color:#fff;
-        background:#5b6cff; border:none; border-radius:12px; cursor:pointer;">Search</button>
+        background:var(--ax-accent2); border:none; border-radius:12px; cursor:pointer;">Search</button>
     </div>
 
-    <div id="instant" style="margin-top:18px; display:none; background:linear-gradient(135deg,#7c8cff14,#7c8cff05);
-      border:1px solid #3d4a7a; border-radius:14px; padding:16px 20px;">
-      <div id="instant-out" style="font-size:26px; font-weight:600; color:#cdd5ff; letter-spacing:-0.01em;"></div>
-      <div style="margin-top:5px; font-size:11px; color:#7d828f;">Aether instant answer — computed on this device, no network</div>
+    <div id="instant" style="margin-top:18px; display:none; background:linear-gradient(135deg,var(--ax-accent-soft),var(--ax-accent)05);
+      border:1px solid var(--ax-border-hi); border-radius:14px; padding:16px 20px;">
+      <div id="instant-out" style="font-size:26px; font-weight:600; color:var(--ax-accent-tint); letter-spacing:-0.01em;"></div>
+      <div style="margin-top:5px; font-size:11px; color:var(--ax-muted2);">Aether instant answer — computed on this device, no network</div>
     </div>
 
-    <div id="status" style="margin-top:20px; color:#9aa0ae; font-size:13px;"></div>
+    <div id="status" style="margin-top:20px; color:var(--ax-muted); font-size:13px;"></div>
     <div id="chips" style="margin-top:10px; display:none; flex-wrap:wrap; gap:6px;"></div>
     <div id="gfallback" style="margin-top:14px; display:none;"></div>
-    <div id="aiwrap" style="margin-top:18px; display:none; background:#1e2026; border:1px solid #2e313a;
+    <div id="aiwrap" style="margin-top:18px; display:none; background:var(--ax-card); border:1px solid var(--ax-border);
       border-radius:14px; padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:.09em; color:#7c8cff; margin-bottom:9px;">AI ANSWER — LOCAL MODEL</div>
+      <div style="font-size:11px; letter-spacing:.09em; color:var(--ax-accent); margin-bottom:9px;">AI ANSWER — LOCAL MODEL</div>
       <div id="answer" style="font-size:14px; line-height:1.65; white-space:pre-wrap;"></div>
     </div>
     <div id="sources" style="margin-top:18px; display:none;"></div>
-    <div style="margin-top:34px; padding-bottom:26px; color:#565b66; font-size:11px; line-height:1.7;">
+    <div style="margin-top:34px; padding-bottom:26px; color:var(--ax-faint); font-size:11px; line-height:1.7;">
       Aether Search aggregates public sources, strips tracking parameters, deduplicates and ranks
       results locally. It does not profile you and stores nothing beyond this device's history.
     </div>
@@ -201,7 +213,7 @@ export const SEARCH_HTML = pageShell(
     wrap.innerHTML = ''
     var btn = document.createElement('a')
     btn.href = '#'
-    btn.style.cssText = 'display:inline-block;padding:10px 18px;font-size:13px;font-weight:600;color:#fff;background:#5b6cff;border-radius:10px;cursor:pointer;text-decoration:none'
+    btn.style.cssText = 'display:inline-block;padding:10px 18px;font-size:13px;font-weight:600;color:#fff;background:var(--ax-accent2);border-radius:10px;cursor:pointer;text-decoration:none'
     btn.textContent = 'Search on Google instead'
     btn.addEventListener('click', function (e) {
       e.preventDefault()
@@ -229,7 +241,7 @@ export const SEARCH_HTML = pageShell(
     for (var i = 0; i < stats.length; i++) {
       var s = stats[i]
       var chip = document.createElement('span')
-      chip.style.cssText = 'font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid #2e313a;color:' + (s.error || !s.count ? '#565b66' : '#9aa0ae') + ';background:#1a1c21'
+      chip.style.cssText = 'font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--ax-border);color:' + (s.error || !s.count ? 'var(--ax-faint)' : 'var(--ax-muted)') + ';background:var(--ax-card2)'
       chip.textContent = s.error ? (s.source + ' — unavailable') : (s.source + ' · ' + s.count + ' results · ' + s.ms + ' ms')
       chips.appendChild(chip)
     }
@@ -243,19 +255,19 @@ export const SEARCH_HTML = pageShell(
       var r = sources[i]
       var card = document.createElement('a')
       card.href = '#'
-      card.style.cssText = 'display:block;padding:12px 16px;margin-bottom:8px;background:#1a1c21;border:1px solid #2e313a;border-radius:10px'
-      var t = esc((i + 1) + '. ' + r.title); t.style.cssText = 'font-size:13px;color:#aeb6ff;font-weight:600'
+      card.style.cssText = 'display:block;padding:12px 16px;margin-bottom:8px;background:var(--ax-card2);border:1px solid var(--ax-border);border-radius:10px'
+      var t = esc((i + 1) + '. ' + r.title); t.style.cssText = 'font-size:13px;color:var(--ax-accent-tint);font-weight:600'
       var meta = document.createElement('div')
       meta.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:3px'
-      var u = esc(host(r.url)); u.style.cssText = 'font-size:11px;color:#565b66'
+      var u = esc(host(r.url)); u.style.cssText = 'font-size:11px;color:var(--ax-faint)'
       meta.appendChild(u)
       if (r.source) {
         var badge = document.createElement('span')
-        badge.style.cssText = 'font-size:9.5px;letter-spacing:.06em;padding:1px 7px;border-radius:20px;background:#7c8cff1a;color:#7c8cff;font-weight:600'
+        badge.style.cssText = 'font-size:9.5px;letter-spacing:.06em;padding:1px 7px;border-radius:20px;background:var(--ax-accent-soft);color:var(--ax-accent);font-weight:600'
         badge.textContent = String(r.source).toUpperCase()
         meta.appendChild(badge)
       }
-      var s = esc(r.snippet); s.style.cssText = 'font-size:12px;color:#9aa0ae;margin-top:4px'
+      var s = esc(r.snippet); s.style.cssText = 'font-size:12px;color:var(--ax-muted);margin-top:4px'
       card.appendChild(t); card.appendChild(meta); card.appendChild(s)
       card.addEventListener('click', function (url) {
         return function (e) { e.preventDefault(); window.aether.internal.open(url) }
@@ -287,7 +299,7 @@ export const SEARCH_HTML = pageShell(
     var watchdog = setTimeout(function () {
       if (!gotData) {
         status.textContent = 'The sources did not respond in time. Try again, or use Google below.'
-        status.style.color = '#ff8a8a'
+        status.style.color = 'var(--ax-danger)'
         showGoogle(q, '')
       }
     }, 25000)
@@ -307,11 +319,11 @@ export const SEARCH_HTML = pageShell(
       if (d.delta) {
         aiwrap.style.display = 'block'
         answer.textContent += d.delta
-        if (status.style.color !== '#ff8a8a') status.textContent = ''
+        if (status.style.color !== 'var(--ax-danger)') status.textContent = ''
       }
       if (d.error) {
         status.textContent = d.error
-        status.style.color = '#ff8a8a'
+        status.style.color = 'var(--ax-danger)'
       }
       if (d.done) clearTimeout(watchdog)
     })
@@ -319,7 +331,7 @@ export const SEARCH_HTML = pageShell(
       clearTimeout(watchdog)
       if (r && r.error && !gotData) {
         status.textContent = String(r.error)
-        status.style.color = '#ff8a8a'
+        status.style.color = 'var(--ax-danger)'
         showGoogle(q, '')
       }
     })
@@ -341,27 +353,27 @@ const MGR_CSS = `
   .wrap { width:min(760px,92vw); margin-top:7vh; padding-bottom:60px; }
   .head { display:flex; align-items:center; gap:14px; margin-bottom:22px; }
   .head h1 { font-size:20px; font-weight:700; letter-spacing:-0.02em; margin-right:auto; }
-  .head input { flex:none; width:280px; padding:10px 14px; font-size:13px; color:#e8eaf0;
-    background:#1e2026; border:1px solid #2e313a; border-radius:10px; outline:none; }
-  .head input:focus { border-color:#7c8cff; }
-  .muted-btn { padding:9px 14px; font-size:12px; color:#ff8a8a; background:transparent;
-    border:1px solid #3a2a2a; border-radius:10px; cursor:pointer; }
-  .muted-btn:hover { background:#2a1c1c; }
+  .head input { flex:none; width:280px; padding:10px 14px; font-size:13px; color:var(--ax-fg);
+    background:var(--ax-card); border:1px solid var(--ax-border); border-radius:10px; outline:none; }
+  .head input:focus { border-color:var(--ax-accent); }
+  .muted-btn { padding:9px 14px; font-size:12px; color:var(--ax-danger); background:transparent;
+    border:1px solid var(--ax-danger-border); border-radius:10px; cursor:pointer; }
+  .muted-btn:hover { background:var(--ax-danger-bg); }
   .rows { display:flex; flex-direction:column; gap:6px; }
   .row { display:flex; align-items:center; gap:12px; padding:11px 14px;
-    background:#1a1c21; border:1px solid #2e313a; border-radius:10px; cursor:pointer; }
-  .row:hover { border-color:#3d4150; }
-  .row .ic { width:30px; height:30px; border-radius:8px; background:#7c8cff22; color:#7c8cff;
+    background:var(--ax-card2); border:1px solid var(--ax-border); border-radius:10px; cursor:pointer; }
+  .row:hover { border-color:var(--ax-border-hi); }
+  .row .ic { width:30px; height:30px; border-radius:8px; background:var(--ax-accent-soft); color:var(--ax-accent);
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:none; }
   .row .meta { min-width:0; flex:1; }
-  .row .t { font-size:13px; color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .row .u { font-size:11px; color:#7d828f; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
-  .row .when { font-size:11px; color:#565b66; flex:none; }
+  .row .t { font-size:13px; color:var(--ax-fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .u { font-size:11px; color:var(--ax-muted2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .row .when { font-size:11px; color:var(--ax-faint); flex:none; }
   .row .del { flex:none; width:26px; height:26px; border:none; border-radius:7px; background:transparent;
-    color:#565b66; font-size:14px; cursor:pointer; }
-  .row .del:hover { background:#2a1c1c; color:#ff8a8a; }
-  .empty2 { color:#565b66; font-size:13px; padding:30px 4px; text-align:center; }
-  .none { border:none; background:transparent; color:#9aa0ae; cursor:default; }
+    color:var(--ax-faint); font-size:14px; cursor:pointer; }
+  .row .del:hover { background:var(--ax-danger-bg); color:var(--ax-danger); }
+  .empty2 { color:var(--ax-faint); font-size:13px; padding:30px 4px; text-align:center; }
+  .none { border:none; background:transparent; color:var(--ax-muted); cursor:default; }
 `
 
 function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string): string {
@@ -479,7 +491,7 @@ export const SETTINGS_HTML = pageShell(
   'Settings',
   `
   <div class="wrap" style="width:min(620px,92vw)">
-    <div class="head"><h1>Settings</h1><span id="health" style="font-size:12px;color:#7d828f"></span></div>
+    <div class="head"><h1>Settings</h1><span id="health" style="font-size:12px;color:var(--ax-muted2)"></span></div>
 
     <div class="sec">
       <div class="label">Local model (Ollama)</div>
@@ -496,6 +508,44 @@ export const SETTINGS_HTML = pageShell(
       </div>
     </div>
 
+    <div class="sec" id="cust-sec">
+      <div class="label">Customization — make it yours</div>
+      <div class="opts">
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <label style="margin:0"><input type="radio" name="axtheme" value="dark" /> Dark</label>
+          <label style="margin:0"><input type="radio" name="axtheme" value="light" /> Light</label>
+          <label style="margin:0"><input type="radio" name="axtheme" value="system" /> Match system</label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" id="axswatches"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <label style="font-size:13px; color:var(--ax-fg)">Custom accent</label>
+          <input type="color" id="axaccent" value="#7c8cff" style="width:46px; height:30px; padding:0; border:1px solid var(--ax-border); background:var(--ax-card); border-radius:8px; cursor:pointer" />
+          <span id="axaccentVal" class="mono" style="font-size:11.5px"></span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <label style="font-size:13px; color:var(--ax-fg)">Text &amp; UI size</label>
+          <input type="range" id="axscale" min="85" max="125" step="5" style="width:180px" />
+          <span id="axscaleVal" class="mono" style="font-size:11.5px"></span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <label style="font-size:13px; color:var(--ax-fg)">New tab background</label>
+          <select id="axntbg" style="width:160px">
+            <option value="aurora">Aurora glow</option>
+            <option value="midnight">Midnight</option>
+            <option value="slate">Slate</option>
+            <option value="light">Daylight</option>
+            <option value="solid">Plain</option>
+          </select>
+        </div>
+        <label><input type="checkbox" id="axclock" /> Show clock &amp; greeting on the new tab</label>
+      </div>
+      <div class="row-btns" style="margin-top:10px">
+        <button class="muted-btn" id="axreset">Restore default look</button>
+        <span id="axsaved" style="font-size:11.5px; color:var(--ax-ok); align-self:center"></span>
+      </div>
+      <div class="hint" style="margin-top:8px">Accent and size apply to every internal page and the browser chrome immediately. Theme changes re-render internal pages on open (this page reloads once so you see it live). "Match system" follows your OS light/dark setting.</div>
+    </div>
+
     <div class="sec">
       <div class="label">Behavior</div>
       <div class="opts">
@@ -507,7 +557,7 @@ export const SETTINGS_HTML = pageShell(
       </div>
       <div class="hint" style="margin-top:10px">Tiered memory saver: idle background tabs are hibernated (muted, throttled — instant wake) after the delay, then fully unloaded after 3× that. Pinned and playing-audio tabs are never touched.</div>
       <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
-        <label style="font-size:13px; color:#e8eaf0">Hibernate idle tabs after</label>
+        <label style="font-size:13px; color:var(--ax-fg)">Hibernate idle tabs after</label>
         <select id="memorySaver" style="width:140px">
           <option value="0">Never</option>
           <option value="15">15 minutes</option>
@@ -539,7 +589,7 @@ export const SETTINGS_HTML = pageShell(
       <div class="row-btns" style="margin-top:10px">
         <button class="save-btn" id="extAddFile">Install from .crx / .zip…</button>
         <button class="muted-btn" id="extAdd">Load unpacked…</button>
-        <span id="extMsg" style="font-size:11.5px;color:#7d828f;align-self:center"></span>
+        <span id="extMsg" style="font-size:11.5px;color:var(--ax-muted2);align-self:center"></span>
       </div>
       <div id="extDrop" class="ext-drop">…or drop a <b>.crx</b> / <b>.zip</b> here</div>
     </div>
@@ -561,7 +611,7 @@ export const SETTINGS_HTML = pageShell(
         <input id="cfUrl" type="text" placeholder="https://api.groq.com/openai/v1" />
         <input id="cfModel" type="text" placeholder="Model, e.g. llama-3.3-70b-versatile" />
         <input id="cfKey" type="password" placeholder="API key (stored locally only)" />
-        <div class="row-btns"><button class="save-btn" id="cfSave">Save cloud fallback</button><span id="cfSaved" style="font-size:11.5px;color:#4ade80;align-self:center"></span></div>
+        <div class="row-btns"><button class="save-btn" id="cfSave">Save cloud fallback</button><span id="cfSaved" style="font-size:11.5px;color:var(--ax-ok);align-self:center"></span></div>
       </div>
     </div>
 
@@ -578,42 +628,42 @@ export const SETTINGS_HTML = pageShell(
   </div>
   <style>
     .sec { margin-bottom:24px; }
-    .label { font-size:12px; letter-spacing:.08em; color:#9aa0ae; margin-bottom:10px; }
+    .label { font-size:12px; letter-spacing:.08em; color:var(--ax-muted); margin-bottom:10px; }
     .opts { display:flex; flex-direction:column; gap:9px; }
-    .opts label { font-size:13px; color:#e8eaf0; display:flex; align-items:center; gap:9px; cursor:pointer; }
-    .opts input { accent-color:#5b6cff; width:14px; height:14px; }
+    .opts label { font-size:13px; color:var(--ax-fg); display:flex; align-items:center; gap:9px; cursor:pointer; }
+    .opts input { accent-color:var(--ax-accent2); width:14px; height:14px; }
     .row-btns { flex-direction:row; gap:10px; }
-    .hint { font-size:11.5px; color:#7d828f; line-height:1.6; }
-    .mono { font-family:monospace; color:#7c8cff; }
-    select, #cfUrl, #cfModel, #cfKey { padding:10px 12px; font-size:13px; color:#e8eaf0; background:#1e2026;
-      border:1px solid #2e313a; border-radius:10px; outline:none; width:100%; }
-    #cfUrl:focus, #cfModel:focus, #cfKey:focus { border-color:#7c8cff; }
-    .save-btn { padding:9px 14px; font-size:12px; color:#fff; background:#5b6cff;
+    .hint { font-size:11.5px; color:var(--ax-muted2); line-height:1.6; }
+    .mono { font-family:monospace; color:var(--ax-accent); }
+    select, #cfUrl, #cfModel, #cfKey { padding:10px 12px; font-size:13px; color:var(--ax-fg); background:var(--ax-card);
+      border:1px solid var(--ax-border); border-radius:10px; outline:none; width:100%; }
+    #cfUrl:focus, #cfModel:focus, #cfKey:focus { border-color:var(--ax-accent); }
+    .save-btn { padding:9px 14px; font-size:12px; color:#fff; background:var(--ax-accent2);
       border:none; border-radius:10px; cursor:pointer; }
-    .save-btn:hover { background:#6d7cff; }
+    .save-btn:hover { background:var(--ax-accent2); }
     .perm-row { display:flex; align-items:center; gap:10px; padding:9px 12px;
-      background:#1a1c21; border:1px solid #2e313a; border-radius:10px; font-size:12.5px; }
-    .perm-row .host { color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .perm-row .what { color:#7d828f; flex:none; }
+      background:var(--ax-card2); border:1px solid var(--ax-border); border-radius:10px; font-size:12.5px; }
+    .perm-row .host { color:var(--ax-fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .perm-row .what { color:var(--ax-muted2); flex:none; }
     .perm-row .badge { flex:none; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
-    .perm-row .badge.allow { color:#4ade80; background:#4ade8018; }
-    .perm-row .badge.block { color:#ff6b6b; background:#ff6b6b18; }
+    .perm-row .badge.allow { color:var(--ax-ok); background:var(--ax-ok-soft); }
+    .perm-row .badge.block { color:var(--ax-danger); background:var(--ax-danger-soft); }
     .perm-row .del { margin-left:auto; flex:none; width:24px; height:24px; border:none; border-radius:7px;
-      background:transparent; color:#565b66; font-size:13px; cursor:pointer; }
-    .perm-row .del:hover { background:#2a1c1c; color:#ff8a8a; }
+      background:transparent; color:var(--ax-faint); font-size:13px; cursor:pointer; }
+    .perm-row .del:hover { background:var(--ax-danger-bg); color:var(--ax-danger); }
     .ext-row { display:flex; align-items:center; gap:10px; padding:9px 12px;
-      background:#1a1c21; border:1px solid #2e313a; border-radius:10px; font-size:12.5px; }
-    .ext-row .name { color:#e8eaf0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .ext-row .ver { color:#565b66; flex:none; }
+      background:var(--ax-card2); border:1px solid var(--ax-border); border-radius:10px; font-size:12.5px; }
+    .ext-row .name { color:var(--ax-fg); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ext-row .ver { color:var(--ax-faint); flex:none; }
     .ext-row .badge { flex:none; font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
-    .ext-row .badge.on { color:#4ade80; background:#4ade8018; }
-    .ext-row .badge.off { color:#9aa0ae; background:#9aa0ae18; }
-    .ext-drop { margin-top:10px; padding:14px; text-align:center; font-size:12px; color:#7d828f;
-      border:1.5px dashed #33363f; border-radius:10px; transition: border-color .15s, background .15s; }
-    .ext-drop.over { border-color:#7c8cff; background:#7c8cff14; color:#aeb4ff; }
+    .ext-row .badge.on { color:var(--ax-ok); background:var(--ax-ok-soft); }
+    .ext-row .badge.off { color:var(--ax-muted); background:var(--ax-muted-soft); }
+    .ext-drop { margin-top:10px; padding:14px; text-align:center; font-size:12px; color:var(--ax-muted2);
+      border:1.5px dashed var(--ax-border); border-radius:10px; transition: border-color .15s, background .15s; }
+    .ext-drop.over { border-color:var(--ax-accent); background:var(--ax-accent-soft); color:var(--ax-accent-tint); }
     .ext-row button { flex:none; width:24px; height:24px; border:none; border-radius:7px;
-      background:transparent; color:#565b66; font-size:12px; cursor:pointer; }
-    .ext-row button:hover { background:#23262d; color:#e8eaf0; }
+      background:transparent; color:var(--ax-faint); font-size:12px; cursor:pointer; }
+    .ext-row button:hover { background:var(--ax-border); color:var(--ax-fg); }
   </style>
   `,
   `
@@ -622,6 +672,17 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('model').value = s.model || ''
       var radios = document.querySelectorAll('input[name=sm]')
       for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === s.searchMode
+      var a = s.appearance || {}
+      axState = { theme: a.theme || 'dark', accent: a.accent || '#7c8cff', fontScale: a.fontScale || 1, newtabBg: a.newtabBg || 'aurora', newtabClock: a.newtabClock !== false }
+      var axr = document.querySelectorAll('input[name=axtheme]')
+      for (var j = 0; j < axr.length; j++) axr[j].checked = axr[j].value === axState.theme
+      document.getElementById('axaccent').value = axState.accent
+      document.getElementById('axaccentVal').textContent = axState.accent
+      document.getElementById('axscale').value = Math.round(axState.fontScale * 100)
+      document.getElementById('axscaleVal').textContent = Math.round(axState.fontScale * 100) + '%'
+      document.getElementById('axntbg').value = axState.newtabBg
+      document.getElementById('axclock').checked = axState.newtabClock
+      axWire(); axMarkSwatch()
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
       document.getElementById('usePageContext').checked = !!s.usePageContext
       document.getElementById('pageMemory').checked = s.pageMemory !== false
@@ -639,7 +700,7 @@ export const SETTINGS_HTML = pageShell(
     })
     window.aether.ai.health().then(function (h) {
       document.getElementById('health').textContent = h.ok ? '● Ollama connected' : '● Ollama not reachable'
-      document.getElementById('health').style.color = h.ok ? '#4ade80' : '#ff6b6b'
+      document.getElementById('health').style.color = h.ok ? 'var(--ax-ok)' : 'var(--ax-danger)'
     })
     window.aether.ai.models().then(function (m) {
       var sel = document.getElementById('model')
@@ -666,7 +727,7 @@ export const SETTINGS_HTML = pageShell(
       if (!list.length) {
         var none = document.createElement('div')
         none.textContent = 'No remembered permissions yet.'
-        none.style.cssText = 'color:#565b66;font-size:12.5px;padding:2px 2px'
+        none.style.cssText = 'color:var(--ax-faint);font-size:12.5px;padding:2px 2px'
         box.appendChild(none); return
       }
       list.forEach(function (p) {
@@ -691,7 +752,7 @@ export const SETTINGS_HTML = pageShell(
       if (!list.length) {
         var none = document.createElement('div')
         none.textContent = 'No extensions installed yet.'
-        none.style.cssText = 'color:#565b66;font-size:12.5px;padding:2px 2px'
+        none.style.cssText = 'color:var(--ax-faint);font-size:12.5px;padding:2px 2px'
         box.appendChild(none); return
       }
       list.forEach(function (x) {
@@ -712,27 +773,27 @@ export const SETTINGS_HTML = pageShell(
   }
   document.getElementById('extAdd').addEventListener('click', function () {
     var msg = document.getElementById('extMsg')
-    msg.style.color = '#7d828f'
+    msg.style.color = 'var(--ax-muted2)'
     msg.textContent = 'Choose a folder with manifest.json…'
     window.aether.extensions.add().then(function (r) {
       if (r && r.info) { msg.textContent = 'Loaded ' + r.info.name + ' ✓' }
       else { msg.textContent = '' }
       loadExts()
     }).catch(function (err) {
-      msg.style.color = '#ff6b6b'
+      msg.style.color = 'var(--ax-danger)'
       msg.textContent = String(err && err.message || err)
     })
   })
   document.getElementById('extAddFile').addEventListener('click', function () {
     var msg = document.getElementById('extMsg')
-    msg.style.color = '#7d828f'
+    msg.style.color = 'var(--ax-muted2)'
     msg.textContent = 'Pick a .crx or .zip package…'
     window.aether.extensions.installFile().then(function (r) {
-      if (r && r.info) { msg.style.color = '#4ade80'; msg.textContent = 'Installed ' + r.info.name + ' ✓' }
+      if (r && r.info) { msg.style.color = 'var(--ax-ok)'; msg.textContent = 'Installed ' + r.info.name + ' ✓' }
       else { msg.textContent = '' }
       loadExts()
     }).catch(function (err) {
-      msg.style.color = '#ff6b6b'
+      msg.style.color = 'var(--ax-danger)'
       msg.textContent = String(err && err.message || err)
     })
   })
@@ -745,18 +806,18 @@ export const SETTINGS_HTML = pageShell(
       drop.classList.remove('over')
       var msg = document.getElementById('extMsg')
       var files = Array.prototype.slice.call(e.dataTransfer.files).filter(function (f) { return /\.(crx|zip)$/i.test(f.name) })
-      if (!files.length) { msg.style.color = '#ff6b6b'; msg.textContent = 'Drop a .crx or .zip file'; return }
-      msg.style.color = '#7d828f'
+      if (!files.length) { msg.style.color = 'var(--ax-danger)'; msg.textContent = 'Drop a .crx or .zip file'; return }
+      msg.style.color = 'var(--ax-muted2)'
       msg.textContent = 'Installing ' + files[0].name + '…'
       var next = function (i) {
         if (i >= files.length) { loadExts(); return }
         var path = window.aether.files.pathFor(files[i])
         window.aether.extensions.installPath(path).then(function (info) {
-          msg.style.color = '#4ade80'
+          msg.style.color = 'var(--ax-ok)'
           msg.textContent = 'Installed ' + info.name + ' ✓'
           next(i + 1)
         }).catch(function (err) {
-          msg.style.color = '#ff6b6b'
+          msg.style.color = 'var(--ax-danger)'
           msg.textContent = String(err && err.message || err)
           next(i + 1)
         })
@@ -765,6 +826,84 @@ export const SETTINGS_HTML = pageShell(
     })
   }
   function save(patch) { window.aether.settings.set(patch) }
+
+  /* ---------------- v1.4.0 Customization Studio ---------------- */
+  var AX_PRESETS = ['#7c8cff', '#4f9cf9', '#3fb27f', '#e0a63a', '#e5636f', '#b06ce6', '#2fb8c6', '#f07ab8']
+  var axState = { theme: 'dark', accent: '#7c8cff', fontScale: 1, newtabBg: 'aurora', newtabClock: true }
+  function axShade(hex, amt) {
+    var n = function (i) { return parseInt(hex.slice(i, i + 2), 16) }
+    var mix = function (v) { var o = Math.max(0, Math.min(255, Math.round(v * (1 - amt)))); return ('0' + o.toString(16)).slice(-2) }
+    return '#' + mix(n(1)) + mix(n(3)) + mix(n(5))
+  }
+  function axLive(a) {
+    var r = document.documentElement.style
+    r.setProperty('--ax-accent', a.accent)
+    r.setProperty('--ax-accent2', axShade(a.accent, 0.16))
+    r.setProperty('--ax-accent-tint', axShade(a.accent, 0.45))
+    r.setProperty('--ax-accent-soft', axShade(a.accent, 0.86) + '22')
+    document.body.style.zoom = a.fontScale
+  }
+  function axApply(patch, reloadAfter) {
+    var next = {}
+    for (var k in axState) next[k] = axState[k]
+    for (var k2 in patch) next[k2] = patch[k2]
+    save({ appearance: next })
+    axState = next
+    axLive(next)
+    var flash = document.getElementById('axsaved')
+    flash.textContent = 'Saved'
+    setTimeout(function () { flash.textContent = '' }, 1400)
+    if (reloadAfter) setTimeout(function () { location.reload() }, 350)
+  }
+  function axBuildSwatches() {
+    var box = document.getElementById('axswatches')
+    for (var i = 0; i < AX_PRESETS.length; i++) {
+      (function (color) {
+        var b = document.createElement('button')
+        b.type = 'button'
+        b.title = color
+        b.style.cssText = 'width:26px;height:26px;border-radius:50%;border:2px solid ' + (color.toLowerCase() === axState.accent ? 'var(--ax-fg)' : 'transparent') + ';cursor:pointer;background:' + color
+        b.addEventListener('click', function () { axApply({ accent: color }, false); axMarkSwatch() })
+        box.appendChild(b)
+      })(AX_PRESETS[i])
+    }
+  }
+  function axMarkSwatch() {
+    var box = document.getElementById('axswatches')
+    var kids = box.children
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].style.border = AX_PRESETS[i].toLowerCase() === axState.accent ? '2px solid var(--ax-fg)' : '2px solid transparent'
+    }
+  }
+  function axWire() {
+    var themes = document.querySelectorAll('input[name=axtheme]')
+    for (var i = 0; i < themes.length; i++) {
+      themes[i].addEventListener('change', function (e) {
+        if (e.target.checked) axApply({ theme: e.target.value }, true)
+      })
+    }
+    axBuildSwatches()
+    document.getElementById('axaccent').addEventListener('input', function (e) {
+      document.getElementById('axaccentVal').textContent = e.target.value
+      axApply({ accent: e.target.value }, false)
+      axMarkSwatch()
+    })
+    document.getElementById('axscale').addEventListener('input', function (e) {
+      var v = parseInt(e.target.value, 10) / 100
+      document.getElementById('axscaleVal').textContent = Math.round(v * 100) + '%'
+      axApply({ fontScale: v }, false)
+    })
+    document.getElementById('axntbg').addEventListener('change', function (e) {
+      axApply({ newtabBg: e.target.value }, true)
+    })
+    document.getElementById('axclock').addEventListener('change', function (e) {
+      axApply({ newtabClock: e.target.checked }, false)
+    })
+    document.getElementById('axreset').addEventListener('click', function () {
+      save({ appearance: {} })
+      setTimeout(function () { location.reload() }, 300)
+    })
+  }
   document.getElementById('model').addEventListener('change', function (e) { save({ model: e.target.value || null }) })
   var radios = document.querySelectorAll('input[name=sm]')
   for (var i = 0; i < radios.length; i++) {
@@ -817,7 +956,7 @@ export const SETTINGS_HTML = pageShell(
         name.textContent = l.url
         name.title = l.url + ' (' + l.status + ')'
         var badge = document.createElement('span')
-        badge.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:8px;' + (l.status === 'error' ? 'background:#5c2623;color:#ff9c96' : 'background:#1d3a2a;color:#7ee2a8')
+        badge.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:8px;' + (l.status === 'error' ? 'background:var(--ax-danger-border);color:var(--ax-danger)' : 'background:var(--ax-ok-soft);color:var(--ax-ok)')
         badge.textContent = l.status
         var rm = document.createElement('button')
         rm.className = 'btn'
@@ -884,22 +1023,22 @@ export const ERROR_HTML = pageShell(
   <div style="width:min(620px,90vw); margin-top:14vh;">
     <div style="font-size:46px; line-height:1;">🌐</div>
     <h1 id="err-title" style="margin-top:18px; font-size:24px; font-weight:600;">Can\u2019t reach this page</h1>
-    <p id="err-detail" style="margin-top:10px; color:#9aa0ae; font-size:14px; line-height:1.6;"></p>
-    <div id="err-url" style="margin-top:14px; padding:10px 14px; background:#1e2026; border:1px solid #2e313a;
-      border-radius:10px; color:#c6cad4; font-size:12px; -webkit-user-select:text; user-select:text;
+    <p id="err-detail" style="margin-top:10px; color:var(--ax-muted); font-size:14px; line-height:1.6;"></p>
+    <div id="err-url" style="margin-top:14px; padding:10px 14px; background:var(--ax-card); border:1px solid var(--ax-border);
+      border-radius:10px; color:var(--ax-fg); font-size:12px; -webkit-user-select:text; user-select:text;
       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
     <div style="margin-top:26px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button id="err-retry" style="padding:11px 22px; font-size:14px; color:#16171b; background:#7c8cff;
+      <button id="err-retry" style="padding:11px 22px; font-size:14px; color:var(--ax-bg); background:var(--ax-accent);
         border:none; border-radius:10px; cursor:pointer; font-weight:600;">Try again</button>
-      <button id="err-noadblock" style="display:none; padding:11px 22px; font-size:14px; color:#e8eaf0;
-        background:#2a2d36; border:1px solid #3a3e4a; border-radius:10px; cursor:pointer;">Turn off ad blocker &amp; retry</button>
-      <button id="err-newtab" style="padding:11px 22px; font-size:14px; color:#9aa0ae; background:transparent;
-        border:1px solid #2e313a; border-radius:10px; cursor:pointer;">New tab</button>
+      <button id="err-noadblock" style="display:none; padding:11px 22px; font-size:14px; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border-hi); border-radius:10px; cursor:pointer;">Turn off ad blocker &amp; retry</button>
+      <button id="err-newtab" style="padding:11px 22px; font-size:14px; color:var(--ax-muted); background:transparent;
+        border:1px solid var(--ax-border); border-radius:10px; cursor:pointer;">New tab</button>
     </div>
-    <p id="err-hint" style="margin-top:22px; color:#565b66; font-size:12px; line-height:1.7;"></p>
-    <div id="err-bridge" style="display:none; margin-top:16px; padding:12px 16px; background:#2a1c1c;
-      border:1px solid #3a2a2a; border-radius:10px; color:#ff8a8a; font-size:13px; line-height:1.5;"></div>
-    <div style="margin-top:26px; color:#565b66; font-size:11px;">Aether Browser ${VER}</div>
+    <p id="err-hint" style="margin-top:22px; color:var(--ax-faint); font-size:12px; line-height:1.7;"></p>
+    <div id="err-bridge" style="display:none; margin-top:16px; padding:12px 16px; background:var(--ax-danger-bg);
+      border:1px solid var(--ax-danger-border); border-radius:10px; color:var(--ax-danger); font-size:13px; line-height:1.5;"></div>
+    <div style="margin-top:26px; color:var(--ax-faint); font-size:11px;">Aether Browser ${VER}</div>
   </div>
   `,
   `

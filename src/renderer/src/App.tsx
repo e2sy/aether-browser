@@ -13,6 +13,48 @@ export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
   const set = useApp((s) => s.set)
 
+  // v1.4.0 Customization Studio — accent + UI zoom live on the chrome
+  useEffect(() => {
+    const axShade = (hex: string, amt: number): string => {
+      if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return hex
+      const n = (i: number): number => parseInt(hex.slice(i, i + 2), 16)
+      const mix = (v: number): string => {
+        const o = Math.max(0, Math.min(255, Math.round(v * (1 - amt))))
+        return ('0' + o.toString(16)).slice(-2)
+      }
+      return '#' + mix(n(1)) + mix(n(3)) + mix(n(5))
+    }
+    const apply = (raw: unknown): void => {
+      const a = raw as { accent?: string; fontScale?: number } | undefined
+      if (!a) return
+      const r = document.documentElement.style
+      if (typeof a.accent === 'string' && /^#[0-9a-f]{6}$/i.test(a.accent)) {
+        r.setProperty('--accent', a.accent)
+        r.setProperty('--accent2', axShade(a.accent, 0.16))
+      }
+      if (typeof a.fontScale === 'number' && a.fontScale > 0) {
+        document.body.style.zoom = String(a.fontScale)
+      }
+    }
+    window.aether.settings
+      .get()
+      .then((s) => apply((s as { appearance?: { accent?: string; fontScale?: number } }).appearance))
+      .catch(() => {})
+    let unsub: (() => void) | undefined
+    try {
+      unsub = window.aether.settings.onAppearanceChanged(apply)
+    } catch {
+      /* older preload — appearance just stays default until reboot */
+    }
+    return () => {
+      try {
+        unsub?.()
+      } catch {
+        /* noop */
+      }
+    }
+  }, [])
+
   useEffect(() => {
     const unsub = window.aether.state.subscribe((data) => {
       const s = data as { tabs: never[]; activeId: number | null }

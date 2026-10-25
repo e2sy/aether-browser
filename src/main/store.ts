@@ -2,6 +2,7 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Bookmark, HistoryEntry, Settings } from '../shared/types'
+import { DEFAULT_APPEARANCE, normalizeAppearance } from './appearance'
 /** Minimal debounced JSON file store — zero native dependencies. */
 export class JsonStore<T> {
   private file: string
@@ -45,7 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   pageMemory: true,
   cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' },
   memorySaver: 30,
-  extensions: []
+  extensions: [],
+  appearance: DEFAULT_APPEARANCE
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
@@ -53,6 +55,8 @@ export function mergedSettings(): Settings {
   const merged = { ...DEFAULT_SETTINGS, ...settings.data }
   merged.cloudFallback = { ...DEFAULT_SETTINGS.cloudFallback, ...settings.data.cloudFallback }
   if (!Array.isArray(merged.extensions)) merged.extensions = []
+  // v1.4.0 — normalize the appearance blob so corrupted/old files can never break theming
+  merged.appearance = normalizeAppearance(settings.data?.appearance, DEFAULT_APPEARANCE)
   return merged
 }
 
