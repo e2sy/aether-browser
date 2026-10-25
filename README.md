@@ -332,6 +332,11 @@ npm test
 **Documentation:** the full user guide lives in [docs/index.html](docs/index.html) — it is published
 to GitHub Pages by `.github/workflows/docs.yml` on every push to `main`.
 
+**Roadmap:** what we build next and why is framed openly in [docs/ROADMAP.md](docs/ROADMAP.md) —
+currently **v1.3.0 Aether Search** (own metasearch layer, own ranking, instant answers, omnibox
+suggestion feed) and **v1.4.0 Customization Studio** (themes, accent colors, fonts, new-tab
+backgrounds). Every build ships as its own tagged release once CI is green on all three OSes.
+
 ## 📄 License
 
 **GPL-3.0** — see [LICENSE](LICENSE).
