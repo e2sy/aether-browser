@@ -9,12 +9,32 @@ npmRebuild: false
 # Stamp security fuses into the Electron binary (RunAsNode off, cookie
 # encryption on, ASAR integrity) — see scripts/apply-fuses.js
 afterPack: scripts/apply-fuses.js
+# URL schemes the OS may hand us (Master Plan #22/#23/#24/#32):
+# http/https make Aether a default-browser candidate; aether:// opens our
+# internal pages from other apps. Top-level `protocols` flows into the mac
+# Info.plist (CFBundleURLTypes) and the Linux .desktop (x-scheme-handler/*).
+protocols:
+  - name: Web Link
+    schemes: [http, https]
+  - name: Aether Internal Page
+    schemes: [aether]
 mac:
   category: public.app-category.productivity
   icon: build/icon.png
   target:
     - dmg
     - zip
+  extendInfo:
+    # LaunchServices document types (#23) — open .html/.htm files and web
+    # locations from Finder / other apps in Aether
+    CFBundleDocumentTypes:
+      - CFBundleTypeName: HTML Document
+        CFBundleTypeRole: Viewer
+        LSItemContentTypes: [public.html, public.xhtml]
+      - CFBundleTypeName: Web Location
+        CFBundleTypeRole: Viewer
+        LSItemContentTypes: [public.url]
+    NSUserNotificationAlertStyle: alert
 win:
   icon: build/icon.ico
   target:
@@ -32,9 +52,21 @@ win:
       name: HTML Document
       role: Viewer
       description: Open this web page in Aether
+  # ProgID polish (#22): NSIS writes the registry ProgIDs (DefaultIcon +
+  # shell\\open\\command) for the associations above, and the app itself
+  # calls app.setAppUserModelId('dev.aether.browser') = appId, so Aether
+  # renders with its name+icon in Settings → Default apps and the taskbar.
 linux:
   category: Utility
   icon: build/icon.png
   target:
     - AppImage
     - deb
+  mimeTypes:
+    # desktop-entry handoff (#24): xdg-settings set default-web-browser
+    # aether.desktop works because the entry claims these handlers
+    - x-scheme-handler/http
+    - x-scheme-handler/https
+    - x-scheme-handler/aether
+    - text/html
+    - application/xhtml+xml

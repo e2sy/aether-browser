@@ -44,21 +44,33 @@ const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-scan178-'))
 fs.writeFileSync(path.join(fx, 'clean.ts'), `export const greeting = 'hello world'\nexport const n = 42\n`)
 ok(run(fx).code === 0, 'clean fixture passes (exit 0)')
 
-fs.writeFileSync(path.join(fx, 'dirty.ts'), `const t = 'github_pat_AAAABBBBCCCCDDDDEEEE11122'\n`)
+// ⚠️ All fake tokens below are BUILT AT RUNTIME via concatenation so that
+// this test file itself never contains a credential-shaped literal —
+// the repo must stay scan-clean (scan-secrets runs on it in CI).
+const fakePat = 'github_pat_' + 'A'.repeat(26)
+const fakeGhp = 'ghp_' + 'A'.repeat(36)
+const fakeAws = 'AKIA' + 'A'.repeat(16)
+const fakeSk = 'sk-proj-' + 'A'.repeat(20)
+const fakeSlack = 'xoxb-' + '1'.repeat(12) + '-abcdef'
+const fakeGoogle = 'AIza' + 'A'.repeat(32)
+const fakePem = ['-----BEGIN', 'RSA PRIVATE', 'KEY-----'].join(' ')
+const fakeGeneric = 'Abcd1234'.repeat(3)
+
+fs.writeFileSync(path.join(fx, 'dirty.ts'), `const t = '${fakePat}'\n`)
 const dirty = run(fx)
 ok(dirty.code === 1, 'fine-grained PAT fixture fails (exit 1)')
 ok(dirty.out.includes('GitHub PAT'), 'finding names the kind')
 
-fs.writeFileSync(path.join(fx, 'dirty2.ts'), `const k = 'ghp_' + 'A'.repeat(36)\nconst k2 = 'ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'\n`)
+fs.writeFileSync(path.join(fx, 'dirty2.ts'), `const k = '${fakeGhp}'\n`)
 ok(run(fx).code === 1, 'classic ghp_ token caught')
 
 const kinds = [
-  ['aws', `const a = 'AKIAABCDEFGHIJKLMNOP'\n`],
-  ['openai', `const a = 'sk-proj-AAABBBCCCDDDEEEFFFGG'\n`],
-  ['slack', `const a = 'xoxb-123456789012-ABCDEFabcdef'\n`],
-  ['google', `const a = 'AIzaSyA1234567890abcdefghijklmnopqrstuv'\n`],
-  ['privkey', `const pem = '-----BEGIN RSA PRIVATE KEY-----\\nMII'\n`],
-  ['generic', `const config = { apiKey: 'Abcd1234Abcd1234Abcd1234' }\n`]
+  ['aws', `const a = '${fakeAws}'\n`],
+  ['openai', `const a = '${fakeSk}'\n`],
+  ['slack', `const a = '${fakeSlack}'\n`],
+  ['google', `const a = '${fakeGoogle}'\n`],
+  ['privkey', `const pem = '${fakePem}\\nMII'\n`],
+  ['generic', `const config = { apiKey: '${fakeGeneric}' }\n`]
 ]
 for (const [name, content] of kinds) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-k178-'))
@@ -69,7 +81,7 @@ for (const [name, content] of kinds) {
 }
 
 fs.mkdirSync(path.join(fx, 'node_modules', 'evil'), { recursive: true })
-fs.writeFileSync(path.join(fx, 'node_modules', 'evil', 'x.js'), `const t = 'github_pat_AAAABBBBCCCCDDDDEEEE11122'\n`)
+fs.writeFileSync(path.join(fx, 'node_modules', 'evil', 'x.js'), `const t = '${fakePat}'\n`)
 fs.writeFileSync(path.join(fx, 'bin.png'), Buffer.from([0x00, 0x01, 0x02, 0x89, 0x50]))
 ok(run(fx).code === 1, 'ignored dirs do not rescue a dirty repo (still fails on top-level)')
 fs.rmSync(path.join(fx, 'dirty.ts'), { force: true })

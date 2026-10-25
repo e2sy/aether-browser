@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView, Rectangle } from 'electron'
 import type { TabMeta, TabsState } from '../shared/types'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
 import { shouldBlockWillNavigate, blockReason } from './navlock'
+import { isExternalCandidate, maybeOpenExternal } from './extproto'
 import { onContextMenu } from './menu'
 import { resolveInput } from './resolve'
 import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './errmap'
@@ -187,12 +188,22 @@ export class TabManager {
     })
     wc.setWindowOpenHandler(({ url: popupUrl }) => {
       if (/^https?:/i.test(popupUrl)) this.create(popupUrl, true)
+      // mailto:/magnet:/zoommtg: … from window.open never navigate —
+      // ask-once-per-scheme and hand to the OS app (Master Plan #26)
+      if (isExternalCandidate(popupUrl)) void maybeOpenExternal(popupUrl)
       return { action: 'deny' }
     })
     // navlock: in-page navigation attempts are policy-checked (see navlock.ts).
     // Internal pages must only move through the bridge; web pages may browse
     // freely except into file:// and other privileged schemes.
     wc.on('will-navigate', (e, targetUrl) => {
+      // external-protocol hand-off runs BEFORE the lock: mailto: & friends
+      // get the ask-once dialog instead of a dead navigation
+      if (isExternalCandidate(targetUrl)) {
+        e.preventDefault()
+        void maybeOpenExternal(targetUrl)
+        return
+      }
       if (shouldBlockWillNavigate(wc.getURL(), targetUrl)) {
         e.preventDefault()
         console.warn('[navlock] blocked:', blockReason(wc.getURL(), targetUrl), '->', String(targetUrl).slice(0, 120))

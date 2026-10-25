@@ -173,6 +173,12 @@ export const api = {
     forget: () => ipcRenderer.invoke('certs:forget')
   },
 
+  /** remembered external-protocol choices (mailto:/magnet: … — extproto.ts) */
+  extproto: {
+    list: () => ipcRenderer.invoke('extproto:list'),
+    forget: () => ipcRenderer.invoke('extproto:forget')
+  },
+
   /** local per-domain page memory */
   memory: {
     list: () => ipcRenderer.invoke('memory:list'),

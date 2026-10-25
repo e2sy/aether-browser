@@ -55,6 +55,17 @@ app.on('second-instance', (_e, argv) => {
   if (packages.length) void installCrxFromArgv(argv)
 })
 
+// macOS default-browser flow: LaunchServices delivers picked-up links here
+// (http/https after "Default browser" setup, aether:// links always).
+app.on('open-url', (e, url) => {
+  e.preventDefault()
+  openUrlInRunningBrowser(String(url || ''))
+})
+
+// Windows taskbar identity — MUST match electron-builder's appId so jumps,
+// badges and the Settings → Default apps entry render as "Aether" (#22).
+app.setAppUserModelId('dev.aether.browser')
+
 app.whenReady().then(() => {
   const INTERNAL_PAGES: Record<string, string> = {
     search: SEARCH_HTML,

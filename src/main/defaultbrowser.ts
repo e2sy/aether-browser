@@ -19,6 +19,10 @@
  */
 import { app, shell } from 'electron'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
+
+/** Linux: the desktop file electron-builder ships for us (see builder yml). */
+export const LINUX_DESKTOP_FILE = 'aether.desktop'
 
 /**
  * Pure: does the OS-reported handler for http/https look like THIS Aether
@@ -55,7 +59,8 @@ export interface LaunchTargets {
  * Pure: extract launch targets from process.argv / second-instance argv.
  * Windows passes URLs as bare arguments ("Aether.exe" "https://…");
  * flags (--foo, /bar), file paths and junk are ignored. Length is capped —
- * a pathological argv must not wedge boot.
+ * a pathological argv must not wedge boot. Handles http(s) AND aether://
+ * links (the internal scheme is registered with the OS — item #32).
  */
 export function parseLaunchArgs(argv: string[]): LaunchTargets {
   const urls: string[] = []
@@ -64,7 +69,7 @@ export function parseLaunchArgs(argv: string[]): LaunchTargets {
   for (const raw of argv ?? []) {
     const a = String(raw ?? '').trim()
     if (!a || a.startsWith('-') || a.startsWith('/')) continue
-    if (/^https?:\/\//i.test(a)) {
+    if (/^(https?|aether):\/\//i.test(a)) {
       if (a.length <= 2048 && !seen.has(a)) {
         seen.add(a)
         urls.push(a)
@@ -106,10 +111,53 @@ export function setAsDefaultBrowser(): DefaultBrowserState {
   try {
     app.setAsDefaultProtocolClient('http')
     app.setAsDefaultProtocolClient('https')
+    registerAetherScheme()
+    if (process.platform === 'linux') void xdgSetDefault()
   } catch (err) {
     console.warn('[defaultbrowser] registration failed:', err instanceof Error ? err.message : err)
   }
   return defaultBrowserState()
+}
+
+/**
+ * Also claim aether:// so internal links (aether://settings, shared search
+ * URLs…) open in Aether from other apps (Master Plan #32).
+ */
+export function registerAetherScheme(): void {
+  try {
+    if (app.isPackaged) {
+      app.setAsDefaultProtocolClient('aether')
+    } else {
+      // unpackaged runs must point at the electron CLI + our entry script
+      const entry = path.resolve(process.argv[1] || '.')
+      app.setAsDefaultProtocolClient('aether', process.execPath, [entry])
+    }
+  } catch (err) {
+    console.warn('[defaultbrowser] aether:// registration failed:', err instanceof Error ? err.message : err)
+  }
+}
+
+/** Linux fallback: xdg-settings speaks the desktop-entry dialect (#24). */
+export function xdgSetDefault(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('xdg-settings', ['set', 'default-web-browser', LINUX_DESKTOP_FILE], (err) => {
+      if (err) {
+        console.warn('[defaultbrowser] xdg-settings set failed:', String((err as Error).message || err).slice(0, 120))
+        resolve(false)
+      } else {
+        resolve(true)
+      }
+    })
+  })
+}
+
+/** Linux: ask xdg-settings who owns the web right now. */
+export function xdgCheckDefault(): Promise<string> {
+  return new Promise((resolve) => {
+    execFile('xdg-settings', ['get', 'default-web-browser'], (err, stdout) => {
+      resolve(err ? '' : String(stdout || '').trim())
+    })
+  })
 }
 
 /**
@@ -125,6 +173,13 @@ export async function openDefaultAppsSettings(): Promise<boolean> {
     }
     if (process.platform === 'darwin') {
       await shell.openExternal('x-apple.systempreferences:com.apple.Desktop-Settings.extension')
+      return true
+    }
+    if (process.platform === 'linux') {
+      // xdg handles registration silently; surface the generic settings app
+      await shell.openExternal('gnome-control-center default-apps').catch(async () => {
+        await shell.openExternal('kcmshell5 kcm_componentchooser').catch(() => undefined)
+      })
       return true
     }
     return false

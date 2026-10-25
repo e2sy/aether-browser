@@ -14,6 +14,7 @@ import { TabManager } from './tabs'
 import { registerTabManager, unregisterTabManager } from './extensions'
 import { scheduleSessionSave, type SessionTab } from './session-restore'
 import { CHROME_SHELL_LOCK } from './navlock'
+import { canOpenAsTab } from './extproto'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -243,7 +244,9 @@ export function focusAnyWindow(): void {
  */
 export function openUrlInRunningBrowser(url: string): void {
   const clean = String(url || '').trim()
-  if (!/^https?:\/\//i.test(clean)) return
+  // http/https always; aether:// only for our own internal routes (#32) —
+  // the OS hands us both after default-browser + aether:// registration
+  if (!canOpenAsTab(clean)) return
   const entry = firstEntry()
   if (entry && !entry.win.isDestroyed()) {
     try {

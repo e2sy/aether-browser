@@ -1114,6 +1114,9 @@ export const SETTINGS_HTML = pageShell(
       <div class="label" style="margin-top:18px">Certificate exceptions</div>
       <div class="hint" style="margin-bottom:8px">Sites you chose “Proceed anyway” on are remembered for 24 hours, for that exact certificate only. There is no permanent bypass.</div>
       <button class="muted-btn" id="certForget">Forget remembered certificate exceptions</button>
+      <div class="label" style="margin-top:18px">External apps</div>
+      <div class="hint" style="margin-bottom:8px">When a site hands off a mailto:, magnet: or meeting link, Aether asks before launching the app — with an optional “remember my choice” per link type.</div>
+      <button class="muted-btn" id="extprotoForget">Reset remembered app-launch choices</button>
     </div>
 
     <div class="sec">
@@ -1566,6 +1569,14 @@ export const SETTINGS_HTML = pageShell(
     } catch (err) { this.textContent = 'Failed' }
     const btn = this
     setTimeout(function () { btn.textContent = 'Forget remembered certificate exceptions' }, 2500)
+  })
+  document.getElementById('extprotoForget').addEventListener('click', async function () {
+    try {
+      const n = await window.aether.extproto.forget()
+      this.textContent = n > 0 ? 'Reset ' + n + ' choice' + (n === 1 ? '' : 's') : 'Nothing to reset'
+    } catch (err) { this.textContent = 'Failed' }
+    const btn = this
+    setTimeout(function () { btn.textContent = 'Reset remembered app-launch choices' }, 2500)
   })
   document.getElementById('cfSave').addEventListener('click', function () {
     save({

@@ -57,6 +57,7 @@ import {
   sweepExpiredGrants
 } from './permissions'
 import { forgetCertMemos } from './certs'
+import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -578,6 +579,17 @@ export function registerIpc(): void {
   ipcMain.handle('certs:forget', (e) => {
     guard(e, 'certs:forget')
     return forgetCertMemos()
+  })
+
+  // external-protocol handler memory (mailto: etc. — Master Plan #26)
+  ipcMain.handle('extproto:list', (e) => {
+    guard(e, 'extproto:list')
+    return listExternalChoices()
+  })
+
+  ipcMain.handle('extproto:forget', (e) => {
+    guard(e, 'extproto:forget')
+    return forgetExternalChoices()
   })
 
   // ---------- page memory (local, per-domain) ----------
