@@ -55,7 +55,9 @@ export const DEFAULT_SETTINGS: Settings = {
   closeToTray: false,
   startupBoost: false,
   notifyDownloads: true,
-  tabOrientation: 'top'
+  tabOrientation: 'top',
+  forceDarkMode: 'off',
+  forceDarkHosts: []
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

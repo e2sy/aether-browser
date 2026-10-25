@@ -95,6 +95,10 @@ export interface Settings {
   notifyDownloads: boolean
   /** v1.8.0 (#33) — tab strip orientation: classic top strip or left panel */
   tabOrientation: 'top' | 'left'
+  /** v1.8.0 (#52) — force-dark scheduler: off / always / night (20:00–07:00) */
+  forceDarkMode: 'off' | 'always' | 'night'
+  /** v1.8.0 (#52) — hosts that get the force-dark inversion */
+  forceDarkHosts: string[]
 }
 
 /** A loaded unpacked extension (persisted across boots). */

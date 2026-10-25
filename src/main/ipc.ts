@@ -60,6 +60,7 @@ import { forgetCertMemos } from './certs'
 import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { createTray, destroyTray, applyStartupBoost } from './osshell'
 import { getNotes, setNotes } from './quicknotes'
+import { listReading, addReading, removeReading, toggleReading } from './readinglist'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -657,6 +658,31 @@ export function registerIpc(): void {
   ipcMain.handle('notes:set', (e, text: string) => {
     guard(e, 'notes:set')
     return setNotes(text)
+  })
+
+  // reading list (#46) — internal pages + chrome only (guard covers both)
+  ipcMain.handle('reading:list', (e) => {
+    guard(e, 'reading:list')
+    return listReading()
+  })
+
+  ipcMain.handle('reading:add', (e, entry: { url: string; title?: string; words?: number }) => {
+    guard(e, 'reading:add')
+    return addReading({
+      url: String(entry?.url || ''),
+      title: entry?.title ? String(entry.title) : undefined,
+      words: Number.isFinite(Number(entry?.words)) ? Number(entry?.words) : undefined
+    })
+  })
+
+  ipcMain.handle('reading:remove', (e, url: string) => {
+    guard(e, 'reading:remove')
+    return removeReading(String(url || ''))
+  })
+
+  ipcMain.handle('reading:toggle', (e, url: string) => {
+    guard(e, 'reading:toggle')
+    return toggleReading(String(url || ''))
   })
 
   // ---------- page memory (local, per-domain) ----------

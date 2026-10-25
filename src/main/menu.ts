@@ -1,9 +1,13 @@
 import { app, Menu, MenuItemConstructorOptions, clipboard, shell } from 'electron'
 import type { WebContents } from 'electron'
+import path from 'node:path'
+import fs from 'node:fs'
 import type { TabManager } from './tabs'
 import { focusedEntry, createBrowserWindow, popoutTab, allEntries } from './windows'
 import { contextMenuItems } from './extensions'
 import { mergedSettings, settings } from './store'
+import { addReading } from './readinglist'
+import { notify } from './osshell'
 
 /** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
  *  rebuild the menu so the checkbox stays truthful. */
@@ -220,6 +224,26 @@ export function buildMenu(): Menu {
           label: 'Bookmarks',
           accelerator: 'CmdOrCtrl+Shift+O',
           click: (): void => openInternal('aether://bookmarks')
+        },
+        {
+          label: 'Reading list',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click: (): void => openInternal('aether://readinglist')
+        },
+        {
+          label: 'Mute all tabs',
+          accelerator: 'CmdOrCtrl+Alt+M',
+          click: (): void => {
+            const e = focusedEntry()
+            if (e) e.tabs.muteAll(true)
+          }
+        },
+        {
+          label: 'Unmute all tabs',
+          click: (): void => {
+            const e = focusedEntry()
+            if (e) e.tabs.muteAll(false)
+          }
         }
       ]
     },
@@ -300,6 +324,37 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
         void clipboard.writeText(params.srcURL)
       }
     })
+  }
+
+  // Aether actions group (#45) — reading list + screenshot on any page
+  const pageUrl = wc.getURL()
+  if (/^https?:/i.test(pageUrl)) {
+    items.push({
+      label: 'Add to reading list',
+      click: (): void => {
+        // grab a word count while the page is open — drives the time estimate
+        void wc
+          .executeJavaScript('document.body ? String(document.body.innerText || "").split(/\\s+/).length : 0', true)
+          .then((words: number) => addReading({ url: pageUrl, title: wc.getTitle(), words: Number(words) || 0 }))
+          .catch(() => addReading({ url: pageUrl, title: wc.getTitle() }))
+      }
+    })
+    items.push({
+      label: 'Save screenshot',
+      click: (): void => {
+        void wc
+          .capturePage()
+          .then((img) => {
+            const dir = path.join(app.getPath('userData'), 'screenshots')
+            fs.mkdirSync(dir, { recursive: true })
+            const file = path.join(dir, `aether-${Date.now()}.png`)
+            fs.writeFileSync(file, img.toPNG())
+            notify('Screenshot saved', file)
+          })
+          .catch(() => undefined)
+      }
+    })
+    items.push({ type: 'separator' })
   }
 
   items.push(

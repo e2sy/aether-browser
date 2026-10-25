@@ -10,6 +10,7 @@ import {
   type TabGroup
 } from './tabgroups'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
+import { wireForceDark, cleanHosts } from './darkmode'
 import { shouldBlockWillNavigate, blockReason } from './navlock'
 import { isExternalCandidate, maybeOpenExternal } from './extproto'
 import { onContextMenu } from './menu'
@@ -123,6 +124,11 @@ export class TabManager {
         spellcheck: false
       }
     })
+    // force-dark v2 (#52): per-site CSS inversion + night scheduler
+    wireForceDark(view.webContents, () => ({
+      mode: (mergedSettings().forceDarkMode as 'off' | 'always' | 'night') || 'off',
+      hosts: cleanHosts(mergedSettings().forceDarkHosts)
+    }))
     tab.view = view
     tab.discarded = false
     tab.hibernated = false
@@ -478,6 +484,17 @@ export class TabManager {
   toggleMuted(id: number): void {
     const tab = this.tabs.get(id)
     if (tab) this.setAudioMuted(id, !tab.muted)
+  }
+
+  /** Sound control (#53): mute/unmute every tab in this window at once. */
+  muteAll(muted: boolean): void {
+    for (const id of this.order) {
+      try {
+        this.setAudioMuted(id, muted)
+      } catch {
+        /* racing shutdown */
+      }
+    }
   }
 
   /** Open a copy of the tab right next to it. */

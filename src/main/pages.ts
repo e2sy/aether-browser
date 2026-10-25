@@ -818,10 +818,10 @@ const MGR_CSS = `
   .none { border:none; background:transparent; color:var(--ax-muted); cursor:default; }
 `
 
-function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string, withDomain = false): string {
+function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string, withDomain = false, extraHead = ''): string {
   const clearBtn = withClear ? '<button class="muted-btn" id="clear">Clear all</button>' : ''
   const domainSel = withDomain ? '<select id="domain" style="max-width:180px"><option value="">All sites</option></select>' : ''
-  const count = withDomain ? '<span id="count" style="font-size:11.5px;color:var(--ax-muted);align-self:center"></span>' : ''
+  const count = '<span id="count" style="font-size:11.5px;color:var(--ax-muted);align-self:center"></span>'
   return pageShell(
     title,
     `
@@ -831,6 +831,7 @@ function mgrShell(title: string, heading: string, withClear: boolean, body: stri
         ${domainSel}
         <input id="q" type="text" placeholder="Search…" />
         ${count}
+        ${extraHead}
         ${clearBtn}
       </div>
       <div class="rows" id="rows"></div>
@@ -973,6 +974,63 @@ export const BOOKMARKS_HTML = mgrShell(
   document.getElementById('q').addEventListener('input', load)
   load()
   `
+)
+
+export const READINGLIST_HTML = mgrShell(
+  'Reading list',
+  'Reading list',
+  false,
+  '',
+  `
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  var current = []
+  var showRead = true
+  function render() {
+    var rows = document.getElementById('rows')
+    rows.innerHTML = ''
+    var items = showRead ? current : current.filter(function (x) { return !x.read })
+    document.getElementById('empty').style.display = items.length ? 'none' : 'block'
+    document.getElementById('count').textContent = items.length
+      ? items.length + ' page' + (items.length === 1 ? '' : 's') +
+        ' · ' + items.filter(function (x) { return !x.read }).length + ' unread'
+      : ''
+    items.forEach(function (it) {
+      var row = document.createElement('div'); row.className = 'row' + (it.read ? ' read' : '')
+      var ic = document.createElement('div'); ic.className = 'ic none'
+      ic.textContent = it.read ? '\\u2713' : '\\u2022'
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(it.title || it.url); t.className = 't'
+      var u = esc((it.url || '').replace(/^https?:\\/\\//, '').split('/')[0])
+      u.className = 'u'
+      var mins = document.createElement('span'); mins.className = 'mins'
+      mins.textContent = it.minutes ? it.minutes + ' min read' : ''
+      mins.style.cssText = 'font-size:10.5px;color:var(--ax-muted);margin-left:8px'
+      meta.appendChild(t); meta.appendChild(u); if (it.minutes) meta.appendChild(mins)
+      var done = document.createElement('button'); done.className = 'muted-btn'; done.style.fontSize = '11px'
+      done.textContent = it.read ? 'Unread' : 'Read'
+      done.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.reading.toggleRead(it.url).then(function (l) { current = l; render() })
+      })
+      var del = document.createElement('button'); del.className = 'del'; del.textContent = '\\u00d7'
+      del.title = 'Remove'
+      del.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.reading.remove(it.url).then(function (l) { current = l; render() })
+      })
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(done); row.appendChild(del)
+      row.addEventListener('click', function () { window.aether.internal.open(it.url) })
+      rows.appendChild(row)
+    })
+  }
+  document.getElementById('showread').addEventListener('change', function (e) {
+    showRead = !e.target.checked
+    render()
+  })
+  window.aether.reading.list().then(function (l) { current = l || []; render() })
+  `,
+  false,
+  '<label style="font-size:11.5px;color:var(--ax-muted);display:flex;align-items:center;gap:5px"><input type="checkbox" id="showread" /> Hide read</label>'
 )
 
 export const DOWNLOADS_HTML = mgrShell(
@@ -1138,6 +1196,15 @@ export const SETTINGS_HTML = pageShell(
             <option value="top">Top — classic horizontal strip</option>
             <option value="left">Left — vertical panel with groups</option>
           </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
+          <label style="font-size:13px; color:var(--ax-fg)">Force dark</label>
+          <select id="fdMode" style="width:210px">
+            <option value="off">Off</option>
+            <option value="always">Always — for the listed sites</option>
+            <option value="night">Night only — 20:00 to 07:00</option>
+          </select>
+          <input id="fdHosts" type="text" placeholder="example.com, news.org" style="flex:1" />
         </div>
       </div>
       <div class="row-btns" style="margin-top:10px">
@@ -1344,6 +1411,8 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('axntbg').value = axState.newtabBg
       document.getElementById('axclock').checked = axState.newtabClock
       document.getElementById('tabOrientation').value = s.tabOrientation === 'left' ? 'left' : 'top'
+      document.getElementById('fdMode').value = s.forceDarkMode || 'off'
+      document.getElementById('fdHosts').value = Array.isArray(s.forceDarkHosts) ? s.forceDarkHosts.join(', ') : ''
       axWire(); axMarkSwatch()
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
       document.getElementById('showBookmarksBar').checked = s.showBookmarksBar !== false
@@ -1569,6 +1638,16 @@ export const SETTINGS_HTML = pageShell(
     })
     document.getElementById('tabOrientation').addEventListener('change', function (e) {
       save({ tabOrientation: (e.target as HTMLSelectElement).value === 'left' ? 'left' : 'top' })
+    })
+    document.getElementById('fdMode').addEventListener('change', function (e) {
+      save({ forceDarkMode: (e.target as HTMLSelectElement).value })
+    })
+    document.getElementById('fdHosts').addEventListener('change', function (e) {
+      var hosts = String((e.target as HTMLInputElement).value || '')
+        .split(',')
+        .map(function (x) { return x.trim() })
+        .filter(Boolean)
+      save({ forceDarkHosts: hosts })
     })
     document.getElementById('axreset').addEventListener('click', function () {
       save({ appearance: {} })

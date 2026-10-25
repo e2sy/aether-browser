@@ -195,6 +195,14 @@ export const api = {
     set: (text: string) => ipcRenderer.invoke('notes:set', text)
   },
 
+  /** reading list (#46) — saved pages with read/unread + time estimates */
+  reading: {
+    list: () => ipcRenderer.invoke('reading:list'),
+    add: (entry: { url: string; title?: string; words?: number }) => ipcRenderer.invoke('reading:add', entry),
+    remove: (url: string) => ipcRenderer.invoke('reading:remove', url),
+    toggleRead: (url: string) => ipcRenderer.invoke('reading:toggle', url)
+  },
+
   /** local per-domain page memory */
   memory: {
     list: () => ipcRenderer.invoke('memory:list'),
