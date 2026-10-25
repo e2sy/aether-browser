@@ -13,8 +13,12 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const file = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'out', 'preload', 'index.js')
+// fileURLToPath, NOT new URL(...).pathname: the latter returns '/D:/a/...' on
+// Windows and path.resolve then doubles the drive letter (D:\D:\...) — npm run
+// build was dead on Windows because of exactly this.
+const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'out', 'preload', 'index.js')
 
 if (!fs.existsSync(file)) {
   console.error('[patch-preload] ERROR: out/preload/index.js not found — run electron-vite build first')
