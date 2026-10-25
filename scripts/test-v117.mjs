@@ -79,7 +79,11 @@ const WIN = 'C:\\Users\\u\\AppData\\Roaming\\aether-browser'
 /* ---------- 3. decideProfileDir — locked, first recovery works ---------- */
 {
   const probed = []
-  const probe = (d) => (probed.push(d), !d.endsWith('-recovered\\Cache') && d !== path.join(REAL, 'Cache'))
+  // lock ONLY the original cache: this scenario is "original locked, first candidate free".
+  // (The old probe also matched '-recovered\Cache' via a hardcoded backslash — a POSIX
+  //  path.join never matches it, but on Windows it locked candidate #1 and the relocation
+  //  cascaded to -recovered-2, failing this test on windows-latest only.)
+  const probe = (d) => (probed.push(d), d !== path.join(REAL, 'Cache'))
   const d = decideProfileDir(REAL, probe)
   ok(d.relocated === true && d.reason === 'locked', 'locked cache triggers relocation')
   ok(d.dir === REAL + '-recovered', 'relocates to the first free candidate')
