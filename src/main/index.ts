@@ -27,9 +27,11 @@ import {
   focusedEntry,
   allEntries,
   popoutTab,
-  focusAnyWindow
+  focusAnyWindow,
+  openUrlInRunningBrowser
 } from './windows'
 import { installCrxFromArgv } from './crx'
+import { parseLaunchArgs } from './defaultbrowser'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -41,8 +43,15 @@ if (process.env.AETHER_HEADLESS) app.disableHardwareAcceleration()
 
 // The lock itself is acquired in ./preboot (with a hard exit for losers).
 // 'second-instance' only ever fires in the instance that HOLDS the lock.
-app.on('second-instance', () => {
+// This is the default-browser flow: the OS (or a link in another app)
+// spawned a second Aether with targets on the command line; the lock loser
+// exits (preboot) and we open its targets here as tabs. CRX files keep
+// their install-dialog flow.
+app.on('second-instance', (_e, argv) => {
   focusAnyWindow()
+  const { urls, packages } = parseLaunchArgs(argv)
+  for (const u of urls) openUrlInRunningBrowser(u)
+  if (packages.length) void installCrxFromArgv(argv)
 })
 
 app.whenReady().then(() => {

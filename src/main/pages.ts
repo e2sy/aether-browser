@@ -768,6 +768,9 @@ const MGR_CSS = `
   .muted-btn { padding:9px 14px; font-size:12px; color:var(--ax-danger); background:transparent;
     border:1px solid var(--ax-danger-border); border-radius:10px; cursor:pointer; }
   .muted-btn:hover { background:var(--ax-danger-bg); }
+  .action-btn { padding:9px 16px; font-size:12.5px; color:var(--ax-accent); background:var(--ax-accent-soft);
+    border:1px solid var(--ax-accent); border-radius:10px; cursor:pointer; font-weight:600; }
+  .action-btn:hover { filter:brightness(1.15); }
   .rows { display:flex; flex-direction:column; gap:6px; }
   .row { display:flex; align-items:center; gap:12px; padding:11px 14px;
     background:var(--ax-card2); border:1px solid var(--ax-border); border-radius:10px; cursor:pointer; }
@@ -998,6 +1001,16 @@ export const SETTINGS_HTML = pageShell(
   <div class="wrap" style="width:min(620px,92vw)">
     <div class="head"><h1>Settings</h1><span id="health" style="font-size:12px;color:var(--ax-muted2)"></span></div>
 
+    <div class="sec" id="default-browser-sec">
+      <div class="label">Default browser</div>
+      <div id="db-status" class="hint" style="margin-bottom:10px">Checking whether links open in Aether…</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="db-set" class="action-btn" style="display:none">Make Aether my default browser</button>
+        <button id="db-open" class="muted-btn" style="display:none;color:var(--ax-fg);border-color:var(--ax-border)">Open system settings</button>
+      </div>
+      <div class="hint" style="margin-top:10px">Once Aether is the default, every link you click anywhere on this computer opens here — and stays on this machine.</div>
+    </div>
+
     <div class="sec">
       <div class="label">Local model (Ollama)</div>
       <select id="model" style="width:100%"></select>
@@ -1173,6 +1186,40 @@ export const SETTINGS_HTML = pageShell(
   </style>
   `,
   `
+  // --- default browser card ------------------------------------------------
+  function renderDefaultBrowser(st) {
+    var status = document.getElementById('db-status')
+    var setBtn = document.getElementById('db-set')
+    var openBtn = document.getElementById('db-open')
+    if (!st || typeof st.isDefault !== 'boolean') {
+      status.textContent = 'Could not check the system default browser.'
+      return
+    }
+    if (st.isDefault) {
+      status.textContent = '✓ Aether is your default browser — links everywhere open here.'
+      status.style.color = 'var(--ax-ok)'
+      setBtn.style.display = 'none'
+      openBtn.style.display = 'none'
+    } else {
+      var who = st.handler ? 'Currently links open in: ' + st.handler.split(/[\\\\/]/).pop() : 'Currently another browser handles your links.'
+      status.textContent = who + ' Make links open in Aether instead?'
+      status.style.color = 'var(--ax-muted)'
+      setBtn.style.display = ''
+      openBtn.style.display = ''
+    }
+  }
+  try {
+    window.aether.internal.defaultBrowser().then(renderDefaultBrowser).catch(function () {
+      document.getElementById('db-status').textContent = 'Could not check the system default browser.'
+    })
+    document.getElementById('db-set').addEventListener('click', function () {
+      window.aether.internal.setDefaultBrowser().then(renderDefaultBrowser).catch(function () {})
+    })
+    document.getElementById('db-open').addEventListener('click', function () {
+      try { window.aether.internal.openSystemSettings() } catch (e) {}
+    })
+  } catch (e) {}
+
   function load() {
     window.aether.settings.get().then(function (s) {
       document.getElementById('model').value = s.model || ''

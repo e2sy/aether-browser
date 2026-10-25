@@ -263,7 +263,10 @@ export const api = {
     removeAdblockList: (url: string) => ipcRenderer.invoke('internal:adblock-remove-list', url),
     instant: (q: string) => ipcRenderer.invoke('internal:instant', { q }),
     suggest: (q: string) => ipcRenderer.invoke('internal:suggest', { q }),
-    ask: (q: string) => stream('internal:ask', 'search:chunk', { q })
+    ask: (q: string) => stream('internal:ask', 'search:chunk', { q }),
+    defaultBrowser: () => ipcRenderer.invoke('internal:default-browser'),
+    setDefaultBrowser: () => ipcRenderer.invoke('internal:set-default-browser'),
+    openSystemSettings: () => ipcRenderer.invoke('internal:open-system-settings')
   }
 }
 

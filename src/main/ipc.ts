@@ -23,6 +23,7 @@ import {
   DEFAULT_SETTINGS
 } from './store'
 import { applyAdblockSetting, shieldsState, toggleSiteShields, addFilterList, removeFilterList } from './adblock'
+import { defaultBrowserState, setAsDefaultBrowser, openDefaultAppsSettings } from './defaultbrowser'
 import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama'
 import {
   cancelDownload,
@@ -730,6 +731,20 @@ export function registerIpc(): void {
   ipcMain.handle('internal:startup', (e) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
     return { topSites: topSites(8), bookmarks: bookmarks.data.slice(0, 6) }
+  })
+
+  // Default-browser card (Settings) + system settings pane
+  ipcMain.handle('internal:default-browser', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return defaultBrowserState()
+  })
+  ipcMain.handle('internal:set-default-browser', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return setAsDefaultBrowser()
+  })
+  ipcMain.handle('internal:open-system-settings', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return openDefaultAppsSettings()
   })
 
   // Error-page recovery: "Turn off ad blocker & retry" — persists the setting

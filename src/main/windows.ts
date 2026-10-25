@@ -223,6 +223,29 @@ export function focusAnyWindow(): void {
   }
 }
 
+/**
+ * Open a URL as a tab in the running browser (second-instance link
+ * forwarding — the default-browser flow: the OS hands us the URL, the
+ * already-running instance opens it as a foreground tab and comes to
+ * front). Never throws.
+ */
+export function openUrlInRunningBrowser(url: string): void {
+  const clean = String(url || '').trim()
+  if (!/^https?:\/\//i.test(clean)) return
+  const entry = firstEntry()
+  if (entry && !entry.win.isDestroyed()) {
+    try {
+      entry.tabs.create(clean, true)
+      if (entry.win.isMinimized()) entry.win.restore()
+      entry.win.focus()
+      return
+    } catch (err) {
+      console.warn('[windows] second-instance tab open failed, creating window:', err instanceof Error ? err.message : err)
+    }
+  }
+  createBrowserWindow(clean)
+}
+
 export function appVersion(): string {
   return app.getVersion()
 }
