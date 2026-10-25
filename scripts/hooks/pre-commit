@@ -1,0 +1,16 @@
+#!/bin/sh
+# Aether pre-commit hook (Master Plan Phase 0 #18) — blocks commits that
+# contain credential-shaped strings. Install once with:
+#     npm run hooks:install
+# (sets git config core.hooksPath scripts/hooks)
+
+echo "[aether] scan-secrets: checking staged tree..."
+if node scripts/scan-secrets.mjs .; then
+  exit 0
+else
+  echo ""
+  echo "[aether] COMMIT BLOCKED — a potential secret was found above."
+  echo "[aether] Rotate the credential, then amend your commit without it."
+  echo "[aether] Runbook: docs/SECURITY-HYGIENE.md"
+  exit 1
+fi

@@ -23,6 +23,8 @@ jobs:
       - name: Security audit gate (high+ fails the build)
         if: matrix.os == 'ubuntu-latest'
         run: npm audit --audit-level=high
+      - name: Secrets scan gate (fails on credential-shaped strings)
+        run: node scripts/scan-secrets.mjs .
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests (full suite)
@@ -51,6 +53,17 @@ jobs:
       - run: npm run build
       - name: Package
         run: npx electron-builder --publish never
+        env:
+          # code signing switches itself on when these repo secrets exist;
+          # without them the artifacts stay unsigned (dev-grade) — see
+          # docs/RELEASE-SIGNING.md (Phase 0 #11)
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}

@@ -93,16 +93,28 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
     frame: process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : undefined,
     backgroundColor: '#16171b',
-    // The chrome UI is first-party code: sandbox:false lets its preload load
-    // the electron-chrome-extensions glue. contextIsolation stays ON and
-    // nodeIntegration stays OFF — window.aether remains the only bridge.
-    // Private windows use a shared in-memory partition: no cookies/cache/
-    // storage ever touch the disk, and the shields pipeline installs on it.
+    // ── chrome-UI sandbox re-audit (Master Plan #17) ──────────────────────
+    // sandbox:true was evaluated and is NOT possible today: the generated
+    // ui.js preload appends `require('electron-chrome-extensions/dist/
+    // browser-action').injectBrowserAction()`, and sandboxed preloads can
+    // require nothing beyond `electron` — extension browser actions (toolbar
+    // icons + popups) would break on every browser window.
+    // Compensating controls, all verified by tests (test-v178):
+    //   • contextIsolation ON / nodeIntegration OFF — window.aether is the
+    //     only bridge into Node
+    //   • the preload itself contains zero Node builtins (single-file bundle)
+    //   • navlock CHROME_SHELL_LOCK: this webContents can never navigate
+    //   • will-attach-webview refused; CSP + nonce (build 2) kill inline JS
+    //   • IPC is identity-guarded (trust.ts), not URL-guarded
+    //   • webSecurity stays ON, insecure content off, no experimental flags
     webPreferences: {
       preload: uiPreloadPath || undefined,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
       spellcheck: false,
       ...(opts.private ? { partition: 'aether-private' } : {})
     },
