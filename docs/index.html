@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.5.0</span>
+    <span class="badge">v1.6.0</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -93,6 +93,7 @@
 </header>
 
 <nav class="toc">
+  <a href="#whatsnew">What's new</a>
   <a href="#install">Install</a>
   <a href="ollama-guide.html">Ollama guide</a>
   <a href="#models">Models</a>
@@ -107,6 +108,29 @@
 </nav>
 
 <div class="wrap">
+
+  <!-- ============ WHATS NEW ============ -->
+  <section id="whatsnew">
+    <h2>What's new — v1.6.0 Beast Search</h2>
+    <ul>
+      <li><b>Five sources, one page</b> — Aether Search now runs DuckDuckGo, DDG Lite, Bing,
+          Wikipedia's API and Mojeek (an independent crawler) in parallel, with per-source
+          filter chips and a diversity pass so no two consecutive results share a domain.</li>
+      <li><b>Bangs</b> — type <code>!yt lofi beats</code>, <code>!g</code>, <code>!w</code>,
+          <code>!gh</code>, <code>!fk</code> and jump straight to that site's own search.
+          43 bangs ship in the binary; unknown ones fall through to a normal search.</li>
+      <li><b>Instant answers v2</b> — on-device calculator, unit conversion
+          (<code>10 km to miles</code>, <code>72 f to c</code>, <code>500 ms to s</code>),
+          percentages (<code>15% of 80</code>) and a world clock (<code>time in tokyo</code>,
+          <code>time in delhi</code>) — previewing live as you type.</li>
+      <li><b>Knowledge panel &amp; related</b> — Wikipedia panels with thumbnails above results,
+          related-search chips below them.</li>
+      <li><b>Keyboard-first</b> — ↑/↓ walk the results, Enter opens, 1-9 quick-open,
+          <code>/</code> jumps to the box, Esc clears; live suggestion dropdown while typing.</li>
+      <li><b>Window controls fixed</b> — the — □ × cluster now hugs the window's right edge;
+          drag regions can never eat a click aimed at a cross button.</li>
+    </ul>
+  </section>
 
   <!-- ============ INSTALL ============ -->
   <section id="install">
@@ -293,7 +317,20 @@ npm run dev</code></pre>
        Chrome-style bubble shows the level and resets on click.</p>
     <h3>Downloads</h3>
     <p>Files land in your Downloads folder (duplicates get “ (1)” suffixes). A shelf at the
-       bottom-left shows progress with cancel and “show in folder”.</p>
+       bottom-left shows progress with cancel and “show in folder”. <kbd>Ctrl+J</kbd> opens the
+       full <code>aether://downloads</code> manager — search, pause/resume, re-download, reveal.</p>
+    <h3>Aether Search — bangs &amp; instant answers</h3>
+    <p>The search page (<code>aether://search</code>) is Aether's own metasearch: five sources in
+       parallel, source badges + filter chips, a Wikipedia knowledge panel, related searches and
+       full keyboard control (<kbd>↓</kbd>/<kbd>↑</kbd>, <kbd>Enter</kbd>, <kbd>1</kbd>-<kbd>9</kbd>,
+       <kbd>/</kbd>). Start a query with a <b>bang</b> to jump straight to a site:
+       <code>!yt</code> YouTube, <code>!g</code> Google, <code>!w</code> Wikipedia, <code>!gh</code>
+       GitHub, <code>!so</code> Stack Overflow, <code>!fk</code> Flipkart, <code>!sp</code> Spotify,
+       <code>!maps</code> Maps, and more. Instant answers computed on this device: math
+       (<code>2^10</code>), units (<code>10 km to miles</code>, <code>72 f to c</code>,
+       <code>1 gb to mb</code>, <code>500 ms to s</code>), percentages (<code>15% of 80</code>),
+       and the world clock (<code>time in tokyo</code>, <code>time in delhi</code>,
+       <code>time</code>, <code>date</code>).</p>
   </section>
 
   <!-- ============ PRIVACY ============ -->

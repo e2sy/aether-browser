@@ -1,9 +1,13 @@
-# Aether Roadmap — v1.3 "Aether Search" & v1.4 "Customization Studio"
+# Aether Roadmap
 
-> Status: **FRAMED 2026-10-25** — Tier-1 items 1, 2, 3, 5 and 8 SHIPPED in v1.5.0 (bookmarks bar, session restore, downloads page, private windows, loading progress + site info) — specs below are the contract the builds must satisfy.
-> Process: every build lands as its own version tag, pushed to GitHub with CI green
-> before the next one starts (fix → commit → push → verify, the loop that got us here).
-
+> Status: **UPDATED 2026-10-25 after v1.6.0** — shipped so far: v1.3.0 Aether Search (metasearch
+> core), v1.4.0 Customization Studio, v1.4.1 Ollama auto-reconnect, v1.5.0 the real-browser core
+> (bookmarks bar, session restore, downloads page, private windows, progress + site info), and
+> **v1.6.0 Beast Search** (43 bangs, instant answers v2 — units/percent/world clock, Wikipedia +
+> Mojeek sources, domain-diversity ranking, knowledge panels, full keyboard UX) plus the
+> window-controls fix. Everything below is the contract the builds satisfied; the remaining
+> Tier-2/Tier-3 tables are what comes next.
+> Process: every build lands as its own version tag, pushed with CI green before the next one.
 ---
 
 ## v1.3.0 — Aether Search (our own search engine)

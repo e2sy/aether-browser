@@ -1,0 +1,26 @@
+{
+  "projectName": "aether-browser",
+  "projectOwner": "e2sy",
+  "repoHost": "https://github.com",
+  "files": ["README.md"],
+  "imageSize": 100,
+  "commit": true,
+  "commitConvention": "angular",
+  "contributorsType": "all",
+  "contributors": [
+    {
+      "login": "e2sy",
+      "name": "Mayank Bhaskar",
+      "avatar_url": "https://avatars.githubusercontent.com/u/e2sy?v=4",
+      "profile": "https://github.com/e2sy",
+      "contributions": [
+        "ideas",
+        "code",
+        "doc",
+        "maintenance",
+        "test",
+        "bug"
+      ]
+    }
+  ]
+}

@@ -6,11 +6,11 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.5.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.6.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.5.0)
+## ✨ Features (v1.6.0)
 
 | Feature | What it does |
 |---|---|
@@ -22,7 +22,7 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | ⏺ **Agent macros** | Tick "Record as macro" before a run, then replay the recorded actions **without the model** — elements are re-located by CSS path, confirm gate still applies. **Step editor**: rename, reorder, edit args, add/remove steps. **Import / export** macros as `.macro.json` files to share or back them up |
 | 🧩 **Chrome extensions** | **One-click install of .crx / .zip packages** (file dialog, drag-and-drop onto Settings, or "Open with Aether" from your OS — .crx is a registered file type on Windows), plus **unpacked MV2/MV3 folders** (content scripts, background pages, popups, `chrome.contextMenus`) via `electron-chrome-extensions`; browser-action icons live in the toolbar, manage / disable / remove in Settings |
 | 💤 **Tiered memory saver** | Idle background tabs first **hibernate** (muted + throttled to 1 fps — instant wake, no reload), then fully **discard** after 3× the delay (view unloaded, URL kept). Pinned and audio-playing tabs are exempt |
-| 🔎 **Aether Search — our own engine** | The omnibox opens `aether://search`: a real metasearch layer that runs every source (DuckDuckGo, DuckDuckGo Lite, Bing) **in parallel**, dedupes URLs (tracking params stripped), ranks with our own scorer and interleaves sources so the top of the page is diverse — every result wears a source badge, with per-source timing chips. **Instant answers** (safe hand-written calculator, zero network), **omnibox suggestion feed** (remote completions merged under your local history/bookmarks), and an optional cited local-AI answer. The page is fully useful with zero Ollama and zero results cached; if everything fails, one click re-runs on Google |
+| 🔎 **Aether Search — our own engine, beast mode (v1.6.0)** | The omnibox opens `aether://search`: a real metasearch layer that runs **five sources in parallel** (DuckDuckGo, DDG Lite, Bing, **Wikipedia's structured API**, and **Mojeek** — an independent crawler with its own index), dedupes URLs (tracking params stripped), de-clumps same-domain results with a most-constrained-first **diversity pass**, and ranks with our own scorer — every result wears a source badge with per-source filter chips. **43 DuckDuckGo-style bangs** (`!yt lofi beats` opens YouTube's own search — zero network, typo-safe, chainable), **instant answers v2 all computed on-device** (safe calculator, unit conversion across 7 dimensions, percentages, a DST-correct world clock for 90+ cities) that preview live as you type, a **Wikipedia knowledge panel**, related-search chips, an arrow-key **suggestion dropdown**, letter-tile favicons, full **keyboard control** (↓/↑ navigate, Enter opens, 1-9 quick-open, `/` focuses), per-result copy-link, and a result-stats line. The page is fully useful with zero Ollama; if everything fails, one click re-runs on Google |
 | ✍️ **Write helpers** | Select text on any page → right-click → Ask / Summarize / Rewrite / Translate into your sidebar |
 | 🛡️ **Ad & tracker blocking** | EasyList + EasyPrivacy via `@cliqz/adblocker-electron`, filters cached on disk after first download, toggle in Settings |
 | 🔐 **Site permissions** | Chrome-style prompts for camera / mic / location / notifications with **remember per site**; manage or forget every grant in Settings |
@@ -32,6 +32,25 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🔎 v1.6.0 — Beast Search (plus: the cross buttons got fixed)
+
+**The fix you asked for first:** the — □ × window controls used to float ~120px away from
+the window's right edge (the drag filler rendered *after* them). They now hug the edge like
+every real browser, the tab × and control buttons carry explicit `no-drag` regions so drag
+areas can never eat their clicks, and the tab-close hit target grew to 20px.
+
+Then the search engine went beast mode — **five sources in parallel** (DDG, DDG Lite, Bing,
+Wikipedia API, Mojeek), **43 bangs** (`!yt`, `!g`, `!w`, `!gh`, `!fk`…), **instant answers v2**
+(calculator + units + percentages + world clock, all on-device, previewing live as you type),
+**Wikipedia knowledge panels**, **related searches**, a live suggestion dropdown, per-source
+filter chips, letter-tile favicons, full keyboard navigation, and a diversity ranking pass so
+no two consecutive results ever share a domain when an alternative exists.
+
+- Bangs ship in the binary — no fetching, no telemetry, unknown bangs fall through safely
+- Unit answers handle `10 km to miles`, `72 f to c`, `500 ms to s` (ms = milliseconds, not m/s)
+- `time in tokyo` / `what time is it in delhi` use the Intl timezone database — DST always right
+- 62 new unit tests; 433 total across the chain
 
 ## 🧭 v1.5.0 — The Real-Browser Release
 
@@ -352,9 +371,42 @@ npm test
 to GitHub Pages by `.github/workflows/docs.yml` on every push to `main`.
 
 **Roadmap:** what we build next and why is framed openly in [docs/ROADMAP.md](docs/ROADMAP.md) —
-currently **v1.3.0 Aether Search** (own metasearch layer, own ranking, instant answers, omnibox
-suggestion feed) and **v1.4.0 Customization Studio** (themes, accent colors, fonts, new-tab
-backgrounds). Every build ships as its own tagged release once CI is green on all three OSes.
+currently **v1.6.0 Beast Search** (bangs, instant answers v2, Wikipedia + Mojeek sources,
+diversity ranking — shipped) and the Tier-2/3 list: tab groups, hover previews, a local
+password vault, auto-update, i18n. Every build ships as its own tagged release once CI is
+green on all three OSes.
+
+## 👤 Contributors
+
+Built and maintained by the project owner. Thanks to everyone who files issues, tests
+Windows builds and suggests features — every bug report has shipped as a fix.
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+<!-- prettier-ignore-end -->
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/e2sy">
+        <img src="https://avatars.githubusercontent.com/u/e2sy?v=4&s=100" width="100px;" alt=""/>
+        <br /><sub><b>Mayank Bhaskar</b></sub>
+      </a><br />
+      <a href="#ideas-mayank" title="Ideas">🤔</a>
+      <a href="#code-mayank" title="Code">💻</a>
+      <a href="#doc-mayank" title="Documentation">📖</a>
+      <a href="#maintenance-mayank" title="Maintenance">🚧</a>
+      <a href="#test-mayank" title="Testing">⚠️</a>
+    </td>
+  </tr>
+</table>
+
+Mayank Bhaskar owns and drives this project — product direction, architecture, feature
+specs, release engineering and testing. Commits are authored under
+`e2sy@users.noreply.github.com` so GitHub's contributor graph credits the @e2sy account
+for every change landed.
 
 ## 📄 License
 
