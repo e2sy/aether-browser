@@ -94,6 +94,18 @@ await build({
   logLevel: 'warning'
 })
 
+// third bundle: shared security classification (no electron at all)
+const secEntry = path.join(tmp, 'src', 'shared', 'testable-security.ts')
+fs.writeFileSync(secEntry, `export { securityOf, SECURITY_LABEL } from './security'`)
+await build({
+  entryPoints: [secEntry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile: path.join(tmp, 'bundle-security.mjs'),
+  logLevel: 'warning'
+})
+
 const mod = await import(outfile)
 const {
   isRestorableUrl,
@@ -236,5 +248,20 @@ const st = mergedSettings()
 ok(st.showBookmarksBar === true && st.restoreSession === true, 'mergedSettings fills both new keys')
 ok(typeof st.showBookmarksBar === 'boolean' && typeof st.restoreSession === 'boolean', 'both keys are real booleans')
 
-console.log(`\nv1.5.0 build 3 (bookmarks bar): ${pass} passed, ${fail} failed`)
+console.log(`\nv1.5.0 build 3 (bookmarks bar): OK — running build 4 sections`)
+
+console.log('\n[9] site security classification (shared/security.ts)')
+const { securityOf, SECURITY_LABEL } = await import(path.join(tmp, 'bundle-security.mjs'))
+ok(securityOf('https://github.com/e2sy').kind === 'secure' && securityOf('https://github.com/e2sy').host === 'github.com', 'https classified secure with host')
+ok(securityOf('http://neverssl.com/').kind === 'insecure', 'http classified insecure')
+ok(securityOf('aether://settings').kind === 'internal', 'aether:// classified internal')
+ok(securityOf('aether://downloads').host === 'downloads', 'internal page host parsed')
+ok(securityOf('file:///C:/Users/x/doc.pdf').kind === 'file', 'file:// classified file')
+ok(securityOf('about:blank').kind === 'internal', 'about: internal')
+ok(securityOf('').kind === 'unknown' && securityOf('').host === '', 'empty url unknown, no throw')
+ok(securityOf('garbage-not-a-url').kind === 'unknown', 'garbage unknown, no throw')
+ok(securityOf('ftp://files.example.com').kind === 'unknown', 'ftp unknown (not web)')
+ok(SECURITY_LABEL.secure.length > 10 && SECURITY_LABEL.insecure.length > 10, 'security labels present')
+
+console.log(`\nv1.5.0 build 4 (loading + site info): ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar, IconShield } from './Icons'
+import { SECURITY_LABEL, securityOf } from '../../../shared/security'
 
 interface ShieldsInfo {
   enabled: boolean
@@ -39,6 +40,8 @@ export default function Toolbar(): JSX.Element {
   const [sugIdx, setSugIdx] = useState(-1)
   const [shields, setShields] = useState<ShieldsInfo | null>(null)
   const [shieldsOpen, setShieldsOpen] = useState(false)
+  const [siteOpen, setSiteOpen] = useState(false)
+  const [siteInfo, setSiteInfo] = useState<ShieldsInfo | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -123,6 +126,31 @@ export default function Toolbar(): JSX.Element {
     setShields({ ...shields, aggressive: next })
     if (tab) window.aether.tabs.reload(tab.id) // scriptlet tier applies on next load
   }
+
+  // site-info popover: security class + live shields counters for this site
+  useEffect(() => {
+    if (!siteOpen) return
+    let dead = false
+    window.aether.shields
+      .state(tab?.url)
+      .then((s) => {
+        if (!dead) setSiteInfo(s as ShieldsInfo)
+      })
+      .catch(() => undefined)
+    return () => {
+      dead = true
+    }
+  }, [siteOpen, tab?.url])
+
+  // close the site-info popover on any outside click
+  useEffect(() => {
+    if (!siteOpen) return
+    const close = (): void => setSiteOpen(false)
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [siteOpen])
+
+  const sec = securityOf(tab?.url || '')
 
   const toggleSidebar = (): void => {
     const next = !useApp.getState().sidebarOpen
@@ -210,9 +238,13 @@ export default function Toolbar(): JSX.Element {
       )}
 
       <div className={`omnibox ${focused ? 'focused' : ''}`}>
-        <span className={`scheme ${tab && /^https:/i.test(tab.url) ? 'secure' : ''}`}>
-          {tab && /^https:/i.test(tab.url) ? '🔒' : tab && /^http:/i.test(tab.url) ? '⚠' : '✦'}
-        </span>
+        <button
+          className={`scheme-chip scheme-${sec.kind} ${siteOpen ? 'open' : ''}`}
+          onClick={() => setSiteOpen((o) => !o)}
+          title={SECURITY_LABEL[sec.kind]}
+        >
+          {sec.kind === 'secure' ? '🔒' : sec.kind === 'insecure' ? '⚠' : sec.kind === 'file' ? '🗂' : '✦'}
+        </button>
         <input
           ref={inputRef}
           value={omnibox}
@@ -259,6 +291,34 @@ export default function Toolbar(): JSX.Element {
         >
           <IconStar filled={bookmarked} size={14} />
         </button>
+        {siteOpen && (
+          <div className="site-pop" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="site-pop-head">{SECURITY_LABEL[sec.kind]}</div>
+            {sec.host && <div className="site-pop-host">{sec.host}</div>}
+            {siteInfo && (
+              <div className="site-pop-stats">
+                <div>
+                  <b>{siteInfo.siteBlocked}</b>
+                  <span>blocked on this site</span>
+                </div>
+                <div>
+                  <b>{siteInfo.totalBlocked}</b>
+                  <span>blocked in total</span>
+                </div>
+              </div>
+            )}
+            <button
+              className="site-pop-link"
+              onClick={() => {
+                setSiteOpen(false)
+                setShieldsOpen(true)
+              }}
+            >
+              Shields &amp; tracking controls →
+            </button>
+          </div>
+        )}
+
         {focused && sugs.length > 0 && (
           <div className="omni-suggest">
             {sugs.map((s, i) => (

@@ -34,6 +34,9 @@ export default function TabStrip(): JSX.Element {
   }, [menu])
 
   const favicon = (t: TabMeta): JSX.Element => {
+    if (t.loading && t.id === activeId) {
+      return <span className="tab-spinner" title="Loading" />
+    }
     if (t.discarded) {
       return (
         <div

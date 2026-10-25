@@ -12,6 +12,7 @@ import DownloadBar from './components/DownloadBar'
 
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
+  const activeLoading = useApp((s) => s.tabs.find((t) => t.id === s.activeId)?.loading)
   const set = useApp((s) => s.set)
   const chromeRef = useRef<HTMLDivElement>(null)
 
@@ -121,6 +122,7 @@ export default function App(): JSX.Element {
         <TabStrip />
         <Toolbar />
         <BookmarksBar />
+        {activeLoading && <div className="load-progress" />}
       </div>
       <div className="body">
         <div className="webarea" />
