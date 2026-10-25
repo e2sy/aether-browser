@@ -5,11 +5,12 @@
  *
  * Run:  node scripts/test-v04.mjs
  */
-import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'node:http'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname)
 const APP = path.resolve(ROOT, '..')
@@ -47,7 +48,7 @@ fs.writeFileSync(
 fs.writeFileSync(path.join(stubDir, 'package.json'), JSON.stringify({ name: 'electron', main: 'index.js' }))
 
 // copy the app sources so relative imports resolve inside tmp
-execSync(`cp -r ${APP}/src ${tmp}/src`, { stdio: 'pipe' })
+fs.cpSync(path.join(APP, 'src'), path.join(tmp, 'src'), { recursive: true })
 
 const entry = path.join(tmp, 'src', 'main', 'testable.ts')
 fs.writeFileSync(
@@ -60,12 +61,17 @@ fs.writeFileSync(
    export { settings } from './store'`
 )
 
-execSync(
-  `${APP}/node_modules/.bin/esbuild ${entry} --bundle --platform=node --format=esm --external:jsdom --external:turndown --external:@mozilla/readability --outfile=${tmp}/bundle.mjs`,
-  { stdio: 'pipe' }
-)
+await build({
+  entryPoints: [entry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  external: ['jsdom', 'turndown', '@mozilla/readability'],
+  outfile: path.join(tmp, 'bundle.mjs'),
+  logLevel: 'silent'
+})
 
-const B = await import(path.join(tmp, 'bundle.mjs'))
+const B = await import(pathToFileURL(path.join(tmp, 'bundle.mjs')).href)
 
 /* ================= 1. DOM diffing (serializer) ================= */
 console.log('\n[1] DOM diffing — formatSnapshotDiff')

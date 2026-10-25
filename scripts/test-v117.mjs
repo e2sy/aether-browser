@@ -10,10 +10,11 @@
  *
  * Run:  node scripts/test-v117.mjs
  */
-import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname)
 const APP = path.resolve(ROOT, '..')
@@ -40,12 +41,16 @@ fs.writeFileSync(
   `export { recoveryCandidates, decideProfileDir, recoveryBanner, MAX_RECOVERY_CANDIDATES } from './main/profile-recovery'`
 )
 
-execSync(
-  `${APP}/node_modules/.bin/esbuild ${entry} --bundle --platform=node --format=esm --outfile=${tmp}/bundle.mjs`,
-  { stdio: 'pipe' }
-)
+await build({
+  entryPoints: [entry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile: path.join(tmp, 'bundle.mjs'),
+  logLevel: 'silent'
+})
 
-const B = await import(path.join(tmp, 'bundle.mjs'))
+const B = await import(pathToFileURL(path.join(tmp, 'bundle.mjs')).href)
 const { recoveryCandidates, decideProfileDir, recoveryBanner, MAX_RECOVERY_CANDIDATES } = B
 
 const REAL = '/home/u/.config/aether-browser'

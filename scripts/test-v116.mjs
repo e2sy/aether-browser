@@ -8,10 +8,11 @@
  *
  * Run:  node scripts/test-v116.mjs
  */
-import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { build } from 'esbuild'
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname)
 const APP = path.resolve(ROOT, '..')
@@ -38,12 +39,16 @@ fs.writeFileSync(
   `export { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './main/errmap'`
 )
 
-execSync(
-  `${APP}/node_modules/.bin/esbuild ${entry} --bundle --platform=node --format=esm --outfile=${tmp}/bundle.mjs`,
-  { stdio: 'pipe' }
-)
+await build({
+  entryPoints: [entry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile: path.join(tmp, 'bundle.mjs'),
+  logLevel: 'silent'
+})
 
-const B = await import(path.join(tmp, 'bundle.mjs'))
+const B = await import(pathToFileURL(path.join(tmp, 'bundle.mjs')).href)
 const { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } = B
 
 /* ---------- 1. shouldShowErrorPage ---------- */
