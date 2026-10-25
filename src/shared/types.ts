@@ -111,6 +111,10 @@ export interface Settings {
   dohTemplate: string
   /** v1.9.0 (#68) — cross-origin requests send origin-only referrers */
   referrerTight: boolean
+  /** v2.0 (#78) — AI search depth: quick / deep / academic / code */
+  searchDepth: 'quick' | 'deep' | 'academic' | 'code'
+  /** v2.0 (#72) — hosts that get an automatic TL;DR toast on load */
+  tldrHosts: string[]
 }
 
 /** A loaded unpacked extension (persisted across boots). */

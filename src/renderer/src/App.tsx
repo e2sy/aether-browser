@@ -11,6 +11,7 @@ import PermPrompt from './components/PermPrompt'
 import ZoomBubble from './components/ZoomBubble'
 import DownloadBar from './components/DownloadBar'
 import CommandPalette from './components/CommandPalette'
+import TldrToast from './components/TldrToast'
 
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
@@ -186,6 +187,7 @@ export default function App(): JSX.Element {
       <ZoomBubble />
       <DownloadBar />
       <CommandPalette />
+      <TldrToast />
     </div>
   )
 }

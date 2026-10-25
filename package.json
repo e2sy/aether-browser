@@ -1,6 +1,6 @@
 {
   "name": "aether-browser",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "description": "Open-source AI browser \u2014 full Chromium compatibility, powered by your local Ollama model. Multi-window, CRX one-click install, tiered memory saver.",
   "main": "out/main/index.js",
   "author": {
@@ -22,7 +22,7 @@
     "build": "electron-vite build && node scripts/patch-preload-sandbox.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "electron-vite preview",
-    "test": "node scripts/test-v04.mjs && node scripts/test-v10.mjs && node scripts/test-v11.mjs && node scripts/test-v111.mjs && node scripts/test-v113.mjs && node scripts/test-v115.mjs && node scripts/test-v116.mjs && node scripts/test-v117.mjs && node scripts/test-v120.mjs && node scripts/test-v130.mjs && node scripts/test-v140.mjs && node scripts/test-v150.mjs && node scripts/test-v160.mjs && node scripts/test-v170.mjs && node scripts/test-v172.mjs && node scripts/test-v174.mjs && node scripts/test-v175.mjs && node scripts/test-v176.mjs && node scripts/test-v177.mjs && node scripts/test-v178.mjs && node scripts/test-v179.mjs && node scripts/test-v180.mjs && node scripts/test-v181.mjs && node scripts/test-v182.mjs && node scripts/test-v183.mjs && node scripts/test-v184.mjs",
+    "test": "node scripts/test-v04.mjs && node scripts/test-v10.mjs && node scripts/test-v11.mjs && node scripts/test-v111.mjs && node scripts/test-v113.mjs && node scripts/test-v115.mjs && node scripts/test-v116.mjs && node scripts/test-v117.mjs && node scripts/test-v120.mjs && node scripts/test-v130.mjs && node scripts/test-v140.mjs && node scripts/test-v150.mjs && node scripts/test-v160.mjs && node scripts/test-v170.mjs && node scripts/test-v172.mjs && node scripts/test-v174.mjs && node scripts/test-v175.mjs && node scripts/test-v176.mjs && node scripts/test-v177.mjs && node scripts/test-v178.mjs && node scripts/test-v179.mjs && node scripts/test-v180.mjs && node scripts/test-v181.mjs && node scripts/test-v182.mjs && node scripts/test-v183.mjs && node scripts/test-v184.mjs && node scripts/test-v185.mjs",
     "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "repair:electron": "node scripts/ensure-electron.mjs",
     "dist": "electron-vite build && electron-builder",

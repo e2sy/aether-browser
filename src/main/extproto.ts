@@ -27,7 +27,7 @@ export const EXTERNAL_SCHEMES: ReadonlySet<string> = new Set([
 
 /** Internal routes reachable from outside via aether:// links (#32). */
 export const AETHER_ROUTES: ReadonlySet<string> = new Set([
-  'newtab', 'search', 'history', 'bookmarks', 'settings', 'downloads', 'readinglist'
+  'newtab', 'search', 'history', 'bookmarks', 'settings', 'downloads', 'readinglist', 'privacy'
 ])
 
 /** Pure: scheme of a URL (lowercased), '' when it has none/is garbage. */

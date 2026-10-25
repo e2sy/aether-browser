@@ -2575,3 +2575,64 @@ browser-action-list::part(action):hover {
   border-top: 1px solid var(--border);
   text-align: right;
 }
+
+/* ============ TL;DR TOAST (#72) — v2.0 ============ */
+.tldr-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 340px;
+  max-height: 40vh;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+  z-index: 260;
+  display: flex;
+  flex-direction: column;
+}
+.tldr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.tldr-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--accent-soft, rgba(124, 140, 255, 0.18));
+  color: var(--accent, #7c8cff);
+}
+.tldr-title {
+  flex: 1;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tldr-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.tldr-close:hover {
+  color: var(--fg);
+}
+.tldr-body {
+  padding: 10px 14px;
+  overflow-y: auto;
+}
+.tldr-line {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 3px 0;
+  color: var(--fg);
+}

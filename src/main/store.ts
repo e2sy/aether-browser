@@ -63,7 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   httpsExemptHosts: [],
   dohMode: 'off',
   dohTemplate: '',
-  referrerTight: true
+  referrerTight: true,
+  searchDepth: 'quick',
+  tldrHosts: []
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

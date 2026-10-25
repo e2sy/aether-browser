@@ -11,6 +11,7 @@ import {
 } from './tabgroups'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
 import { wireForceDark, cleanHosts } from './darkmode'
+import { maybeSummarizePage } from './tldr'
 import { shouldBlockWillNavigate, blockReason } from './navlock'
 import { isExternalCandidate, maybeOpenExternal } from './extproto'
 import { onContextMenu } from './menu'
@@ -176,6 +177,10 @@ export class TabManager {
       if (!this.hooks.private) addHistory(url, tab.title)
       this.applyStoredZoom(tab)
       this.emit()
+    })
+    // TL;DR badge (#72): opt-in per-site auto-summary → chrome toast
+    wc.on('did-finish-load', () => {
+      void maybeSummarizePage(this, tab.id, wc)
     })
     wc.on('did-fail-load', (_e, code, desc, validated, isMainFrame) => {
       // v1.1.6: render a real error page instead of an infinite blank view.

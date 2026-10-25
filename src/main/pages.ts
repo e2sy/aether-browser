@@ -929,6 +929,53 @@ export const HISTORY_HTML = mgrShell(
   document.getElementById('clear').addEventListener('click', function () {
     if (confirm('Clear ALL browsing history?')) { window.aether.history.clear(); render([]) }
   })
+  // semantic history (#73) — "find that article about…" via local embeddings
+  var semBtn = document.createElement('button')
+  semBtn.className = 'muted-btn'
+  semBtn.textContent = 'Find that article…'
+  semBtn.title = 'Semantic search — describe what you remember; needs an Ollama embedding model'
+  document.getElementById('clear').parentNode.insertBefore(semBtn, document.getElementById('clear'))
+  semBtn.addEventListener('click', function () {
+    var q = document.getElementById('q').value.trim()
+    if (!q) return
+    semBtn.disabled = true
+    semBtn.textContent = 'Thinking locally…'
+    window.aether.ai2.semSearch(q).then(function (res) {
+      semBtn.disabled = false
+      semBtn.textContent = 'Find that article…'
+      if (!res || !res.ok) {
+        document.getElementById('empty').style.display = 'block'
+        document.getElementById('empty').textContent = (res && res.error) || 'Semantic search unavailable.'
+        return
+      }
+      document.getElementById('empty').style.display = 'none'
+      var rows = document.getElementById('rows')
+      rows.innerHTML = ''
+      var head = document.createElement('div'); head.className = 'day-head'
+      head.textContent = 'Semantically closest to “' + q + '”' + (res.model ? ' · ' + res.model : '')
+      rows.appendChild(head)
+      if (!res.results || !res.results.length) {
+        document.getElementById('empty').style.display = 'block'
+        document.getElementById('empty').textContent = 'Nothing close enough. Browse more or try different words.'
+        return
+      }
+      res.results.forEach(function (r) {
+        var row = document.createElement('div'); row.className = 'row'
+        var ic = document.createElement('div'); ic.className = 'ic none'; ic.textContent = '~'
+        var meta = document.createElement('div'); meta.className = 'meta'
+        var t = esc(r.item.title); t.className = 't'
+        var u = esc(r.item.url); u.className = 'u'
+        meta.appendChild(t); meta.appendChild(u)
+        var w = document.createElement('div'); w.className = 'when'; w.textContent = Math.round(r.score * 100) + '%'
+        row.appendChild(ic); row.appendChild(meta); row.appendChild(w)
+        row.addEventListener('click', function () { window.aether.internal.open(r.item.url) })
+        rows.appendChild(row)
+      })
+    }).catch(function () {
+      semBtn.disabled = false
+      semBtn.textContent = 'Find that article…'
+    })
+  })
   load()
   `,
   true
@@ -1129,6 +1176,34 @@ export const DOWNLOADS_HTML = mgrShell(
   `
 )
 
+export const PRIVACY_HTML = pageShell(
+  'AI privacy pledge',
+  `
+  <style>
+    .pl { max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    .pl h1 { font-size: 26px; font-weight: 300; margin-bottom: 6px; }
+    .pl .sub { color: var(--ax-muted); font-size: 13px; margin-bottom: 24px; }
+    .pl .claim { display: flex; gap: 12px; padding: 14px 16px; background: var(--ax-card); border: 1px solid var(--ax-border);
+      border-radius: 12px; margin-bottom: 10px; font-size: 13.5px; line-height: 1.55; }
+    .pl .claim .tick { color: var(--ax-ok); font-weight: 700; flex: none; }
+    .pl .claim b { display: block; margin-bottom: 2px; }
+    .pl .claim span.d { color: var(--ax-muted); font-size: 12.5px; }
+  </style>
+  <div class="pl">
+    <h1>AI privacy pledge</h1>
+    <div class="sub">What Aether does with your data — every claim below is enforced in code, in this repository (GPL-3.0, auditable).</div>
+    <div class="claim"><span class="tick">✓</span><div><b>Your browsing history never leaves this device.</b><span class="d">History is written to one JSON file in your profile folder. There is no sync, no account, no telemetry endpoint in the codebase.</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>AI chat, summaries and search answers run on YOUR machine.</b><span class="d">Chat, TL;DR and cited answers call your local Ollama at 127.0.0.1:11434. Nothing else can reach them.</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>Search result snippets come from the open web; answers are composed locally.</b><span class="d">Aether fetches public search HTML (DuckDuckGo/Bing/Wikipedia/Mojeek), then your local model writes the answer.</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>Agent actions run in this browser, under your approval.</b><span class="d">The agent can only drive tabs you can see, and asks before every write action when confirmation is enabled (default).</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>Cloud fallback is opt-in and never automatic.</b><span class="d">Only if you enable it in Settings and paste your own key — and even then only chat messages you send go to that endpoint.</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>Semantic history embeddings stay local.</b><span class="d">"Find that article" vectors are computed by your local embedding model and cached on disk in your profile.</span></div></div>
+    <div class="claim"><span class="tick">✓</span><div><b>Blocked trackers stay blocked.</b><span class="d">EasyList + EasyPrivacy + your lists are enforced by the shields engine before requests leave the machine.</span></div></div>
+  </div>
+  `,
+  ''
+)
+
 export const SETTINGS_HTML = pageShell(
   'Settings',
   `
@@ -1158,6 +1233,21 @@ export const SETTINGS_HTML = pageShell(
         <label><input type="radio" name="sm" value="google" /> Google</label>
         <label><input type="radio" name="sm" value="duckduckgo" /> DuckDuckGo</label>
       </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:10px">
+        <label style="font-size:13px; color:var(--ax-fg)">AI search depth</label>
+        <select id="searchDepth" style="width:170px">
+          <option value="quick">Quick — concise, cited</option>
+          <option value="deep">Deep — thorough synthesis</option>
+          <option value="academic">Academic — sourced review</option>
+          <option value="code">Code — docs &amp; fixes</option>
+        </select>
+        <a href="#" id="pledgeLink" style="font-size:11.5px; color:var(--ax-accent)">AI privacy pledge →</a>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:8px">
+        <label style="font-size:13px; color:var(--ax-fg)">TL;DR on load for</label>
+        <input id="tldrHosts" type="text" placeholder="en.wikipedia.org, docs.python.org" style="flex:1" />
+      </div>
+      <div class="hint" style="margin-top:5px">Pages from these sites get an automatic 3-bullet summary from your local model (bottom-right toast). Empty = off.</div>
     </div>
 
     <div class="sec" id="cust-sec">
@@ -1439,6 +1529,8 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('model').value = s.model || ''
       var radios = document.querySelectorAll('input[name=sm]')
       for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === s.searchMode
+      document.getElementById('searchDepth').value = s.searchDepth || 'quick'
+      document.getElementById('tldrHosts').value = Array.isArray(s.tldrHosts) ? s.tldrHosts.join(', ') : ''
       var a = s.appearance || {}
       axState = { theme: a.theme || 'dark', accent: a.accent || '#7c8cff', fontScale: a.fontScale || 1, newtabBg: a.newtabBg || 'aurora', newtabClock: a.newtabClock !== false }
       var axr = document.querySelectorAll('input[name=axtheme]')
@@ -1740,6 +1832,15 @@ export const SETTINGS_HTML = pageShell(
   for (var i = 0; i < radios.length; i++) {
     radios[i].addEventListener('change', function (e) { if (e.target.checked) save({ searchMode: e.target.value }) })
   }
+  document.getElementById('searchDepth').addEventListener('change', function (e) { save({ searchDepth: (e.target as HTMLSelectElement).value }) })
+  document.getElementById('tldrHosts').addEventListener('change', function (e) {
+    var hosts = String((e.target as HTMLInputElement).value || '').split(',').map(function (x) { return x.trim() }).filter(Boolean)
+    save({ tldrHosts: hosts })
+  })
+  document.getElementById('pledgeLink').addEventListener('click', function (e) {
+    e.preventDefault()
+    try { window.aether.internal.open('aether://privacy') } catch (err) {}
+  })
   document.getElementById('confirmAgentActions').addEventListener('change', function (e) { save({ confirmAgentActions: e.target.checked }) })
   document.getElementById('showBookmarksBar').addEventListener('change', function (e) {
     // ui.setBookmarksBar persists AND broadcasts to every window — don't double-save

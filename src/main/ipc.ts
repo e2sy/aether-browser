@@ -63,6 +63,8 @@ import { getNotes, setNotes } from './quicknotes'
 import { listReading, addReading, removeReading, toggleReading } from './readinglist'
 import { clearHistorySince } from './store'
 import { historyCutoff, storagesFor, type ClearKind, type ClearRange } from './privacy'
+import { isSearchDepth, depthSourceCount, depthPrompt, depthBoost, type SearchDepth } from './depth'
+import { semSearch } from './semhistory'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -687,6 +689,11 @@ export function registerIpc(): void {
     return toggleReading(String(url || ''))
   })
 
+  ipcMain.handle('history:sem', async (e, q: string) => {
+    guard(e, 'history:sem')
+    return semSearch(String(q || ''), 8)
+  })
+
   // clear browsing data (#63) — history by range + Chromium storage per type
   ipcMain.handle('privacy:clearData', async (e, sel: { kinds?: string[]; range?: string }) => {
     guard(e, 'privacy:clearData')
@@ -992,7 +999,14 @@ export function registerIpc(): void {
         sources = []
       }
       const [panel, related] = await Promise.all([panelP, relatedP])
-      send({ sources, stats, ...(panel ? { panel } : {}), ...(related.length ? { related } : {}) })
+      // depth modes (#78): source budget + relevance boosts per mode
+      const s = mergedSettings() as { searchDepth?: unknown }
+      const depth: SearchDepth = isSearchDepth(s.searchDepth) ? s.searchDepth : 'quick'
+      const boosted = [...sources].sort(
+        (a, b) => depthBoost(depth, b.url) - depthBoost(depth, a.url)
+      )
+      sources = boosted.slice(0, depthSourceCount(depth))
+      send({ sources, stats, depth, ...(panel ? { panel } : {}), ...(related.length ? { related } : {}) })
 
       const choice = await resolveBrain()
       if (!choice) {
@@ -1002,7 +1016,7 @@ export function registerIpc(): void {
         })
         return { ok: false }
       }
-      for await (const delta of streamBrain(choice, buildSearchMessages(String(payload.q || ''), sources), ctrl.signal)) {
+      for await (const delta of streamBrain(choice, buildSearchMessages(String(payload.q || ''), sources, depth), ctrl.signal)) {
         send({ delta })
       }
       send({ done: true })
@@ -1021,10 +1035,11 @@ export function newRequestId(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10)
 }
 
-function buildSearchMessages(q: string, results: SearchResult[]): OllamaMessage[] {
+function buildSearchMessages(q: string, results: SearchResult[], depth: SearchDepth = 'quick'): OllamaMessage[] {
   const resultsText = results.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')
+  const sys = depth === 'quick' ? SEARCH_SYSTEM : `${SEARCH_SYSTEM}\n\n${depthPrompt(depth)}`
   return [
-    { role: 'system', content: SEARCH_SYSTEM },
+    { role: 'system', content: sys },
     { role: 'user', content: `Question: ${q}\n\nWeb results:\n${resultsText || '(no results found)'}` }
   ]
 }

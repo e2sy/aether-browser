@@ -6,14 +6,21 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.6.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v2.0.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.6.0)
+## ✨ Features (v2.0.0)
 
 | Feature | What it does |
 |---|---|
+| 🤖 **AI, everywhere it helps (v2.0.0)** | **TL;DR toasts** — list hosts in Settings (e.g. `en.wikipedia.org`) and pages from them get an automatic **3-bullet summary from your local model** in a dismissible toast while the tab loads (private windows excluded). **AI search depth modes** — Quick / **Deep** (synthesis across all 14 sources) / **Academic** (prefers .edu/.gov, structured review) / **Code** (docs & Stack Overflow) — each mode reshapes the prompt and the source budget. **Semantic history** — "Find that article…" on `aether://history` describes what you remember and Ollama embeddings (`nomic-embed-text`) rank your 300 most recent visits & bookmarks by meaning, vectors cached locally. **VRAM calculator** — the model manager honestly estimates weights + KV cache + overhead per quant before you pull, so "fits in 8 GB" claims don't embarrass the browser |
+| 🪟 **Your default browser (v1.7.0)** | One click in Settings → Aether registers as a **default-browser candidate on Windows/macOS/Linux**, opens the OS chooser, and **URLs from other apps open as foreground tabs in the running window** (second-instance forwarding). `.htm/.html` file associations included — the flagship feature that makes Aether a *real* daily driver |
+| 🖥️ **OS chrome (v1.7.0)** | **System tray icon** with quick actions, **Windows jump list + macOS dock menu** (new window / private window), **unread-badge** on taskbar/dock, native **notifications** for downloads, and **startup boost** (fast boot path) |
+| 🗂️ **Vertical tabs + tab groups (v1.8.0)** | The tab strip can go **vertical** (sidebar rail with favicons + close buttons), tabs **group** by color with collapse — plus **hover previews** and drag-out-to-window still works |
+| ⌨️ **Command palette (v1.8.0)** | **Ctrl+K** opens a fuzzy command bar: switch tabs, toggle every UI surface, run bangs, open settings sections, trigger agent macros — keyboard-first like the rest of Aether |
+| 🔖 **Reading list + context menu v2 (v1.8.0)** | Save pages to a **reading list** (`aether://readinglist`), per-tab **sound control** (mute/unmute any tab), **force-dark v2** per site, a richer link/image context menu |
+| 🛡️ **Privacy fortress (v1.9.0)** | **History scrubber** (auto-trim by age), **HTTPS-only mode** (with per-site exemptions), **DNS-over-HTTPS** (off/auto/your provider), **clear-browsing-data dialog** (history/cookies/cache per time range), **origin-only referrers** — and an `aether://privacy` page that states every data claim **in plain English, enforced in code** |
 | 🧭 **The real-browser core (v1.5.0)** | **Bookmarks bar** (Ctrl+Shift+B — click to open, middle-click for a background tab, right-click menu, live everywhere), **session restore** ("continue where you left off" — every window/tab/pinned state survives restarts and crashes), **aether://downloads** (Ctrl+J — search, pause/resume, cancel, re-download, remove/clear, reveal file), **private windows** (Ctrl+Shift+N — in-memory session, zero history/site-data writes, shields still up, violet strip), **loading progress line** + tab spinner + **clickable site-info chip** (connection verdict, host, live shields counts) |
 | 🌐 **Full browser** | **Multi-window** (Ctrl+N, move/drag tabs out into their own window), tabs (drag to reorder, **pin, mute, duplicate, discard, hibernate** + full tab context menu), omnibox with **live suggestions** (history, bookmarks, search), back/forward, **per-site zoom** with Chrome-style bubble, **download shelf** (progress / cancel / reveal), **find-in-page bar (Ctrl+F)** |
 | 💬 **Chat with any page** | The sidebar reads the page via Readability, converts to clean Markdown, and answers grounded questions — streamed token-by-token |
@@ -27,11 +34,47 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🛡️ **Ad & tracker blocking** | EasyList + EasyPrivacy via `@cliqz/adblocker-electron`, filters cached on disk after first download, toggle in Settings |
 | 🔐 **Site permissions** | Chrome-style prompts for camera / mic / location / notifications with **remember per site**; manage or forget every grant in Settings |
 | ☁️ **Optional cloud fallback** | If Ollama is unreachable, chat & AI search can use **any OpenAI-compatible endpoint** (Groq / OpenRouter free tiers…). Opt-in, key stays on disk, agent stays local |
-| 🧭 **Manager pages** | `aether://history` (search, delete, clear), `aether://bookmarks`, `aether://settings` (model picker, search engine, **extensions manager**, **memory saver**, permissions manager, cloud fallback, privacy toggles) |
+| 🧭 **Manager pages** | `aether://history` (search, delete, clear, **semantic find**), `aether://bookmarks`, `aether://settings` (model picker, search engine, **AI depth**, **TL;DR hosts**, **extensions manager**, **memory saver**, permissions manager, cloud fallback, privacy toggles), `aether://privacy` (the AI privacy pledge) |
 | 📦 **Model Library** | Add **any Ollama model in-app** — no CLI needed: curated catalog (Qwen 9B/4B/1.7B, Llama, Gemma, Phi, Hermes, Mistral, DeepSeek-R1, coder, vision, tiny), or type **any tag** (`qwen3.5:4b`, `hf.co/…` GGUF) → live pull progress, cancel, delete, one-click "Use" |
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
+| 🏰 **Hardened by the Master Plan** | `npm audit` **0 vulnerabilities**; internal pages serve a **nonce-based CSP** (`unsafe-inline` is dead), a **will-navigate lock** keeps web pages out of privileged schemes, **Electron fuses** (RunAsNode off, cookie encryption, ASAR integrity) ship in every build, extensions extract through a **zip-hardening gate** (traversal/symlink/bomb-proof), an **XSS regression gate** runs in CI, and **Dependabot + an npm-audit CI gate** watch the supply chain — see [SECURITY.md](SECURITY.md) |
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🤖 v2.0.0 — the AI milestone (build 14)
+
+Aether's AI stops being "a sidebar you open" and starts meeting you where you already are:
+
+- **TL;DR on load** — add hosts in Settings → "TL;DR on load for" (`en.wikipedia.org, docs.python.org`) and every page from them gets a **3-bullet summary from your local model** in a bottom-right toast, 20 s auto-dismiss, per-tab, private windows excluded. One summary per tab at a time, opt-in per site, off by default.
+- **AI search depth modes** — Settings → "AI search depth": **Quick** (concise, cited, 6 sources), **Deep** (synthesizes across 14 sources, structured with counterpoints), **Academic** (10 sources, prefers `.edu`/`.gov`, review-style), **Code** (10 sources, docs & Stack Overflow first). Depth reshapes both the source budget and the answer prompt.
+- **Semantic history — "find that article about…"** — a button on `aether://history` takes a *description* instead of keywords ("that Rust async tutorial with the green background") and ranks your recent history + bookmarks with **Ollama embeddings** (`nomic-embed-text` → `mxbai-embed-large` → `all-minilm` auto-picked). Pure cosine similarity, top-8, vectors cached in your profile per model.
+- **VRAM calculator** — the model manager now estimates **weights + KV cache + runtime overhead** per quantization (4/5/8/16-bit) before you pull a model, deliberately conservative and calibrated against real models (an 8B q4 @ 8k ctx ≈ 6.9 GB — it honestly tells you a 70B won't fit in 8 GB).
+- **The AI privacy pledge** — `aether://privacy` states exactly what happens to your data in seven plain-English claims (history never leaves the device, AI runs on your machine, embeddings stay local, cloud fallback is opt-in…) — every claim enforced in code you can audit.
+- 54 new tests (depth policy, VRAM honesty, cosine math, TL;DR prompt shape, wiring gates); **1,119 total across 27 suites**.
+
+## 🛡️ v1.9.0 — Privacy Fortress (Phase 3 of the Master Plan)
+
+- **History scrubber** — auto-trim history older than your chosen window (forever / 90 / 30 / 7 days), enforced at boot and on write.
+- **HTTPS-only mode** — upgrades every navigation to https:// and shows a block page instead of silently downgrading; per-site exemptions for the stragglers.
+- **DNS-over-HTTPS** — off / automatic / custom provider (Cloudflare, Google, Quad9 or any DoH template), resolving the classic plaintext-DNS leak at the network layer.
+- **Clear browsing data** — one dialog for history / cookies / cache / site data across any time range, with the count of what will go.
+- **Origin-only referrers** — cross-origin requests send origin-only `Referer` by default (tightened from the leaky default).
+
+## 🎨 v1.8.0 — the UI/UX wave (Phase 2 of the Master Plan)
+
+Four builds of interface work: **vertical tabs** (the strip becomes a favicon rail) and **tab groups** (color-coded, collapsible), a **Ctrl+K command palette** (fuzzy: switch tabs, toggle surfaces, run bangs, open settings sections, fire macros), the **New Tab v3** (grouped quick links, smarter wallpaper engine) and **History v2** (day-grouped, per-entry delete, faster search), a **reading list** (`aether://readinglist`), **context menu v2** (richer link/image/selection actions), **per-tab sound control**, and **force-dark v2** with per-site overrides.
+
+## 🪟 v1.7.0 — Security hardening + Your default browser (Phases 0–1 of the Master Plan)
+
+The safety work came first, then the flagship feature:
+
+- **CSP v2** — every internal page serves a **nonce-based CSP**; `unsafe-inline` is dead for scripts; `object-src`, `base-uri`, `form-action` all `none`; CSP also re-emitted as an HTTP header with `frame-ancestors 'none'`.
+- **Navigation lock** — a `will-navigate` policy: internal pages talk only through their bridge, the chrome shell can't navigate at all, web pages browse freely **except** `file://` and privileged schemes (`devtools:`, `chrome:`, `chrome-extension:`, `view-source:`, `javascript:`) — unknown targets fail closed.
+- **Electron fuses** — `RunAsNode`, `NODE_OPTIONS`, `--inspect`, file privileges off; **cookie encryption** and ASAR integrity on where the OS supports it.
+- **XSS regression gate** — a CI test sweeps every `innerHTML` sink, bans `document.write`/`eval`/`javascript:` and proves hostile payloads render inert in JSDOM.
+- **Supply chain** — `npm audit` went **14 → 0 vulnerabilities** (self-built `safe-zip` replaced the unpatched extract-zip), an **npm-audit CI gate** and **Dependabot** keep it there; extensions extract through a **zip-hardening gate** (path traversal, symlinks, device entries, zip bombs — fail closed). Full details in [SECURITY.md](SECURITY.md).
+- **THE flagship: default browser** — one click registers Aether with the OS (Windows/macOS/Linux), opens the platform chooser, and **links from other apps open as foreground tabs in your running window**; `.htm`/`.html` file associations included.
+- **OS chrome** — system tray quick actions, Windows jump list / macOS dock menu, taskbar unread badges, native download notifications, startup boost.
 
 ## 🔎 v1.6.0 — Beast Search (plus: the cross buttons got fixed)
 
@@ -328,7 +371,12 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.1.6 — **visible error pages for every failed/crashed page load (reason + Try again + ad-blocker recovery), Chrome-like omnibox/history/reload behavior**
 - [x] v1.1.7 — **single-instance lock that can't be ignored + cache-lock auto-recovery (profile relocates, exact reclaim steps printed), survives zombie electron.exe / AV / OneDrive locks**
 - [x] v1.2.0 — **Brave-style Shields: two tiers (Standard default / Aggressive opt-in scriptlets), per-site toolbar popup with live counters, custom filter lists (uBlock presets + any URL), YouTube-blank root cause fixed**
-- [ ] v1.3 — extension store search UI, tab hibernation tiers UI, per-tab agent sessions
+- [x] v1.3–v1.6 — **resilient search → Beast Search: 5 parallel sources, 43 bangs, instant answers v2, Wikipedia knowledge panels, diversity ranking; error pages that tell the truth; profile-recovery; trust-hardened IPC**
+- [x] v1.7.0 — **Phase 0 (CSP v2, navlock, fuses, safe-zip, XSS gate, audit gate, SECURITY.md) + Phase 1: DEFAULT BROWSER, OS chrome (tray/jump list/dock/badges)**
+- [x] v1.8.0 — **Phase 2 UI/UX: vertical tabs, tab groups, command palette, New Tab v3, History v2, reading list, context menu v2, sound control, force-dark v2**
+- [x] v1.9.0 — **Phase 3 privacy fortress: history scrubber, HTTPS-only, DoH, clear-data dialog, origin-only referrers**
+- [x] v2.0.0 — **Phase 4 AI milestone: TL;DR toasts, search depth modes, semantic history (local embeddings), VRAM calculator, AI privacy pledge page**
+- [ ] Next — **the remaining Master Plan phases** (see [docs/ROADMAP.md](docs/ROADMAP.md)): AI agents + MCP, performance budgets, extension store polish, then **mobile (Android/iOS)**
 
 ## 🔐 Security notes
 
@@ -346,15 +394,17 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - **Cloud fallback is opt-in and off by default**; it only covers sidebar chat & AI search (the agent
   stays local), and your API key is stored in the local settings file only.
 - **Macros replay with the same confirm gate** as live agent runs — a recorded click can't bypass Allow/Deny.
-- Model output is **never** rendered as HTML — all internal pages build DOM via `textContent`.
+- Model output is **never** rendered as HTML — all internal pages build DOM via `textContent` (enforced by a CI XSS gate that also bans `document.write`, `eval` and `javascript:` URLs, and renders hostile payloads in JSDOM to prove they're inert).
 - The agent is hard-prompted to never enter passwords or payment details, and stops at captchas/login walls.
-- v1.0 is a stability milestone, but independent security review is still welcome — file issues privately.
+- **v1.7.0 hardening (Master Plan Phase 0):** internal pages serve a **nonce-based CSP** (no `unsafe-inline` scripts, `object-src`/`base-uri`/`form-action` all `none`, CSP re-emitted as an HTTP header with `frame-ancestors 'none'`); a **will-navigate lock** (see `src/main/navlock.ts`) keeps web pages out of `file://` and privileged schemes and fails closed on empty targets; **Electron fuses** disable `RunAsNode`/`NODE_OPTIONS`/`--inspect` and enable cookie encryption + ASAR integrity (where the OS supports it); extension archives extract through `src/main/safe-zip.ts` which rejects path traversal, symlinks, device entries, encrypted entries and zip bombs; `npm audit` is **clean (0 vulnerabilities)** and a CI gate + Dependabot keep it clean. See [SECURITY.md](SECURITY.md) for the disclosure policy.
+- v2.0.0 is a stability + AI milestone, but independent security review is still welcome — file issues privately.
 
 ## 🧑‍💻 Contributing
 
-PRs welcome! Good first issues: per-extension permission prompts, macro import/export,
-tab hibernation tiers, multi-window support.
-Run `npm run typecheck` before committing. Unit tests: `npm test` (all suites).
+PRs welcome! Good first issues: Master Plan Phase 5 (performance budgets: paint metrics,
+startup profiling, memory ceilings), Phase 6 (auto-update signing, i18n), and helping test
+default-browser flows across Linux distros.
+Run `npm run typecheck` before committing. Unit tests: `npm test` — **27 suites, 1,119 tests**, every feature lands with its own suite.
 
 **Headless checks** (used by CI — typecheck, build, boot + internal pages + discard/wake, unit tests):
 
@@ -370,11 +420,7 @@ npm test
 **Documentation:** the full user guide lives in [docs/index.html](docs/index.html) — it is published
 to GitHub Pages by `.github/workflows/docs.yml` on every push to `main`.
 
-**Roadmap:** what we build next and why is framed openly in [docs/ROADMAP.md](docs/ROADMAP.md) —
-currently **v1.6.0 Beast Search** (bangs, instant answers v2, Wikipedia + Mojeek sources,
-diversity ranking — shipped) and the Tier-2/3 list: tab groups, hover previews, a local
-password vault, auto-update, i18n. Every build ships as its own tagged release once CI is
-green on all three OSes.
+**Roadmap:** the full plan lives in [docs/ROADMAP.md](docs/ROADMAP.md) — **"The Master Plan: 118 items to beat Brave"** across 9 phases. Shipped so far: Phase 0 security hardening, Phase 1 default-browser + OS integration, Phase 2 UI/UX, Phase 3 privacy fortress, and the Phase 4 AI milestone (v2.0.0). Next up: AI agents + MCP, performance budgets, then **mobile (Android/iOS)**. Every build ships as its own commit once CI is green on all three OSes.
 
 ## 👤 Contributors
 

@@ -6,7 +6,7 @@ import { app, Menu, protocol, session } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
-import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, READINGLIST_HTML, pageSecurityHeaders } from './pages'
+import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, READINGLIST_HTML, PRIVACY_HTML, pageSecurityHeaders } from './pages'
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
@@ -107,6 +107,7 @@ app.whenReady().then(() => {
     downloads: DOWNLOADS_HTML,
     settings: SETTINGS_HTML,
     readinglist: READINGLIST_HTML,
+    privacy: PRIVACY_HTML,
     error: ERROR_HTML
   }
   protocol.handle('aether', (req) => {

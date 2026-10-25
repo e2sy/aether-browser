@@ -208,6 +208,12 @@ export const api = {
     clearData: (sel: { kinds: string[]; range: string }) => ipcRenderer.invoke('privacy:clearData', sel)
   },
 
+  /** TL;DR toast (#72) + semantic history (#73) — local-AI features */
+  ai2: {
+    onTLDR: subscribe('tldr:summary'),
+    semSearch: (q: string) => ipcRenderer.invoke('history:sem', q)
+  },
+
   /** local per-domain page memory */
   memory: {
     list: () => ipcRenderer.invoke('memory:list'),
