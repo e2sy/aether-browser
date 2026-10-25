@@ -113,3 +113,70 @@ build → full suite locally (all suites) → commit → push → CI green on 3 
 ```
 
 README features table + version badge updated in the same commit as each release.
+
+---
+
+## v1.5+ — "The Real-Browser Gap List" (audited 2026-10-25)
+
+Everything a daily-driver browser has that Aether still lacks, audited against
+the codebase. Already shipped (NOT listed): tabs w/ pin/mute/duplicate/discard/
+reopen/hibernate + drag reorder, multi-window, Chrome extensions (CRX/ZIP),
+Shields engine + per-site popup + custom filters, omnibox + suggestions,
+aether:// newtab/search/history/bookmarks/settings/error pages, download bar,
+find-in-page, per-site zoom bubble, permission prompts, agent + macros, model
+manager, Customization Studio (theme/accent/scale/newtab), UA scrub, fullscreen.
+
+### Tier 1 — "feels like a browser" (target: v1.5)
+
+| # | Feature | Notes |
+|---|---------|-------|
+| 1 | Bookmarks bar | toggleable favicon row under omnibox; drag, folders on bar |
+| 2 | Session restore | persist open tabs/windows to disk; "continue where you left off" on boot; crash → Restore bubble (in-memory reopenClosedTab exists) |
+| 3 | Full downloads page | aether://downloads: search, pause/resume (DownloadItem API), re-download, open folder, clear |
+| 4 | Print + Save page | Ctrl+P via printToPDF/print, Ctrl+S "save as" (HTML/MHTML), export to PDF |
+| 5 | Private windows | ephemeral in-memory session, no history/cache writes, distinct chrome tint |
+| 6 | Omnibox polish | favicons in suggestions, switch-to-open-tab rows, inline URL autocomplete |
+| 7 | Search engine choice | settings UI: default among Aether Search/DDG/Bing/Google + @bookmarks @history @tabs bangs |
+| 8 | Loading progress | spinner in tab + Chrome-style top progress line; site-info padlock chip in omnibox (click → shields/permissions summary) |
+| 9 | Tab context menu completion | Close others, Close to the right, Reopen closed (exists), Mute site |
+| 10 | First-run welcome | aether://welcome: theme pick, search choice, Ollama check, import hint |
+
+### Tier 2 — Privacy + content power (target: v1.6)
+
+| # | Feature | Notes |
+|---|---------|-------|
+| 11 | Multiple profiles | separate userData dirs + profile switcher in toolbar |
+| 12 | Clear browsing data dialog | history/cache/cookies/site-data × time-range granular |
+| 13 | Cookies & site-data viewer | per-site storage/cookies list + clear (shields popup extension) |
+| 14 | Import from Chrome/Edge | bookmarks + history via HTML/JSON import (passwords need vault, see Tier 3) |
+| 15 | HTTPS-only mode | auto-upgrade + warn-on-downgrade toggle |
+| 16 | Secure DNS (DoH) | app.commandLine.appendSwitch DoH provider selector |
+| 17 | Force dark webpages | WebContentsForceDark feature switch + toggle |
+| 18 | Screenshot tool | Ctrl+Shift+S visible-area capture → copy/save; full-page later |
+| 19 | Reader mode | reuse the existing Readability extraction (already in sidebar AI) |
+| 20 | Full-page AI translate | extract → local-model translate → re-inject; sidebar translate exists for selections |
+| 21 | Picture-in-picture | PIP button on <video>, media session integration |
+| 22 | Download settings | default dir picker, ask-every-file toggle, auto-open types |
+
+### Tier 3 — Differentiators & long tail (v1.7+)
+
+| # | Feature | Notes |
+|---|---------|-------|
+| 23 | Tab groups + vertical tabs | named/colored collapsible groups; vertical strip mode (fits Customization Studio) |
+| 24 | Tab hover previews | hover card w/ title+favicon, live thumbnail later |
+| 25 | Password vault | local encrypted store (safeStorage) + autofill + generator |
+| 26 | Form autofill | addresses; verify Chromium autofill support in Electron first |
+| 27 | Auto-update flow | check GitHub Releases API → "update available" chip → download installer |
+| 28 | Shortcuts page + remap | aether://settings/shortcuts listing accelerators; remap later |
+| 29 | i18n | string extraction; English + Hindi first |
+| 30 | Site-info manager page | per-site permissions/cookies/zoom/shields in one aether:// page |
+| 31 | PDF viewer verify | ensure Chromium PDF plugin renders in-tab (else route to viewer page) |
+| 32 | Portable / extra formats | Windows zip portable, Linux rpm/flatpak |
+| 33 | Fingerprint defenses | Brave-style randomization (canvas/UA/ timezone) — long-term |
+| 34 | Accessibility pass | aria on chrome UI, focus rings, light-theme contrast |
+
+### Non-goals (stay honest)
+
+- Own crawler/index (metasearch only, transparently branded)
+- Telemetry, accounts, sync cloud (local-first identity)
+- Bundled proprietary codecs beyond what Chromium/Electron ships legally
