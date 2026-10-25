@@ -91,11 +91,16 @@ export interface DownloadState {
   id: string
   filename: string
   path: string
+  /** source URL (v1.5.0 — enables re-download from the downloads page) */
+  url?: string
   received: number
   total: number
   /** null while the server doesn't send Content-Length */
-  percent: number | null
+  percent: number
+  | null
   done: boolean
+  /** v1.5.0 — true while paused by the user */
+  paused?: boolean
   cancelled?: boolean
   error?: string
 }

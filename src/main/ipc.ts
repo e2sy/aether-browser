@@ -23,6 +23,16 @@ import {
 } from './store'
 import { applyAdblockSetting, shieldsState, toggleSiteShields, addFilterList, removeFilterList } from './adblock'
 import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama'
+import {
+  cancelDownload,
+  revealDownload,
+  listDownloads,
+  pauseDownload,
+  resumeDownload,
+  redownload,
+  removeDownloadRecord,
+  clearDownloadHistory
+} from './downloads'
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
@@ -41,7 +51,6 @@ import {
   clearPermissions
 } from './permissions'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
-import { cancelDownload, revealDownload } from './downloads'
 import {
   listExtensionInfos,
   addExtensionFromDialog,
@@ -590,6 +599,32 @@ export function registerIpc(): void {
   ipcMain.handle('downloads:reveal', (e, path: string) => {
     guard(e, 'downloads:reveal')
     revealDownload(String(path || ''))
+  })
+
+  // v1.5.0 — the aether://downloads page
+  ipcMain.handle('downloads:list', (e) => {
+    guard(e, 'downloads:list')
+    return listDownloads()
+  })
+  ipcMain.handle('downloads:pause', (e, id: string) => {
+    guard(e, 'downloads:pause')
+    pauseDownload(String(id || ''))
+  })
+  ipcMain.handle('downloads:resume', (e, id: string) => {
+    guard(e, 'downloads:resume')
+    resumeDownload(String(id || ''))
+  })
+  ipcMain.handle('downloads:redownload', (e, id: string) => {
+    guard(e, 'downloads:redownload')
+    return redownload(String(id || ''))
+  })
+  ipcMain.handle('downloads:remove-record', (e, id: string) => {
+    guard(e, 'downloads:remove-record')
+    removeDownloadRecord(String(id || ''))
+  })
+  ipcMain.handle('downloads:clear', (e) => {
+    guard(e, 'downloads:clear')
+    clearDownloadHistory()
   })
 
   // ---------- extensions (unpacked + .crx/.zip one-click) ----------

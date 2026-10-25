@@ -179,6 +179,11 @@ export function buildMenu(): Menu {
           }))
         },
         {
+          label: 'Downloads',
+          accelerator: 'CmdOrCtrl+J',
+          click: (): void => openInternal('aether://downloads')
+        },
+        {
           label: 'Browse History',
           accelerator: 'CmdOrCtrl+H',
           click: (): void => openInternal('aether://history')

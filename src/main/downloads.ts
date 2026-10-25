@@ -1,6 +1,8 @@
 /**
- * Download manager — intercepts session downloads, dedupes filenames into
- * ~/Downloads, streams progress to the chrome UI, supports cancel / reveal.
+ * Download manager (v1.5.0) — intercepts session downloads, dedupes filenames
+ * into ~/Downloads, streams progress to the chrome UI, and keeps a persisted
+ * download history for the aether://downloads page: pause / resume / cancel /
+ * re-download / reveal / clear.
  */
 import { app, shell, session, DownloadItem, BrowserWindow } from 'electron'
 import { randomUUID } from 'node:crypto'
@@ -9,6 +11,68 @@ import fs from 'node:fs'
 import type { DownloadState } from '../shared/types'
 
 const active = new Map<string, { item: DownloadItem; path: string }>()
+
+/** One finished (or failed) download, kept on disk for the downloads page. */
+export interface DownloadRecord {
+  id: string
+  url: string
+  filename: string
+  path: string
+  total: number
+  received: number
+  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted'
+  ts: number
+}
+
+const LOG_MAX = 300
+let log: DownloadRecord[] | null = null
+
+function logFile(): string {
+  return path.join(app.getPath('userData'), 'downloads.json')
+}
+
+function loadLog(): DownloadRecord[] {
+  if (log) return log
+  try {
+    const raw = JSON.parse(fs.readFileSync(logFile(), 'utf-8')) as DownloadRecord[]
+    log = Array.isArray(raw) ? raw.filter((r) => r && typeof r.url === 'string') : []
+  } catch {
+    log = []
+  }
+  return log
+}
+
+function saveLog(): void {
+  try {
+    fs.mkdirSync(app.getPath('userData'), { recursive: true })
+    fs.writeFileSync(logFile(), JSON.stringify((log || []).slice(0, LOG_MAX)))
+  } catch (err) {
+    console.error('[downloads] log save failed', err)
+  }
+}
+
+/* ----------------------- pure record helpers (tested) ----------------------- */
+
+export function doneStateOf(itemState: string): DownloadRecord['state'] {
+  return itemState === 'completed' ? 'completed' : itemState === 'cancelled' ? 'cancelled' : 'interrupted'
+}
+
+/** Newest first. */
+export function sortRecords(list: DownloadRecord[]): DownloadRecord[] {
+  return [...list].sort((a, b) => (b.ts || 0) - (a.ts || 0))
+}
+
+/** Cap the log, keeping the newest entries. */
+export function capLog(list: DownloadRecord[], max = LOG_MAX): DownloadRecord[] {
+  return sortRecords(list).slice(0, Math.max(0, max))
+}
+
+/** Remove every record with this id (defensive dedupe). */
+export function withoutRecord(list: DownloadRecord[], id: string): DownloadRecord[] {
+  return list.filter((r) => r.id !== id)
+}
+
+/* ------------------------------ electron glue ------------------------------ */
 
 /** Downloads can start in any window — stream progress to all of them. */
 function broadcast(channel: string, payload: unknown): void {
@@ -55,10 +119,12 @@ function stateOf(id: string, item: DownloadItem, extra: Partial<DownloadState> =
     id,
     filename: path.basename(item.getSavePath()),
     path: item.getSavePath(),
+    url: item.getURL(),
     received,
     total,
     percent: total > 0 ? Math.min(100, Math.round((received / total) * 100)) : null,
     done: false,
+    paused: item.isPaused(),
     ...extra
   }
 }
@@ -71,8 +137,24 @@ export function installDownloadHandler(): void {
     item.setSavePath(savePath)
     active.set(id, { item, path: savePath })
 
+    const record: DownloadRecord = {
+      id,
+      url: item.getURL(),
+      filename: path.basename(savePath),
+      path: savePath,
+      total: 0,
+      received: 0,
+      state: 'progressing',
+      ts: Date.now()
+    }
+    const store = loadLog()
+    log = capLog(withoutRecord(store, id))
+
     item.on('updated', (_e, state) => {
-      broadcast('download:progress', stateOf(id, item, state === 'interrupted' ? { error: 'interrupted' } : {}))
+      const st = stateOf(id, item, state === 'interrupted' ? { error: 'interrupted' } : {})
+      record.received = st.received
+      record.total = st.total
+      broadcast('download:progress', st)
     })
     item.on('done', (_e, state) => {
       const final = stateOf(id, item, {
@@ -82,14 +164,74 @@ export function installDownloadHandler(): void {
         ...(state === 'interrupted' ? { error: 'interrupted' } : {})
       })
       active.delete(id)
+      record.state = doneStateOf(state)
+      record.received = final.received
+      record.total = final.total || record.total
+      log = capLog([...(log || []), record])
+      saveLog()
       broadcast('download:progress', final)
+      broadcast('downloads:changed', {})
     })
+    log = capLog([...(log || []), record])
     broadcast('download:progress', stateOf(id, item))
   })
 }
 
 export function cancelDownload(id: string): void {
   active.get(String(id))?.item.cancel()
+}
+
+export function pauseDownload(id: string): void {
+  const item = active.get(String(id))?.item
+  try {
+    if (item && !item.isPaused()) item.pause()
+  } catch {
+    /* already done */
+  }
+}
+
+export function resumeDownload(id: string): void {
+  const item = active.get(String(id))?.item
+  try {
+    if (item && item.isPaused()) item.resume()
+  } catch {
+    /* already done */
+  }
+}
+
+/** Everything the downloads page needs: live items + persisted history. */
+export function listDownloads(): {
+  active: DownloadState[]
+  history: DownloadRecord[]
+} {
+  const activeStates: DownloadState[] = []
+  for (const [id, a] of active) {
+    try {
+      activeStates.push(stateOf(id, a.item))
+    } catch {
+      /* item vanished */
+    }
+  }
+  return { active: activeStates, history: sortRecords(loadLog()) }
+}
+
+export function clearDownloadHistory(): void {
+  log = []
+  saveLog()
+}
+
+/** Remove one record from the persisted history (file itself untouched). */
+export function removeDownloadRecord(id: string): void {
+  log = withoutRecord(loadLog(), String(id || ''))
+  saveLog()
+}
+
+/** Start a fresh download of a recorded URL (fresh file, dedupe keeps both). */
+export function redownload(id: string): boolean {
+  const rec = loadLog().find((r) => r.id === String(id || ''))
+  if (!rec || !/^https?:\/\//i.test(rec.url)) return false
+  session.defaultSession.downloadURL(rec.url)
+  return true
 }
 
 export function revealDownload(p: string): void {

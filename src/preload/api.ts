@@ -182,7 +182,15 @@ export const api = {
   /** file downloads */
   downloads: {
     cancel: (id: string) => ipcRenderer.invoke('downloads:cancel', id),
-    reveal: (path: string) => ipcRenderer.invoke('downloads:reveal', path)
+    reveal: (path: string) => ipcRenderer.invoke('downloads:reveal', path),
+    /** v1.5.0 — aether://downloads page */
+    list: () => ipcRenderer.invoke('downloads:list'),
+    pause: (id: string) => ipcRenderer.invoke('downloads:pause', id),
+    resume: (id: string) => ipcRenderer.invoke('downloads:resume', id),
+    redownload: (id: string) => ipcRenderer.invoke('downloads:redownload', id),
+    removeRecord: (id: string) => ipcRenderer.invoke('downloads:remove-record', id),
+    clear: () => ipcRenderer.invoke('downloads:clear'),
+    onChanged: subscribe('downloads:changed')
   },
 
   /** unpacked Chrome extensions + .crx/.zip one-click install */

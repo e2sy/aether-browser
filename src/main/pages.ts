@@ -487,6 +487,102 @@ export const BOOKMARKS_HTML = mgrShell(
   `
 )
 
+export const DOWNLOADS_HTML = mgrShell(
+  'Downloads',
+  'Downloads',
+  true,
+  '',
+  `
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  function fmtBytes(n) {
+    if (n == null || isNaN(n) || n <= 0) return ''
+    if (n < 1024) return n + ' B'
+    var u = ['KB', 'MB', 'GB'], i = -1
+    do { n = n / 1024; i++ } while (n >= 1024 && i < 2)
+    return (n >= 10 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i]
+  }
+  function when(ts) {
+    var d = new Date(ts), today = new Date()
+    var hm = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes()
+    if (d.toDateString() === today.toDateString()) return hm
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm
+  }
+  function ext(name) { var i = String(name).lastIndexOf('.'); return i > 0 ? String(name).slice(i + 1, i + 5).toUpperCase() : 'FILE' }
+  var view = { active: [], history: [] }
+  function rows() {
+    var q = document.getElementById('q').value.trim().toLowerCase()
+    function hit(name) { return !q || String(name).toLowerCase().indexOf(q) >= 0 }
+    var act = view.active.filter(function (a) { return hit(a.filename) })
+    var his = view.history.filter(function (h) { return hit(h.filename) })
+    return act.concat(his)
+  }
+  function subLine(x) {
+    if (x.state === 'progressing') {
+      if (x.paused) return 'Paused — ' + fmtBytes(x.received)
+      var pct = x.percent == null ? '' : ' (' + x.percent + '%)'
+      return fmtBytes(x.received) + (x.total ? ' of ' + fmtBytes(x.total) : '') + pct
+    }
+    if (x.state === 'cancelled') return 'Cancelled' + (x.total ? ' · ' + fmtBytes(x.total) : '')
+    if (x.state === 'interrupted') return 'Failed' + (x.total ? ' · ' + fmtBytes(x.total) : '')
+    return 'Completed' + (x.total ? ' · ' + fmtBytes(x.total) : '')
+  }
+  function render() {
+    var items = rows()
+    var box = document.getElementById('rows')
+    box.innerHTML = ''
+    document.getElementById('empty').style.display = items.length ? 'none' : 'block'
+    document.getElementById('empty').textContent = items.length ? '' : 'No downloads yet.'
+    items.forEach(function (x) {
+      var isLive = x.state === 'progressing'
+      var row = document.createElement('div'); row.className = 'row'
+      var ic = document.createElement('div'); ic.className = 'ic none'
+      ic.textContent = ext(x.filename)
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(x.filename); t.className = 't'
+      var u = esc(subLine(x)); u.className = 'u'
+      meta.appendChild(t); meta.appendChild(u)
+      var w = document.createElement('div'); w.className = 'when'; w.textContent = when(x.ts)
+
+      var btns = document.createElement('div'); btns.style.cssText = 'display:flex;gap:4px;flex:none'
+      function mkBtn(label, title, fn) {
+        var b = document.createElement('button'); b.className = 'del'; b.textContent = label; b.title = title
+        b.addEventListener('click', function (e) { e.stopPropagation(); fn() })
+        btns.appendChild(b)
+      }
+      if (isLive) {
+        if (x.paused) mkBtn('\\u25b6', 'Resume download', function () { window.aether.downloads.resume(x.id); load() })
+        else mkBtn('\\u23f8', 'Pause download', function () { window.aether.downloads.pause(x.id); load() })
+        mkBtn('\\u00d7', 'Cancel download', function () { window.aether.downloads.cancel(x.id); load() })
+      } else {
+        mkBtn('\\u21bb', 'Download again', function () { window.aether.downloads.redownload(x.id) })
+        mkBtn('\\u00d7', 'Remove from list (keeps the file)', function () {
+          window.aether.downloads.removeRecord(x.id).then(load)
+        })
+      }
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(w); row.appendChild(btns)
+      row.title = x.path || x.url || ''
+      row.addEventListener('click', function () {
+        if (x.state === 'progressing') return
+        window.aether.downloads.reveal(x.path)
+      })
+      box.appendChild(row)
+    })
+  }
+  function apply(d) {
+    if (!d) return
+    view = { active: d.active || [], history: d.history || [] }
+    render()
+  }
+  function load() { window.aether.downloads.list().then(apply).catch(function () {}) }
+  document.getElementById('q').addEventListener('input', render)
+  document.getElementById('clear').addEventListener('click', function () {
+    if (confirm('Clear the download list? Files on disk are kept.')) { window.aether.downloads.clear().then(load) }
+  })
+  try { window.aether.downloads.onChanged(function () { load() }) } catch (e) {}
+  load()
+  `
+)
+
 export const SETTINGS_HTML = pageShell(
   'Settings',
   `

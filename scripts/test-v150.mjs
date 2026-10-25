@@ -40,7 +40,17 @@ function stubModule(name, code) {
 stubModule('electron', `module.exports = { app: { getPath: () => '${tmp.replace(/\\/g, '/')}/userdata' } }`)
 // the stub is bundled IN (via alias) so Node never has to named-import a CJS module
 const electronStub = path.join(tmp, 'electron-stub.mjs')
-fs.writeFileSync(electronStub, `const app = { getPath: () => '${tmp.replace(/\\/g, '/')}/userdata' }\nexport { app }\n`)
+fs.writeFileSync(
+  electronStub,
+  [
+    "const app = { getPath: () => '${TMP}/userdata', on: () => {}, whenReady: async () => {} }",
+    'const shell = {}',
+    'const session = { defaultSession: {} }',
+    'const BrowserWindow = Object.assign(function () {}, { getAllWindows: () => [] })',
+    'class DownloadItem {}',
+    'export { app, shell, session, BrowserWindow, DownloadItem }'
+  ].join('\n').replaceAll('${TMP}', tmp.replace(/\\/g, '/')) + '\n'
+)
 fs.cpSync(path.join(APP, 'src'), path.join(tmp, 'src'), { recursive: true })
 
 const entry = path.join(tmp, 'src', 'main', 'testable-v150.ts')
@@ -50,7 +60,11 @@ fs.writeFileSync(
      isRestorableUrl, sanitizeWindow, sanitizeSession, snapshotFromEntries,
      loadSession, writeSessionNow, wasUncleanShutdown, forgetSession,
      type SessionSnapshot, type SessionWindow, type SessionTab
-   } from './session-restore'`
+   } from './session-restore'
+   export {
+     doneStateOf as dlDoneState, sortRecords as dlSort, capLog as dlCap,
+     withoutRecord as dlWithout, sanitizeFilename as dlSanitizeName
+   } from './downloads'`
 )
 
 const outfile = path.join(tmp, 'bundle-v150.mjs')
@@ -61,7 +75,7 @@ await build({
   format: 'esm',
   outfile,
   alias: { electron: electronStub },
-  logLevel: 'silent'
+  logLevel: 'warning'
 })
 
 const mod = await import(outfile)
@@ -73,7 +87,12 @@ const {
   loadSession,
   writeSessionNow,
   wasUncleanShutdown,
-  forgetSession
+  forgetSession,
+  dlDoneState,
+  dlSort,
+  dlCap,
+  dlWithout,
+  dlSanitizeName
 } = mod
 
 console.log('\n[1] session restore — URL restorability')
@@ -165,5 +184,31 @@ ok(wasUncleanShutdown() === false, 'missing snapshot -> not an unclean shutdown'
 fs.writeFileSync(path.join(tmp, 'userdata', 'session.json'), '{corrupted!!')
 ok(loadSession() === null, 'corrupted session.json -> null, no throw')
 
-console.log(`\nv1.5.0 build 1 (session restore): ${pass} passed, ${fail} failed`)
+console.log(`\nv1.5.0 build 1 (session restore): OK — running build 2 sections`)
+
+console.log('\n[6] downloads — state mapping + record list math')
+ok(dlDoneState('completed') === 'completed', 'completed maps to completed')
+ok(dlDoneState('cancelled') === 'cancelled', 'cancelled maps to cancelled')
+ok(dlDoneState('interrupted') === 'interrupted', 'interrupted maps to interrupted')
+ok(dlDoneState('anything') === 'interrupted', 'unknown states degrade to interrupted (fail-safe)')
+const recs = [
+  { id: 'a', url: 'https://x/a.zip', filename: 'a.zip', path: '/d/a.zip', total: 10, received: 10, state: 'completed', ts: 100 },
+  { id: 'b', url: 'https://x/b.zip', filename: 'b.zip', path: '/d/b.zip', total: 5, received: 5, state: 'completed', ts: 300 },
+  { id: 'c', url: 'https://x/c.zip', filename: 'c.zip', path: '/d/c.zip', total: 7, received: 7, state: 'interrupted', ts: 200 }
+]
+const sorted = dlSort(recs)
+ok(sorted[0].id === 'b' && sorted[2].id === 'a', 'records sort newest first')
+ok(dlCap(recs, 2).length === 2 && dlCap(recs, 2)[0].id === 'b', 'capLog keeps newest N')
+ok(dlWithout(recs, 'a').length === 2 && !dlWithout(recs, 'a').some((r) => r.id === 'a'), 'withoutRecord filters by id')
+ok(dlCap([], 5).length === 0, 'capLog of empty list is empty')
+
+console.log('\n[7] downloads — filename sanitization (Windows-hardened)')
+ok(dlSanitizeName('setup.exe') === 'setup.exe', 'normal name untouched')
+ok(dlSanitizeName('a/b/c.txt') === 'a_b_c.txt', 'path separators flattened')
+ok(dlSanitizeName('file<n>:.txt') === 'filen.txt', 'illegal chars stripped')
+ok(dlSanitizeName('CON') === '_CON', 'reserved device name prefixed')
+ok(dlSanitizeName('name. . ') === 'name', 'trailing dots/spaces trimmed')
+ok(dlSanitizeName('') === 'download', 'empty name falls back')
+
+console.log(`\nv1.5.0 build 2 (downloads): ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
