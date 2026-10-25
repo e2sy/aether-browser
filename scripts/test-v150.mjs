@@ -10,7 +10,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
@@ -106,7 +106,7 @@ await build({
   logLevel: 'warning'
 })
 
-const mod = await import(outfile)
+const mod = await import(pathToFileURL(outfile).href)
 const {
   isRestorableUrl,
   sanitizeWindow,
@@ -241,7 +241,9 @@ ok(dlSanitizeName('') === 'download', 'empty name falls back')
 console.log(`\nv1.5.0 build 2 (downloads): OK — running build 3 sections`)
 
 console.log('\n[8] bookmarks bar — settings contract')
-const { DEFAULT_SETTINGS, mergedSettings } = await import(path.join(tmp, 'bundle-settings.mjs'))
+const { DEFAULT_SETTINGS, mergedSettings } = await import(
+  pathToFileURL(path.join(tmp, 'bundle-settings.mjs')).href
+)
 ok(DEFAULT_SETTINGS.showBookmarksBar === true, 'bookmarks bar defaults to visible')
 ok(DEFAULT_SETTINGS.restoreSession === true, 'session restore defaults to on')
 const st = mergedSettings()
@@ -251,7 +253,9 @@ ok(typeof st.showBookmarksBar === 'boolean' && typeof st.restoreSession === 'boo
 console.log(`\nv1.5.0 build 3 (bookmarks bar): OK — running build 4 sections`)
 
 console.log('\n[9] site security classification (shared/security.ts)')
-const { securityOf, SECURITY_LABEL } = await import(path.join(tmp, 'bundle-security.mjs'))
+const { securityOf, SECURITY_LABEL } = await import(
+  pathToFileURL(path.join(tmp, 'bundle-security.mjs')).href
+)
 ok(securityOf('https://github.com/e2sy').kind === 'secure' && securityOf('https://github.com/e2sy').host === 'github.com', 'https classified secure with host')
 ok(securityOf('http://neverssl.com/').kind === 'insecure', 'http classified insecure')
 ok(securityOf('aether://settings').kind === 'internal', 'aether:// classified internal')
