@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar, IconShield } from './Icons'
 import { SECURITY_LABEL, securityOf } from '../../../shared/security'
+import { buildOmniboxRows, type SugRow } from '../../../shared/omnibox'
 
 interface ShieldsInfo {
   enabled: boolean
@@ -13,21 +14,14 @@ interface ShieldsInfo {
   topOffenders: Array<{ host: string; count: number }>
 }
 
-interface Sug {
-  kind: 'search' | 'url' | 'history' | 'bookmark'
-  label: string
-  sub?: string
-  value: string
-}
+type Sug = SugRow
 
-const KIND_ICON: Record<Sug['kind'], string> = {
+const KIND_ICON: Record<SugRow['kind'], string> = {
   search: '✦',
   url: '↗',
   history: '🕘',
   bookmark: '★'
 }
-
-const DOMAINISH = /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/
 
 export default function Toolbar(): JSX.Element {
   const tab = useActiveTab()
@@ -45,6 +39,11 @@ export default function Toolbar(): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** monotonically increasing request id — the stale-guard for the async
+   *  suggestion pipeline (see refreshSuggestions) */
+  const reqSeq = useRef(0)
+  const vertical = useApp((s) => s.tabOrientation) === 'left'
+  const maximized = useApp((s) => s.maximized)
 
   useEffect(() => {
     if (!focused) setOmnibox(tab?.url === 'aether://newtab' ? '' : tab?.url || '')
@@ -167,35 +166,22 @@ export default function Toolbar(): JSX.Element {
       return
     }
     suggestTimer.current = setTimeout(async () => {
+      // v2.1.0 STALE-GUARD: the last keystroke wins. An older, slower request
+      // (remote feeds take up to 1.2s) must never clobber the dropdown with
+      // rows for a query the user already left — that was the reported bug
+      // ("Search for 'youtu'" showing while the input read "youtube").
+      const mySeq = ++reqSeq.current
       try {
         const { history, bookmarks, suggestions } = (await window.aether.omnibox.suggest(text)) as {
           history: Array<{ url: string; title: string; host: string }>
           bookmarks: Array<{ url: string; title: string }>
           suggestions?: string[]
         }
-        const out: Sug[] = [{ kind: 'search', label: `Search for “${text}”`, sub: 'address bar search', value: text }]
-        if (!/\s/.test(text) && DOMAINISH.test(text)) {
-          out.push({ kind: 'url', label: `Go to ${text}`, sub: 'open URL', value: text })
-        }
-        // v1.3.0 — remote search suggestions from the Aether Search feed
-        for (const s of suggestions || []) {
-          if (out.length >= 6) break
-          if (s.toLowerCase() === text.toLowerCase()) continue
-          out.push({ kind: 'search', label: s, sub: 'search suggestion', value: s })
-        }
-        for (const h of history) {
-          if (out.length >= 7) break
-          out.push({ kind: 'history', label: h.title || h.url, sub: h.host, value: h.url })
-        }
-        for (const b of bookmarks) {
-          if (out.some((s) => s.value === b.url)) continue
-          if (out.length >= 8) break
-          out.push({ kind: 'bookmark', label: b.title || b.url, sub: 'bookmark', value: b.url })
-        }
-        setSugs(out)
+        if (mySeq !== reqSeq.current) return
+        setSugs(buildOmniboxRows(text, { history, bookmarks, suggestions }))
         setSugIdx(-1)
       } catch {
-        setSugs([])
+        if (mySeq === reqSeq.current) setSugs([])
       }
     }, 110)
   }
@@ -405,6 +391,31 @@ export default function Toolbar(): JSX.Element {
       <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+Shift+A)">
         <IconSidebar />
       </button>
+
+      {/* v2.1.0 — in vertical-tab mode the strip is gone, so the — □ × cluster
+          lives inline at the right edge of the toolbar row: full-height,
+          flush with the window edge, same geometry as the TabStrip cluster.
+          The old absolute-positioned .win-controls-float box (top:6 right:8)
+          hovered detached over the chrome — the "buttons in the wrong place". */}
+      {vertical && window.aether.platform !== 'darwin' && (
+        <div className="win-controls">
+          <button onClick={() => window.aether.win.minimize()} title="Minimize">
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" strokeWidth={1.1} /></svg>
+          </button>
+          <button onClick={() => window.aether.win.maximizeToggle()} title="Maximize">
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              {maximized ? (
+                <g fill="none" stroke="currentColor" strokeWidth={1.1}><rect x="0.5" y="2.5" width="7" height="7" /><path d="M2.5 2.5v-2h7v7h-2" /></g>
+              ) : (
+                <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.1} />
+              )}
+            </svg>
+          </button>
+          <button className="close" onClick={() => window.aether.win.close()} title="Close">
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth={1.1} /></svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

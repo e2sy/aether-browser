@@ -229,16 +229,26 @@ body {
 .win-controls {
   -webkit-app-region: no-drag;
   display: flex;
-  height: 36px;
+  align-self: stretch; /* fill the row height wherever the cluster lives */
   flex: none;
   margin-left: auto;
 }
 
+/* flush to the window edge — cancel the parent row's right padding so the
+   close button touches the corner like every native browser (v2.1.0) */
+.tabstrip .win-controls {
+  margin-right: -8px;
+}
+.toolbar .win-controls {
+  margin-right: -10px;
+}
+
 .win-controls button {
   -webkit-app-region: no-drag; /* the cross buttons are never part of the drag region */
-  width: 44px;
+  width: 46px; /* Windows-native hit width */
   height: 100%;
   border: none;
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
   display: flex;
@@ -2474,12 +2484,6 @@ browser-action-list::part(action):hover {
 }
 .vtabs.rail .vtabs-head {
   justify-content: center;
-}
-.win-controls-float {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  z-index: 20;
 }
 
 /* ============ COMMAND PALETTE (#37) — v1.8.0 ============ */

@@ -20,7 +20,8 @@ export default function App(): JSX.Element {
   const tabOrientation = useApp((s) => s.tabOrientation)
   const set = useApp((s) => s.set)
   const chromeRef = useRef<HTMLDivElement>(null)
-  const isMac = window.aether.platform === 'darwin'
+  // v2.1.0: the — □ × cluster moved into Toolbar.tsx (vertical mode), so the
+  // platform check lives there now — App no longer needs isMac.
 
   // v1.8.0 (#33) — vertical tabs need the tab strip gone from the top chrome
   const vertical = tabOrientation === 'left'
@@ -161,21 +162,9 @@ export default function App(): JSX.Element {
               <span className="private-dot" /> Private window — history &amp; site data are not saved
             </div>
           )}
-          {vertical && !isMac && (
-            <div className="win-controls win-controls-float">
-              <button onClick={() => window.aether.win.minimize()} title="Minimize">
-                <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" strokeWidth={1.1} /></svg>
-              </button>
-              <button onClick={() => window.aether.win.maximizeToggle()} title="Maximize">
-                <svg width="10" height="10" viewBox="0 0 10 10">
-                  <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.1} />
-                </svg>
-              </button>
-              <button className="close" onClick={() => window.aether.win.close()} title="Close">
-                <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth={1.1} /></svg>
-              </button>
-            </div>
-          )}
+          {/* v2.1.0: the — □ × cluster in vertical mode now renders inline at
+              the toolbar's right edge (inside Toolbar.tsx) — the old detached
+              absolute-positioned overlay is gone. */}
         </div>
         <div className="body">
           <div className="webarea" />

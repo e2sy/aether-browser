@@ -399,8 +399,10 @@ export function instantAnswer(q: string): InstantAnswer | null {
 
 /* --------------------------- omnibox suggestions --------------------------- */
 
-/** Parse the DDG ac response — supports both list-shape and phrase-shape. */
-export function parseAcResponse(body: string): string[] {
+/** Parse any suggest-engine payload — supports the firefox-client shape
+ *  ([q, [s...]]: DDG type=list, Google client=firefox, Bing osjson), the DDG
+ *  phrase shape ([{phrase:...}...]), and garbage (returns []). Pure. */
+export function parseSuggestPayload(body: string): string[] {
   try {
     const data = JSON.parse(String(body || ''))
     if (Array.isArray(data) && Array.isArray(data[1])) {
@@ -418,17 +420,77 @@ export function parseAcResponse(body: string): string[] {
   }
 }
 
-/** Remote suggestion feed (DDG autocomplete). Fails silent+empty. */
+/** Back-compat alias (used by tests and older callers). */
+export const parseAcResponse = parseSuggestPayload
+
+/**
+ * Pure: merge per-engine suggestion feeds into one ranked list. Engines run
+ * in parallel; earlier feeds win on exact duplicates, and we round-robin
+ * across feeds so a chatty engine can't crowd out the others.
+ */
+export function mergeSuggestFeeds(feeds: string[][], n = 10): string[] {
+  const lists = (feeds || []).map((f) => (Array.isArray(f) ? f.map((s) => String(s || '').trim()).filter(Boolean) : []))
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (let i = 0; out.length < n; i++) {
+    let progressed = false
+    for (const list of lists) {
+      if (out.length >= n) break
+      const s = list[i]
+      if (s === undefined) continue
+      progressed = true
+      const key = s.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(s)
+    }
+    if (!progressed) break
+  }
+  return out
+}
+
+/** The three suggest endpoints Aether queries in parallel (all keyless). */
+export const SUGGEST_ENDPOINTS: ReadonlyArray<{ name: string; url: (q: string) => string }> = Object.freeze([
+  { name: 'duckduckgo', url: (q) => 'https://duckduckgo.com/ac/?q=' + encodeURIComponent(q) + '&type=list' },
+  { name: 'google', url: (q) => 'https://suggestqueries.google.com/complete/search?client=firefox&q=' + encodeURIComponent(q) },
+  { name: 'bing', url: (q) => 'https://api.bing.com/osjson.aspx?query=' + encodeURIComponent(q) }
+])
+
+/**
+ * Remote suggestion feed v2 (v2.1.0 build 15): DDG + Google + Bing in
+ * parallel, deduped round-robin, cap 10, ≥2-char queries. Fails silent per
+ * engine — one dead endpoint never starves the others.
+ */
+export async function searchSuggestionsMulti(q: string, timeoutMs = 1200): Promise<string[]> {
+  const query = String(q || '').trim()
+  if (query.length < 2) return []
+  const settled = await Promise.allSettled(
+    SUGGEST_ENDPOINTS.map(async (ep) => {
+      const res = await fetch(ep.url(query), {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aether' },
+        signal: AbortSignal.timeout(timeoutMs)
+      })
+      if (!res.ok) return []
+      return parseSuggestPayload(await res.text())
+    })
+  )
+  return mergeSuggestFeeds(
+    settled.map((r) => (r.status === 'fulfilled' ? r.value : [])),
+    10
+  )
+}
+
+/** Single-engine feed kept for back-compat (delegates to the DDG endpoint). */
 export async function searchSuggestions(q: string, timeoutMs = 1500): Promise<string[]> {
   const query = String(q || '').trim()
-  if (query.length < 3) return []
+  if (query.length < 2) return []
   try {
-    const res = await fetch('https://duckduckgo.com/ac/?q=' + encodeURIComponent(query) + '&type=list', {
+    const res = await fetch(SUGGEST_ENDPOINTS[0].url(query), {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aether' },
       signal: AbortSignal.timeout(timeoutMs)
     })
     if (!res.ok) return []
-    return parseAcResponse(await res.text())
+    return parseSuggestPayload(await res.text())
   } catch {
     return []
   }

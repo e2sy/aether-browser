@@ -41,6 +41,14 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
 
+## ⌨️ v2.1.0 — omnibox suggestions v2 + window controls done right
+
+Two field-reported fixes, one upgrade:
+
+- **Search suggestions v2** — the address bar now queries **three engines in parallel** (DuckDuckGo, Google, Bing — all keyless), merged round-robin with case-insensitive dedupe, so one dead endpoint never starves the feed. Dropdown rows grew to Chrome-scale: **Go to \<url\>** for domain-like input → *Search for …* → up to 7 engine suggestions → 3 history hits → 2 bookmarks (12 rows max). Queries from **2 characters** (was 3), 1.2 s timeout per engine, and the row policy is a pure, unit-tested module (`src/shared/omnibox.ts`).
+- **THE stale-suggestion bug is dead** — typing `youtu` then quickly `youtube` used to let the slow `youtu` response land last and clobber the dropdown with rows for a query you'd already left (the exact *"Search for 'youtu'" while the input read "youtube"* report). Every keystroke now owns a sequence number; stale responses are dropped.
+- **— □ × window controls fixed properly** — the buttons are now Windows-native **46 px wide**, stretch the **full height** of whichever row they live in, and sit **flush against the window edge** in both tab modes. In vertical-tabs mode they no longer float as a detached little box near the top — they render inline at the toolbar's right edge with the same geometry, restore-down glyph included.
+
 ## 🤖 v2.0.0 — the AI milestone (build 14)
 
 Aether's AI stops being "a sidebar you open" and starts meeting you where you already are:

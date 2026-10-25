@@ -2,14 +2,35 @@
 
 > Status: **UPDATED 2026-10-25 — THE MASTER PLAN** — shipped so far: v1.3.0 Aether Search (metasearch
 > core), v1.4.0 Customization Studio, v1.4.1 Ollama auto-reconnect, v1.5.0 the real-browser core
-> (bookmarks bar, session restore, downloads page, private windows, progress + site info), and
-> **v1.6.0 Beast Search** (43 bangs, instant answers v2 — units/percent/world clock, Wikipedia +
-> Mojeek sources, domain-diversity ranking, knowledge panels, full keyboard UX) plus the
-> window-controls fix.
+> (bookmarks bar, session restore, downloads page, private windows, progress + site info), **v1.6.0
+> Beast Search**, v1.7.0 security + default browser + OS chrome, v1.8.0 UI/UX wave, v1.9.0 privacy
+> fortress, v2.0.0 the AI milestone, and **v2.1.0 omnibox suggestions v2 + window-controls fix**.
 > The Master Plan below (118 items, 9 phases) is the contract to beat Brave/Chrome/Firefox on
 > security, looks, speed, and platform reach — desktop first, then Android/iOS. Historical
 > v1.3–v1.6 plans are kept at the bottom.
 > Process: every build lands as its own version tag, pushed with CI green before the next one.
+
+---
+
+## 🔧 v2.1.x punch list — the next fixes & updates (from the field)
+
+Ranked, concrete, each shippable as its own build:
+
+1. **Omnibox inline autocomplete** — type-ahead ghost text (Chrome-style) completing from the top suggestion; Tab accepts
+2. **Omnibox paste-and-go** — middle-click paste navigates straight to the URL, skips the dropdown
+3. **Tab hover previews** — live thumbnail card after 600ms hover (Phase 2 leftovers: #40-42)
+4. **Tab search (Ctrl+Shift+A)** — fuzzy filter across open tabs, like Chrome's tab search bubble
+5. **Per-extension permission consent screen** (#5) — the last unshipped Phase-0 item
+6. **Certificate-error UX (#14)** — real interstitial with "proceed anyway" escape hatch instead of the generic error page
+7. **Chrome-UI sandbox re-audit (#17)** — get the first-party chrome window to `sandbox:true` (split the extension glue preload)
+8. **Auto-update channel (#87)** — signed updates via electron-updater + GitHub Releases, plus update badge in Settings
+9. **PDF viewer polish** — zoom controls, TOC sidebar, form-fill pass on the built-in viewer
+10. **Find-in-page v2** — match count in the bar, highlight-all, Ctrl+G cycles
+11. **Session tiles on New Tab** — "continue where you left off" cards for the last session's tabs
+12. **Download bubbles v2** — per-download virus-scan hook + duplicate-name handling
+13. **Keyboard shortcut editor** — remap every binding in Settings (Phase 6 #99)
+14. **i18n skeleton** — en/hi/de first locales, externalized strings (Phase 6 #100)
+15. **Performance budgets (#86-90)** — startup < 1.5s cold, paint < 100ms, tab-switch < 50ms, memory ceiling alarms — measured in CI
 
 ---
 

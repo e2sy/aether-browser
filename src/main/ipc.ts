@@ -45,7 +45,7 @@ import {
   instantAnswer,
   evaluateMath,
   mergeSuggestions,
-  searchSuggestions
+  searchSuggestionsMulti
 } from './search-engine'
 import { resolveBang } from './bangs'
 import { instantAnswerV2 } from './instant'
@@ -388,11 +388,12 @@ export function registerIpc(): void {
     guard(e, 'omnibox:suggest')
     const text = String(q || '')
     const local = searchOmnibox(text, 5)
-    // v1.3.0 — remote suggestion feed merged under local matches (fails silent)
+    // v2.1.0 — multi-engine remote feed (DDG + Google + Bing in parallel,
+    // deduped round-robin, ≥2-char queries, fails silent per engine)
     let remote: string[] = []
-    if (text.trim().length >= 3) {
+    if (text.trim().length >= 2) {
       try {
-        remote = await searchSuggestions(text, 1500)
+        remote = await searchSuggestionsMulti(text, 1200)
       } catch {
         remote = []
       }
@@ -962,7 +963,7 @@ export function registerIpc(): void {
   // fails silent+empty — the page merges its own history locally)
   ipcMain.handle('internal:suggest', async (e, payload: { q: string }) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
-    return searchSuggestions(String(payload?.q || ''))
+    return searchSuggestionsMulti(String(payload?.q || ''))
   })
 
   ipcMain.handle('internal:ask', async (e, payload: { requestId: string; q: string }) => {
@@ -982,7 +983,7 @@ export function registerIpc(): void {
       // neither can slow the other down; both fail silent
       const query = String(payload.q || '')
       const panelP = wikiPanel(query)
-      const relatedP = searchSuggestions(query).then((s) => s.filter((x) => x.toLowerCase() !== query.toLowerCase()).slice(0, 8))
+      const relatedP = searchSuggestionsMulti(query).then((s) => s.filter((x) => x.toLowerCase() !== query.toLowerCase()).slice(0, 8))
       try {
         // v1.3.0 Aether Search — every source in parallel, own ranking + badges
         const outcome = await searchAll(query, (src) => tryEngine(src, query), ENGINE_NAMES)
