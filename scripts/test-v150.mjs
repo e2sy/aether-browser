@@ -263,5 +263,16 @@ ok(securityOf('garbage-not-a-url').kind === 'unknown', 'garbage unknown, no thro
 ok(securityOf('ftp://files.example.com').kind === 'unknown', 'ftp unknown (not web)')
 ok(SECURITY_LABEL.secure.length > 10 && SECURITY_LABEL.insecure.length > 10, 'security labels present')
 
-console.log(`\nv1.5.0 build 4 (loading + site info): ${pass} passed, ${fail} failed`)
+console.log('\n[10] private windows — snapshot exclusion (mixed case)')
+const snapMixed = snapshotFromEntries([
+  fakeEntry([{ url: 'https://public.com' }], 1),
+  fakeEntry([{ url: 'https://secret.com', pinned: true }], 1, { private: true }),
+  fakeEntry([{ url: 'https://also-public.com' }], 1)
+])
+ok(snapMixed.windows.length === 2, 'mixed entries: only public windows persist')
+ok(!JSON.stringify(snapMixed).includes('secret.com'), 'private URLs never leak into the snapshot')
+const snapPrivActive = snapshotFromEntries([fakeEntry([{ url: 'https://x.com' }], 1, { private: true })])
+ok(snapPrivActive.windows.length === 0, 'private-only session writes nothing')
+
+console.log(`\nv1.5.0 build 5 (private windows): ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

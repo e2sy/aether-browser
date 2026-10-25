@@ -302,25 +302,19 @@ function ensurePipeline(): void {
   // before the big EasyList engine has finished downloading).
   if (!mainEngine && customEngines.length === 0 && !process.env.AETHER_SMOKE) return
   pipelineInstalled = true
-  const ses = session.defaultSession
 
-  // --- cosmetic filtering preload (the engine's own sandboxed script) ---
-  // AETHER_SHIELDS_NO_COSMETICS=1 skips this arm when bisecting site breakage.
-  if (process.env.AETHER_SHIELDS_NO_COSMETICS === '1') {
-    console.log('[shields] cosmetics arm disabled by env (bisect mode)')
-  } else
+  // Default session + the shared in-memory private session (v1.5.0 private
+  // windows) each get their own network/cosmetic/CSP arms — the per-site
+  // gating below is webContents-id based, so it works across sessions.
+  const sessions: Electron.Session[] = [session.defaultSession]
   try {
-    const preloadPath = require.resolve('@cliqz/adblocker-electron-preload')
-    const existing: string[] = (ses as any).getPreloads?.() || []
-    if (!existing.includes(preloadPath)) {
-      // setPreloads is deprecated but still the only session-wide mechanism the
-      // engine's preload understands — same mechanism its own adapter uses.
-      ;(ses as any).setPreloads([...existing, preloadPath])
-    }
+    sessions.push(session.fromPartition('aether-private'))
   } catch (err) {
-    console.warn('[shields] cosmetic preload unavailable:', err instanceof Error ? err.message : err)
+    console.warn('[shields] private session unavailable:', err instanceof Error ? err.message : err)
   }
+  for (const ses of sessions) installPipelineOnSession(ses)
 
+  // --- global cosmetic-filtering IPC arms (session-agnostic, install ONCE) ---
   ipcMain.on('is-mutation-observer-enabled', (event) => {
     event.returnValue = mainEngine?.config?.enableMutationObserver !== false
   })
@@ -372,6 +366,27 @@ function ensurePipeline(): void {
     }
     event.sender.send('get-cosmetic-filters-response', { active, extended, styles: '' })
   })
+
+  console.log(`[shields] pipeline installed (network + cosmetics + CSP) on ${sessions.length} session(s)`)
+}
+
+function installPipelineOnSession(ses: Electron.Session): void {
+  // --- cosmetic filtering preload (the engine's own sandboxed script) ---
+  // AETHER_SHIELDS_NO_COSMETICS=1 skips this arm when bisecting site breakage.
+  if (process.env.AETHER_SHIELDS_NO_COSMETICS === '1') {
+    console.log('[shields] cosmetics arm disabled by env (bisect mode)')
+  } else
+  try {
+    const preloadPath = require.resolve('@cliqz/adblocker-electron-preload')
+    const existing: string[] = (ses as any).getPreloads?.() || []
+    if (!existing.includes(preloadPath)) {
+      // setPreloads is deprecated but still the only session-wide mechanism the
+      // engine's preload understands — same mechanism its own adapter uses.
+      ;(ses as any).setPreloads([...existing, preloadPath])
+    }
+  } catch (err) {
+    console.warn('[shields] cosmetic preload unavailable:', err instanceof Error ? err.message : err)
+  }
 
   // --- network filtering (the one onBeforeRequest slot for this session) ---
   ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {

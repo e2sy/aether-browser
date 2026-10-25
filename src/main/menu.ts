@@ -46,6 +46,13 @@ export function buildMenu(): Menu {
           }
         },
         {
+          label: 'New Private Window',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: (): void => {
+            createBrowserWindow(undefined, { private: true })
+          }
+        },
+        {
           label: 'Move Tab to New Window',
           click: (): void => {
             const entry = focusedEntry()

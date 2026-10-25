@@ -444,18 +444,20 @@ export function registerIpc(): void {
         return { error: msg }
       }
 
-      // page context + per-domain memory notes (from the sender's own window)
+      // page context + per-domain memory notes (from the sender's own window).
+      // Private windows (v1.5.0) get page context but never memory notes/writes.
       let memoryHost = ''
       let memoryUrl = ''
       let memoryTitle = ''
       const messages: OllamaMessage[] = []
+      const senderEntry = fromSender(e)
       if (payload.usePageContext) {
-        const view = fromSender(e)?.tabs.activeView()
+        const view = senderEntry?.tabs.activeView()
         if (view) {
           const page = await extractPage(view)
           if (page) {
             let sys = chatWithPageSystem(page)
-            if (mergedSettings().pageMemory !== false) {
+            if (mergedSettings().pageMemory !== false && !senderEntry?.private) {
               const notes = memoryPromptFor(hostOf(page.url))
               if (notes) sys += notes
               memoryHost = hostOf(page.url)

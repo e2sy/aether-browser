@@ -64,7 +64,9 @@ export const api = {
     /** download progress for the download bar */
     onDownload: subscribe('download:progress'),
     /** v1.5.0 — bookmarks bar visibility toggled from the menu / settings */
-    onBookmarksBar: subscribe('chrome:bookmarksBar')
+    onBookmarksBar: subscribe('chrome:bookmarksBar'),
+    /** v1.5.0 — this window is private (badge + no-history indicator) */
+    onPrivate: subscribe('win:private')
   },
 
   tabs: {

@@ -13,6 +13,7 @@ import DownloadBar from './components/DownloadBar'
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
   const activeLoading = useApp((s) => s.tabs.find((t) => t.id === s.activeId)?.loading)
+  const isPrivate = useApp((s) => s.isPrivate)
   const set = useApp((s) => s.set)
   const chromeRef = useRef<HTMLDivElement>(null)
 
@@ -22,8 +23,12 @@ export default function App(): JSX.Element {
       .get()
       .then((s) => set({ showBookmarksBar: (s as { showBookmarksBar?: boolean }).showBookmarksBar !== false }))
       .catch(() => undefined)
-    const unsub = window.aether.state.onBookmarksBar((v) => set({ showBookmarksBar: Boolean(v) }))
-    return unsub
+    const unsubBar = window.aether.state.onBookmarksBar((v) => set({ showBookmarksBar: Boolean(v) }))
+    const unsubPriv = window.aether.state.onPrivate(() => set({ isPrivate: true }))
+    return () => {
+      unsubBar()
+      unsubPriv()
+    }
   }, [])
 
   // v1.5.0 — report the measured chrome height so the web view sits exactly
@@ -123,6 +128,11 @@ export default function App(): JSX.Element {
         <Toolbar />
         <BookmarksBar />
         {activeLoading && <div className="load-progress" />}
+        {isPrivate && (
+          <div className="private-strip" title="Private window — Aether won't save history, cookies or site data from here">
+            <span className="private-dot" /> Private window — history &amp; site data are not saved
+          </div>
+        )}
       </div>
       <div className="body">
         <div className="webarea" />

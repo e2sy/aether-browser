@@ -188,7 +188,7 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
-    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false, shieldsState: false, shieldsBlock: false }
+    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false, shieldsState: false, shieldsBlock: false, privWin: false }
     // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
     // (A broken sandboxed preload used to leave window.aether undefined — the
     // whole browser looked fine but every click was dead.)
@@ -382,6 +382,15 @@ app.whenReady().then(() => {
         console.log('[smoke] hibernate wake worked: NO')
       }
     }, 6400)
+    // v1.5.0: a private window boots with the in-memory partition, flags
+    // itself private, and never enters the session snapshot (persistence is
+    // unit-tested; here we verify the wiring end-to-end). Created late so it
+    // can't steal focus from the shields checks above.
+    setTimeout(() => {
+      const pw = createBrowserWindow(undefined, { private: true })
+      smoke.privWin = pw.private === true
+      console.log('[smoke] private window created + flagged:', smoke.privWin ? 'YES' : 'NO')
+    }, 12000)
     setTimeout(() => {
       const entries = allEntries()
       const state = focusedEntry()?.tabs.getState()
@@ -394,7 +403,7 @@ app.whenReady().then(() => {
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
       const bridgesOk =
-        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage && smoke.shieldsState && smoke.shieldsBlock
+        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage && smoke.shieldsState && smoke.shieldsBlock && smoke.privWin
       app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
     }, 15000)
   }

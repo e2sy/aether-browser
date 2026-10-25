@@ -16,6 +16,8 @@ interface AppState {
   zoom: { percent: number; ts: number } | null
   /** v1.5.0 — bookmarks bar visibility (settings + live menu toggle) */
   showBookmarksBar: boolean
+  /** v1.5.0 — this window is private (in-memory session, nothing saved) */
+  isPrivate: boolean
   set: (patch: Partial<AppState>) => void
 }
 
@@ -30,6 +32,7 @@ export const useApp = create<AppState>((set) => ({
   downloads: [],
   zoom: null,
   showBookmarksBar: true,
+  isPrivate: false,
   set: (patch) => set(patch)
 }))
 

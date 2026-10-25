@@ -42,6 +42,8 @@ export interface TabManagerHooks {
   onEmpty?: (win: BrowserWindow) => void
   /** “Move tab to new window” — implemented by the window manager */
   popout?: (win: BrowserWindow, tabId: number) => void
+  /** private window — page navigations must never be recorded to history */
+  private?: boolean
 }
 
 export class TabManager {
@@ -137,8 +139,9 @@ export class TabManager {
       tab.canGoForward = wc.navigationHistory.canGoForward()
       // shields: this webContents now belongs to this site (per-site gating)
       noteSiteHost(wc.id, url)
-      // failed loads never enter history, and error pages get no zoom
-      if (!failed) addHistory(tab.url, tab.title)
+      // failed loads never enter history, and error pages get no zoom;
+      // private windows (v1.5.0) write no history at all
+      if (!failed && !this.hooks.private) addHistory(tab.url, tab.title)
       this.emit()
     })
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
@@ -147,7 +150,7 @@ export class TabManager {
       tab.canGoBack = wc.navigationHistory.canGoBack()
       tab.canGoForward = wc.navigationHistory.canGoForward()
       noteSiteHost(wc.id, url)
-      addHistory(url, tab.title)
+      if (!this.hooks.private) addHistory(url, tab.title)
       this.applyStoredZoom(tab)
       this.emit()
     })

@@ -95,12 +95,15 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
     // The chrome UI is first-party code: sandbox:false lets its preload load
     // the electron-chrome-extensions glue. contextIsolation stays ON and
     // nodeIntegration stays OFF — window.aether remains the only bridge.
+    // Private windows use a shared in-memory partition: no cookies/cache/
+    // storage ever touch the disk, and the shields pipeline installs on it.
     webPreferences: {
       preload: uiPreloadPath || undefined,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      spellcheck: false
+      spellcheck: false,
+      ...(opts.private ? { partition: 'aether-private' } : {})
     },
     ...(process.platform !== 'darwin' && fs.existsSync(iconPath) ? { icon: iconPath } : {}),
     show: false
@@ -126,11 +129,15 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
       onEmpty: (w) => {
         if (!w.isDestroyed()) w.close()
       },
-      popout: (w, tabId) => popoutTab(w.id, tabId)
+      popout: (w, tabId) => popoutTab(w.id, tabId),
+      ...(opts.private ? { private: true } : {})
     }
   )
 
   win.once('ready-to-show', () => win.show())
+  win.webContents.on('did-finish-load', () => {
+    if (entry.private && !win.isDestroyed()) win.webContents.send('win:private', true)
+  })
   win.on('resize', () => applyLayout(entry))
   win.on('maximize', () => {
     if (!win.isDestroyed()) win.webContents.send('win:maximized', true)
