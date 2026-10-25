@@ -203,6 +203,11 @@ export const api = {
     toggleRead: (url: string) => ipcRenderer.invoke('reading:toggle', url)
   },
 
+  /** clear browsing data (#63) */
+  privacy: {
+    clearData: (sel: { kinds: string[]; range: string }) => ipcRenderer.invoke('privacy:clearData', sel)
+  },
+
   /** local per-domain page memory */
   memory: {
     list: () => ipcRenderer.invoke('memory:list'),

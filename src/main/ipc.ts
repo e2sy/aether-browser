@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
+import { BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
@@ -61,6 +61,8 @@ import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { createTray, destroyTray, applyStartupBoost } from './osshell'
 import { getNotes, setNotes } from './quicknotes'
 import { listReading, addReading, removeReading, toggleReading } from './readinglist'
+import { clearHistorySince } from './store'
+import { historyCutoff, storagesFor, type ClearKind, type ClearRange } from './privacy'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -683,6 +685,36 @@ export function registerIpc(): void {
   ipcMain.handle('reading:toggle', (e, url: string) => {
     guard(e, 'reading:toggle')
     return toggleReading(String(url || ''))
+  })
+
+  // clear browsing data (#63) — history by range + Chromium storage per type
+  ipcMain.handle('privacy:clearData', async (e, sel: { kinds?: string[]; range?: string }) => {
+    guard(e, 'privacy:clearData')
+    const kinds = (Array.isArray(sel?.kinds) ? sel.kinds : []).filter((k) =>
+      ['history', 'cookies', 'cache', 'siteData'].includes(k)
+    ) as ClearKind[]
+    const range = (['1h', '24h', '7d', '4w', 'all'].includes(String(sel?.range)) ? sel?.range : 'all') as ClearRange
+    const out: Record<string, boolean> = {}
+    if (kinds.includes('history')) {
+      try {
+        clearHistorySince(historyCutoff(range))
+        out.history = true
+      } catch {
+        out.history = false
+      }
+    }
+    try {
+      const storages = storagesFor(kinds)
+      if (storages) await session.defaultSession.clearStorageData({ storages })
+      out.storage = Boolean(storages)
+      if (kinds.includes('cache')) {
+        await session.defaultSession.clearCache()
+        out.cache = true
+      }
+    } catch {
+      out.storage = false
+    }
+    return out
   })
 
   // ---------- page memory (local, per-domain) ----------

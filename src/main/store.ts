@@ -57,7 +57,13 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyDownloads: true,
   tabOrientation: 'top',
   forceDarkMode: 'off',
-  forceDarkHosts: []
+  forceDarkHosts: [],
+  paramScrubber: true,
+  httpsOnly: false,
+  httpsExemptHosts: [],
+  dohMode: 'off',
+  dohTemplate: '',
+  referrerTight: true
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
@@ -125,6 +131,17 @@ export function deleteHistory(url: string): void {
 
 export function clearHistory(): void {
   history.data = []
+  history.save()
+}
+
+/** Clear history entries newer than `cutoffTs` (0 = everything). */
+export function clearHistorySince(cutoffTs: number): void {
+  const cut = Number(cutoffTs) || 0
+  if (cut <= 0) {
+    clearHistory()
+    return
+  }
+  history.data = history.data.filter((h) => typeof h.ts === 'number' && h.ts < cut)
   history.save()
 }
 

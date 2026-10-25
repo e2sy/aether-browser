@@ -99,6 +99,18 @@ export interface Settings {
   forceDarkMode: 'off' | 'always' | 'night'
   /** v1.8.0 (#52) — hosts that get the force-dark inversion */
   forceDarkHosts: string[]
+  /** v1.9.0 (#58) — strip utm_…, gclid, fbclid trackers from navigations */
+  paramScrubber: boolean
+  /** v1.9.0 (#60) — upgrade http navigations to https */
+  httpsOnly: boolean
+  /** v1.9.0 (#60) — hosts allowed to stay on http */
+  httpsExemptHosts: string[]
+  /** v1.9.0 (#61) — DNS-over-HTTPS: off / auto (allow fallback) / secure */
+  dohMode: 'off' | 'auto' | 'secure'
+  /** v1.9.0 (#61) — DoH template URL (Cloudflare/Quad9/Google/custom) */
+  dohTemplate: string
+  /** v1.9.0 (#68) — cross-origin requests send origin-only referrers */
+  referrerTight: boolean
 }
 
 /** A loaded unpacked extension (persisted across boots). */

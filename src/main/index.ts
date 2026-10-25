@@ -10,6 +10,7 @@ import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML,
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
+import { installPrivacy, resetHttpsMemo } from './privacy'
 import { installPermissionHandlers, sweepExpiredGrants } from './permissions'
 import { installCertificateHandlers } from './certs'
 import { initExtensions } from './extensions'
@@ -50,6 +51,25 @@ protocol.registerSchemesAsPrivileged([
 
 // headless / CI environments (AETHER_HEADLESS=1 xvfb-run electron .)
 if (process.env.AETHER_HEADLESS) app.disableHardwareAcceleration()
+
+// DoH selector (#61) — Chromium network-service switches; a restart applies
+// changes (documented in Settings → Privacy).
+try {
+  const doh = mergedSettings() as { dohMode?: 'off' | 'auto' | 'secure'; dohTemplate?: string }
+  if (doh.dohMode === 'secure' || doh.dohMode === 'auto') {
+    app.commandLine.appendSwitch('enable-features', 'DnsOverHttps')
+    app.commandLine.appendSwitch('dns-over-https-mode', doh.dohMode)
+    const tpl = String(doh.dohTemplate || '').trim()
+    if (doh.dohMode === 'secure') {
+      // secure mode REQUIRES a template — default to Cloudflare when unset
+      app.commandLine.appendSwitch('dns-over-https-templates', tpl || 'https://cloudflare-dns.com/dns-query')
+    } else if (tpl) {
+      app.commandLine.appendSwitch('dns-over-https-templates', tpl)
+    }
+  }
+} catch {
+  /* DoH is a nicety — boot must not depend on it */
+}
 
 // The lock itself is acquired in ./preboot (with a hard exit for losers).
 // 'second-instance' only ever fires in the instance that HOLDS the lock.
@@ -120,6 +140,15 @@ app.whenReady().then(() => {
 
   // drop site-permission grants that went idle past the TTL (Master Plan #13)
   sweepExpiredGrants()
+
+  // privacy fortress (#58/#60/#68): scrubber + HTTPS-only + referrer tightening
+  resetHttpsMemo()
+  installPrivacy(() => ({
+    paramScrubber: mergedSettings().paramScrubber !== false,
+    httpsOnly: mergedSettings().httpsOnly === true,
+    httpsExemptHosts: Array.isArray(mergedSettings().httpsExemptHosts) ? mergedSettings().httpsExemptHosts : [],
+    referrerTight: mergedSettings().referrerTight !== false
+  }))
 
   // one-time global extensions host — resolves tabs across all windows
   initExtensions(() => {

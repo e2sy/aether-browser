@@ -1261,6 +1261,45 @@ export const SETTINGS_HTML = pageShell(
         </select>
       </div>
       <div class="hint" style="margin-top:6px">Remembered grants quietly expire after this idle time — the next visit prompts again (Master Plan #13).</div>
+      <div class="label" style="margin-top:18px">Privacy fortress</div>
+      <div class="opts" style="margin-top:6px">
+        <label><input type="checkbox" id="paramScrubber" /> Strip tracking parameters from addresses (utm_*, gclid, fbclid…)</label>
+        <label><input type="checkbox" id="referrerTight" /> Only tell sites the bare origin when you follow an outside link</label>
+        <label><input type="checkbox" id="httpsOnly" /> HTTPS-only mode — upgrade http:// addresses automatically (localhost never touched)</label>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:8px">
+        <select id="dohMode" style="width:190px">
+          <option value="off">DNS: default (your provider)</option>
+          <option value="auto">DNS-over-HTTPS: auto (fallback allowed)</option>
+          <option value="secure">DNS-over-HTTPS: secure (no fallback)</option>
+        </select>
+        <select id="dohPreset" style="width:170px">
+          <option value="">Provider: choose…</option>
+          <option value="https://cloudflare-dns.com/dns-query">Cloudflare</option>
+          <option value="https://dns.quad9.net/dns-query">Quad9</option>
+          <option value="https://dns.google/dns-query">Google</option>
+        </select>
+        <input id="dohCustom" type="url" placeholder="or custom template URL" style="flex:1" />
+      </div>
+      <div class="hint" style="margin-top:6px">DoH changes apply after a restart of Aether. In secure mode a provider is required (defaults to Cloudflare).</div>
+      <div class="label" style="margin-top:16px">Clear browsing data</div>
+      <div class="opts" style="margin-top:6px">
+        <label style="display:inline-flex; margin-right:14px"><input type="checkbox" id="cdHistory" checked /> Browsing history</label>
+        <label style="display:inline-flex; margin-right:14px"><input type="checkbox" id="cdCookies" /> Cookies &amp; logins</label>
+        <label style="display:inline-flex; margin-right:14px"><input type="checkbox" id="cdCache" /> Cached files</label>
+        <label style="display:inline-flex"><input type="checkbox" id="cdSiteData" /> Site storage</label>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px; align-items:center">
+        <select id="cdRange" style="width:140px">
+          <option value="1h">Last hour</option>
+          <option value="24h">Last 24 hours</option>
+          <option value="7d">Last 7 days</option>
+          <option value="4w">Last 4 weeks</option>
+          <option value="all" selected>All time</option>
+        </select>
+        <button class="save-btn" id="cdGo">Clear data</button>
+        <span id="cdStatus" style="font-size:11.5px;color:var(--ax-ok);align-self:center"></span>
+      </div>
       <div class="label" style="margin-top:18px">Certificate exceptions</div>
       <div class="hint" style="margin-bottom:8px">Sites you chose “Proceed anyway” on are remembered for 24 hours, for that exact certificate only. There is no permanent bypass.</div>
       <button class="muted-btn" id="certForget">Forget remembered certificate exceptions</button>
@@ -1413,6 +1452,15 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('tabOrientation').value = s.tabOrientation === 'left' ? 'left' : 'top'
       document.getElementById('fdMode').value = s.forceDarkMode || 'off'
       document.getElementById('fdHosts').value = Array.isArray(s.forceDarkHosts) ? s.forceDarkHosts.join(', ') : ''
+      document.getElementById('paramScrubber').checked = s.paramScrubber !== false
+      document.getElementById('referrerTight').checked = s.referrerTight !== false
+      document.getElementById('httpsOnly').checked = s.httpsOnly === true
+      document.getElementById('dohMode').value = s.dohMode || 'off'
+      var dtpl = s.dohTemplate || ''
+      var presetSel = document.getElementById('dohPreset')
+      var known = ['https://cloudflare-dns.com/dns-query', 'https://dns.quad9.net/dns-query', 'https://dns.google/dns-query']
+      if (known.includes(dtpl)) { presetSel.value = dtpl; document.getElementById('dohCustom').value = '' }
+      else { presetSel.value = ''; document.getElementById('dohCustom').value = dtpl }
       axWire(); axMarkSwatch()
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
       document.getElementById('showBookmarksBar').checked = s.showBookmarksBar !== false
@@ -1648,6 +1696,39 @@ export const SETTINGS_HTML = pageShell(
         .map(function (x) { return x.trim() })
         .filter(Boolean)
       save({ forceDarkHosts: hosts })
+    })
+    document.getElementById('paramScrubber').addEventListener('change', function (e) { save({ paramScrubber: e.target.checked }) })
+    document.getElementById('referrerTight').addEventListener('change', function (e) { save({ referrerTight: e.target.checked }) })
+    document.getElementById('httpsOnly').addEventListener('change', function (e) { save({ httpsOnly: e.target.checked }) })
+    document.getElementById('dohMode').addEventListener('change', function (e) { save({ dohMode: (e.target as HTMLSelectElement).value }) })
+    document.getElementById('dohPreset').addEventListener('change', function (e) {
+      var v = (e.target as HTMLSelectElement).value
+      if (v) document.getElementById('dohCustom').value = ''
+      save({ dohTemplate: v || document.getElementById('dohCustom').value.trim() })
+    })
+    document.getElementById('dohCustom').addEventListener('change', function (e) {
+      save({ dohTemplate: String((e.target as HTMLInputElement).value || '').trim() })
+    })
+    document.getElementById('cdGo').addEventListener('click', function () {
+      var kinds = []
+      if (document.getElementById('cdHistory').checked) kinds.push('history')
+      if (document.getElementById('cdCookies').checked) kinds.push('cookies')
+      if (document.getElementById('cdCache').checked) kinds.push('cache')
+      if (document.getElementById('cdSiteData').checked) kinds.push('siteData')
+      if (!kinds.length) { document.getElementById('cdStatus').textContent = 'pick something first'; return }
+      var btn = this
+      btn.disabled = true
+      window.aether.privacy.clearData({ kinds: kinds, range: document.getElementById('cdRange').value }).then(function (res) {
+        btn.disabled = false
+        var parts = []
+        if (res.history) parts.push('history')
+        if (res.storage) parts.push('site data')
+        if (res.cache) parts.push('cache')
+        document.getElementById('cdStatus').textContent = parts.length ? 'Cleared: ' + parts.join(', ') : 'Nothing matched'
+      }).catch(function () {
+        btn.disabled = false
+        document.getElementById('cdStatus').textContent = 'Failed'
+      })
     })
     document.getElementById('axreset').addEventListener('click', function () {
       save({ appearance: {} })
