@@ -192,11 +192,12 @@ body {
 }
 
 .tab-close {
+  -webkit-app-region: no-drag; /* drag regions must never eat the tab × click */
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border: none;
   border-radius: 5px;
   background: transparent;
@@ -222,15 +223,19 @@ body {
 .tabstrip-drag {
   flex: none;
   width: 120px;
+  align-self: stretch;
 }
 
 .win-controls {
   -webkit-app-region: no-drag;
   display: flex;
   height: 36px;
+  flex: none;
+  margin-left: auto;
 }
 
 .win-controls button {
+  -webkit-app-region: no-drag; /* the cross buttons are never part of the drag region */
   width: 44px;
   height: 100%;
   border: none;

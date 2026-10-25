@@ -185,26 +185,29 @@ export default function TabStrip(): JSX.Element {
           <IconPlus size={14} />
         </button>
       </div>
+      {/* drag filler sits BETWEEN tabs and controls so the — □ × cluster hugs
+          the window's right edge like every real browser (was rendered after
+          the controls, leaving a dead 120px zone right of the close button) */}
+      <div className="tabstrip-drag" />
       {isWinLike && (
         <div className="win-controls">
           <button onClick={() => window.aether.win.minimize()} title="Minimize">
-            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" /></svg>
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" strokeWidth={1.1} /></svg>
           </button>
           <button onClick={() => window.aether.win.maximizeToggle()} title="Maximize">
             <svg width="10" height="10" viewBox="0 0 10 10">
               {maximized ? (
-                <g fill="none" stroke="currentColor"><rect x="0.5" y="2.5" width="7" height="7" /><path d="M2.5 2.5v-2h7v7h-2" /></g>
+                <g fill="none" stroke="currentColor" strokeWidth={1.1}><rect x="0.5" y="2.5" width="7" height="7" /><path d="M2.5 2.5v-2h7v7h-2" /></g>
               ) : (
-                <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" />
+                <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.1} />
               )}
             </svg>
           </button>
           <button className="close" onClick={() => window.aether.win.close()} title="Close">
-            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" /></svg>
+            <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth={1.1} /></svg>
           </button>
         </div>
       )}
-      <div className="tabstrip-drag" />
       {menu && (
         <div className="tab-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
           {menuItems(menu.tab).map((item, i) =>
