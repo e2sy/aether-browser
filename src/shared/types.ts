@@ -132,6 +132,8 @@ export interface SearchResult {
   title: string
   url: string
   snippet: string
+  /** Which upstream fed this result (set by the Aether Search aggregator) */
+  source?: string
 }
 
 export interface Bookmark {

@@ -39,6 +39,8 @@ const ENGINES: Engine[] = [
 /**
  * Web results from the first engine that actually returns some. Every failure
  * is collected so the final error says exactly which engine failed and why.
+ * (Kept for contract compatibility — the v1.3 pipeline uses tryEngine +
+ * search-engine.searchAll to run every source in parallel and aggregate.)
  */
 export async function webSearch(query: string, n = 8): Promise<SearchResult[]> {
   const q = String(query || '').trim()
@@ -64,6 +66,29 @@ export async function webSearch(query: string, n = 8): Promise<SearchResult[]> {
     }
   }
   throw new Error(`all search engines failed (${failures.join(' | ')})`)
+}
+
+/** Source names the Aether Search pipeline runs in parallel (v1.3.0). */
+export const ENGINE_NAMES: string[] = ENGINES.map((e) => e.name)
+
+/**
+ * Fetch ONE source by name — the unit the Aether Search pipeline aggregates.
+ * Throws on HTTP errors and empty result pages (same failure semantics the
+ * chain used), so searchAll can time and tag each source independently.
+ */
+export async function tryEngine(source: string, query: string, n = 8): Promise<SearchResult[]> {
+  const engine = ENGINES.find((e) => e.name === source)
+  if (!engine) throw new Error(`unknown engine: ${source}`)
+  const q = String(query || '').trim()
+  if (!q) return []
+  const res = await fetch(engine.url(q), {
+    headers: HEADERS,
+    signal: AbortSignal.timeout(TIMEOUT_MS)
+  })
+  if (!res.ok) throw new Error(`${engine.name}: HTTP ${res.status}`)
+  const results = engine.parse(await res.text(), n)
+  if (!results.length) throw new Error(`${engine.name}: page had no results`)
+  return results
 }
 
 /* ---------------------------- DuckDuckGo ---------------------------- */

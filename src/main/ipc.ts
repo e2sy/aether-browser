@@ -26,6 +26,13 @@ import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
+import { ENGINE_NAMES, tryEngine } from './search'
+import {
+  searchAll,
+  instantAnswer,
+  mergeSuggestions,
+  searchSuggestions
+} from './search-engine'
 import {
   respondPermission,
   listPermissions,
@@ -44,7 +51,7 @@ import { installExtensionFromDialog, installExtensionFromFile } from './crx'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
-import { webSearch, googleSearchUrl } from './search'
+import { googleSearchUrl } from './search'
 import { ipcGuardDecision, isAetherInternalSender } from './trust'
 import { agentRunner } from './agent/executor'
 import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
@@ -244,9 +251,24 @@ export function registerIpc(): void {
     guard(e, 'history:clear')
     clearHistory()
   })
-  ipcMain.handle('omnibox:suggest', (e, q: string) => {
+  ipcMain.handle('omnibox:suggest', async (e, q: string) => {
     guard(e, 'omnibox:suggest')
-    return searchOmnibox(String(q || ''), 5)
+    const text = String(q || '')
+    const local = searchOmnibox(text, 5)
+    // v1.3.0 — remote suggestion feed merged under local matches (fails silent)
+    let remote: string[] = []
+    if (text.trim().length >= 3) {
+      try {
+        remote = await searchSuggestions(text, 1500)
+      } catch {
+        remote = []
+      }
+    }
+    const localTitles = [
+      ...local.history.map((h) => h.title || h.url),
+      ...local.bookmarks.map((b) => b.title || b.url)
+    ]
+    return { ...local, suggestions: mergeSuggestions(localTitles, remote, 8) }
   })
 
   // ---------- AI: health / models (chrome + internal pages only) ----------
@@ -659,6 +681,11 @@ export function registerIpc(): void {
     return mergedSettings()
   })
 
+  ipcMain.handle('internal:instant', (e, payload: { q: string }) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return instantAnswer(String(payload?.q || ''))
+  })
+
   ipcMain.handle('internal:ask', async (e, payload: { requestId: string; q: string }) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
     const requestId = String(payload.requestId)
@@ -671,8 +698,12 @@ export function registerIpc(): void {
 
     try {
       let sources: SearchResult[] = []
+      let stats: Array<{ source: string; count: number; ms: number; error?: string }> = []
       try {
-        sources = await webSearch(String(payload.q || ''))
+        // v1.3.0 Aether Search — every source in parallel, own ranking + badges
+        const outcome = await searchAll(String(payload.q || ''), (src) => tryEngine(src, String(payload.q || '')), ENGINE_NAMES)
+        sources = outcome.aggregated
+        stats = outcome.stats
       } catch (err) {
         send({
           error:
@@ -683,7 +714,7 @@ export function registerIpc(): void {
         })
         sources = []
       }
-      send({ sources })
+      send({ sources, stats })
 
       const choice = await resolveBrain()
       if (!choice) {

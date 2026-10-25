@@ -157,25 +157,44 @@ export const NEW_TAB_HTML = pageShell(
 export const SEARCH_HTML = pageShell(
   'Aether Search',
   `
-  <div style="width:min(680px,90vw); margin-top:10vh;">
-    <div style="display:flex; align-items:center; gap:12px;">
-      <div style="font-size:22px; font-weight:700; letter-spacing:-0.02em;">
-        aether<span style="color:#7c8cff">AI</span>
+  <div style="width:min(680px,90vw); margin-top:7vh;">
+    <div style="display:flex; align-items:baseline; gap:10px;">
+      <div style="font-size:24px; font-weight:700; letter-spacing:-0.02em;">
+        aether<span style="color:#7c8cff">Search</span>
       </div>
-      <input id="q" type="text" style="flex:1; padding:12px 18px; font-size:14px; color:#e8eaf0;
+      <div style="font-size:11.5px; color:#7d828f;">the open metasearch — every result says where it came from</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
+      <input id="q" type="text" style="flex:1; padding:13px 18px; font-size:14px; color:#e8eaf0;
         background:#1e2026; border:1px solid #2e313a; border-radius:12px; outline:none;" />
-      <button id="go" style="padding:12px 20px; font-size:13px; font-weight:600; color:#fff;
+      <button id="go" style="padding:13px 20px; font-size:13px; font-weight:600; color:#fff;
         background:#5b6cff; border:none; border-radius:12px; cursor:pointer;">Search</button>
     </div>
-    <div id="status" style="margin-top:26px; color:#9aa0ae; font-size:13px;"></div>
+
+    <div id="instant" style="margin-top:18px; display:none; background:linear-gradient(135deg,#7c8cff14,#7c8cff05);
+      border:1px solid #3d4a7a; border-radius:14px; padding:16px 20px;">
+      <div id="instant-out" style="font-size:26px; font-weight:600; color:#cdd5ff; letter-spacing:-0.01em;"></div>
+      <div style="margin-top:5px; font-size:11px; color:#7d828f;">Aether instant answer — computed on this device, no network</div>
+    </div>
+
+    <div id="status" style="margin-top:20px; color:#9aa0ae; font-size:13px;"></div>
+    <div id="chips" style="margin-top:10px; display:none; flex-wrap:wrap; gap:6px;"></div>
     <div id="gfallback" style="margin-top:14px; display:none;"></div>
-    <div id="answer" style="margin-top:14px; font-size:14.5px; line-height:1.65; white-space:pre-wrap;
-      background:#1e2026; border:1px solid #2e313a; border-radius:14px; padding:20px; display:none;"></div>
+    <div id="aiwrap" style="margin-top:18px; display:none; background:#1e2026; border:1px solid #2e313a;
+      border-radius:14px; padding:18px 20px;">
+      <div style="font-size:11px; letter-spacing:.09em; color:#7c8cff; margin-bottom:9px;">AI ANSWER — LOCAL MODEL</div>
+      <div id="answer" style="font-size:14px; line-height:1.65; white-space:pre-wrap;"></div>
+    </div>
     <div id="sources" style="margin-top:18px; display:none;"></div>
+    <div style="margin-top:34px; padding-bottom:26px; color:#565b66; font-size:11px; line-height:1.7;">
+      Aether Search aggregates public sources, strips tracking parameters, deduplicates and ranks
+      results locally. It does not profile you and stores nothing beyond this device's history.
+    </div>
   </div>
   `,
   `
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  function host(u) { return String(u || '').replace(/^https?:\\/\\//, '').split('/')[0] }
   var gotData = false
   function showGoogle(q, url) {
     var wrap = document.getElementById('gfallback')
@@ -191,54 +210,104 @@ export const SEARCH_HTML = pageShell(
     wrap.appendChild(btn)
     wrap.style.display = 'block'
   }
-  function setError(msg, q) {
-    var status = document.getElementById('status')
-    status.textContent = msg
-    status.style.color = '#ff8a8a'
-    showGoogle(q, '')
+  function renderInstant(q) {
+    var card = document.getElementById('instant')
+    if (!window.aether || !window.aether.internal || !window.aether.internal.instant) return
+    window.aether.internal.instant(q).then(function (a) {
+      if (a && a.output) {
+        document.getElementById('instant-out').textContent = a.input + ' = ' + a.output
+        card.style.display = 'block'
+      } else {
+        card.style.display = 'none'
+      }
+    }).catch(function () {})
+  }
+  function renderChips(stats) {
+    var chips = document.getElementById('chips')
+    chips.innerHTML = ''
+    if (!stats || !stats.length) { chips.style.display = 'none'; return }
+    for (var i = 0; i < stats.length; i++) {
+      var s = stats[i]
+      var chip = document.createElement('span')
+      chip.style.cssText = 'font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid #2e313a;color:' + (s.error || !s.count ? '#565b66' : '#9aa0ae') + ';background:#1a1c21'
+      chip.textContent = s.error ? (s.source + ' — unavailable') : (s.source + ' · ' + s.count + ' results · ' + s.ms + ' ms')
+      chips.appendChild(chip)
+    }
+    chips.style.display = 'flex'
+  }
+  function renderSources(sources) {
+    var box = document.getElementById('sources')
+    box.innerHTML = ''
+    if (!sources || !sources.length) { box.style.display = 'none'; return }
+    for (var i = 0; i < sources.length; i++) {
+      var r = sources[i]
+      var card = document.createElement('a')
+      card.href = '#'
+      card.style.cssText = 'display:block;padding:12px 16px;margin-bottom:8px;background:#1a1c21;border:1px solid #2e313a;border-radius:10px'
+      var t = esc((i + 1) + '. ' + r.title); t.style.cssText = 'font-size:13px;color:#aeb6ff;font-weight:600'
+      var meta = document.createElement('div')
+      meta.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:3px'
+      var u = esc(host(r.url)); u.style.cssText = 'font-size:11px;color:#565b66'
+      meta.appendChild(u)
+      if (r.source) {
+        var badge = document.createElement('span')
+        badge.style.cssText = 'font-size:9.5px;letter-spacing:.06em;padding:1px 7px;border-radius:20px;background:#7c8cff1a;color:#7c8cff;font-weight:600'
+        badge.textContent = String(r.source).toUpperCase()
+        meta.appendChild(badge)
+      }
+      var s = esc(r.snippet); s.style.cssText = 'font-size:12px;color:#9aa0ae;margin-top:4px'
+      card.appendChild(t); card.appendChild(meta); card.appendChild(s)
+      card.addEventListener('click', function (url) {
+        return function (e) { e.preventDefault(); window.aether.internal.open(url) }
+      }(r.url))
+      box.appendChild(card)
+    }
+    box.style.display = 'block'
   }
   function run(q) {
     if (!q) return
     document.getElementById('q').value = q
     var status = document.getElementById('status')
+    var aiwrap = document.getElementById('aiwrap')
     var answer = document.getElementById('answer')
     var sources = document.getElementById('sources')
     var gf = document.getElementById('gfallback')
     status.style.color = ''
-    status.textContent = 'Searching the web…'
-    answer.style.display = 'none'
+    status.textContent = 'Searching the web — running all sources in parallel…'
+    aiwrap.style.display = 'none'
+    answer.textContent = ''
     sources.style.display = 'none'
     sources.innerHTML = ''
     gf.style.display = 'none'
     gf.innerHTML = ''
-    answer.textContent = ''
+    document.getElementById('instant').style.display = 'none'
+    document.getElementById('chips').style.display = 'none'
     gotData = false
+    renderInstant(q)
     var watchdog = setTimeout(function () {
-      if (!gotData) setError('The search engines did not respond in time. Try again, or use Google below.', q)
+      if (!gotData) {
+        status.textContent = 'The sources did not respond in time. Try again, or use Google below.'
+        status.style.color = '#ff8a8a'
+        showGoogle(q, '')
+      }
     }, 25000)
     var req = window.aether.internal.ask(q)
     req.onData(function (d) {
       gotData = true
+      if (d.stats) renderChips(d.stats)
       if (d.sources) {
-        status.textContent = d.sources.length ? '' : 'No web results found for this query.'
-        sources.style.display = d.sources.length ? 'block' : 'none'
-        d.sources.forEach(function (r, i) {
-          var card = document.createElement('a')
-          card.href = '#'
-          card.style.cssText = 'display:block;padding:12px 16px;margin-bottom:8px;background:#1a1c21;border:1px solid #2e313a;border-radius:10px'
-          var t = esc('[' + (i + 1) + '] ' + r.title); t.style.cssText = 'font-size:13px;color:#aeb6ff;font-weight:600'
-          var u = esc(r.url.replace(/^https?:\\/\\//, '').split('/')[0]); u.style.cssText = 'font-size:11px;color:#565b66;margin-top:3px'
-          var s = esc(r.snippet); s.style.cssText = 'font-size:12px;color:#9aa0ae;margin-top:4px'
-          card.appendChild(t); card.appendChild(u); card.appendChild(s)
-          card.addEventListener('click', function (e) { e.preventDefault(); window.aether.internal.open(r.url) })
-          sources.appendChild(card)
-        })
+        renderSources(d.sources)
+        if (d.sources.length) {
+          status.textContent = ''
+        } else if (!d.error) {
+          status.textContent = 'No web results found for this query.'
+        }
       }
       if (d.googleFallback) showGoogle(q, d.googleFallback)
       if (d.delta) {
-        answer.style.display = 'block'
+        aiwrap.style.display = 'block'
         answer.textContent += d.delta
-        if (status.textContent !== 'No web results found for this query.') status.textContent = ''
+        if (status.style.color !== '#ff8a8a') status.textContent = ''
       }
       if (d.error) {
         status.textContent = d.error
@@ -248,7 +317,11 @@ export const SEARCH_HTML = pageShell(
     })
     req.result.then(function (r) {
       clearTimeout(watchdog)
-      if (r && r.error && !gotData) setError(String(r.error), q)
+      if (r && r.error && !gotData) {
+        status.textContent = String(r.error)
+        status.style.color = '#ff8a8a'
+        showGoogle(q, '')
+      }
     })
   }
   document.getElementById('go').addEventListener('click', function () { run(document.getElementById('q').value.trim()) })

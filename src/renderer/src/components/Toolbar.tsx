@@ -140,13 +140,20 @@ export default function Toolbar(): JSX.Element {
     }
     suggestTimer.current = setTimeout(async () => {
       try {
-        const { history, bookmarks } = (await window.aether.omnibox.suggest(text)) as {
+        const { history, bookmarks, suggestions } = (await window.aether.omnibox.suggest(text)) as {
           history: Array<{ url: string; title: string; host: string }>
           bookmarks: Array<{ url: string; title: string }>
+          suggestions?: string[]
         }
         const out: Sug[] = [{ kind: 'search', label: `Search for “${text}”`, sub: 'address bar search', value: text }]
         if (!/\s/.test(text) && DOMAINISH.test(text)) {
           out.push({ kind: 'url', label: `Go to ${text}`, sub: 'open URL', value: text })
+        }
+        // v1.3.0 — remote search suggestions from the Aether Search feed
+        for (const s of suggestions || []) {
+          if (out.length >= 6) break
+          if (s.toLowerCase() === text.toLowerCase()) continue
+          out.push({ kind: 'search', label: s, sub: 'search suggestion', value: s })
         }
         for (const h of history) {
           if (out.length >= 7) break
