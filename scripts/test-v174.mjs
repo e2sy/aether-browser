@@ -40,9 +40,11 @@ console.log('\n[1] fuse spec — the escape hatches stay welded shut')
   ok(FUSE_SPEC.enableCookieEncryption === true, 'cookie encryption ON')
   ok(FUSE_SPEC.onlyLoadAppFromAsar === true, 'only-load-from-asar ON')
   ok(FUSE_SPEC.enableEmbeddedAsarIntegrityValidation === true, 'ASAR integrity ON (win/mac)')
-  // binary path resolution per platform
+  // binary path resolution per platform (normalize separators — this suite
+  // itself runs on Windows CI where path.join emits backslashes)
+  const posix = (p) => p.replace(/\\/g, '/')
   ok(electronBinaryPath('/out', 'win32').endsWith('Aether.exe'), 'win32 exe path')
-  ok(electronBinaryPath('/out', 'darwin').includes('Aether.app/Contents/MacOS/Aether'), 'darwin exe path')
+  ok(posix(electronBinaryPath('/out', 'darwin')).includes('Aether.app/Contents/MacOS/Aether'), 'darwin exe path')
   ok(typeof electronBinaryPath('/out', 'linux') === 'string', 'linux exe path resolves')
 }
 
