@@ -6,14 +6,15 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v1.4.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v1.5.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v1.2.0)
+## ✨ Features (v1.5.0)
 
 | Feature | What it does |
 |---|---|
+| 🧭 **The real-browser core (v1.5.0)** | **Bookmarks bar** (Ctrl+Shift+B — click to open, middle-click for a background tab, right-click menu, live everywhere), **session restore** ("continue where you left off" — every window/tab/pinned state survives restarts and crashes), **aether://downloads** (Ctrl+J — search, pause/resume, cancel, re-download, remove/clear, reveal file), **private windows** (Ctrl+Shift+N — in-memory session, zero history/site-data writes, shields still up, violet strip), **loading progress line** + tab spinner + **clickable site-info chip** (connection verdict, host, live shields counts) |
 | 🌐 **Full browser** | **Multi-window** (Ctrl+N, move/drag tabs out into their own window), tabs (drag to reorder, **pin, mute, duplicate, discard, hibernate** + full tab context menu), omnibox with **live suggestions** (history, bookmarks, search), back/forward, **per-site zoom** with Chrome-style bubble, **download shelf** (progress / cancel / reveal), **find-in-page bar (Ctrl+F)** |
 | 💬 **Chat with any page** | The sidebar reads the page via Readability, converts to clean Markdown, and answers grounded questions — streamed token-by-token |
 | 🧠 **Page memory** | Sidebar conversations are remembered **per site** (locally), so follow-up visits start with prior context — toggleable, clearable |
@@ -31,6 +32,23 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🔒 **Private by design** | All AI runs on `localhost:11434` by default. Pages can't touch the browser UI (IPC is sender-guarded); renderers are sandboxed with context isolation. One click clears history / bookmarks / memory / permissions |
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 🧭 v1.5.0 — The Real-Browser Release
+
+Five gaps closed in five audited builds (each with its own test suite, committed and CI-verified
+one at a time):
+
+1. **Session restore** — tabs/windows are snapshotted to `session.json` (sanitized: newtab/error/
+   devtools pages dropped, 10-window/50-tab caps), rebuilt at boot; unclean shutdowns are detected
+   and still restored. Toggle: Settings → "restore session".
+2. **aether://downloads** — full download manager page with the persisted history
+   (`downloads.json`), pause/resume via `DownloadItem`, one-click re-download.
+3. **Bookmarks bar** — the chrome measures its own height (ResizeObserver → `ui:chromeHeight`),
+   so the bar appears without breaking the web-view bounds — even per-window and with UI zoom.
+4. **Loading progress + site info** — an indeterminate accent shimmer runs under the chrome while
+   the active tab loads; the omnibox's scheme chip opens a site-info popover.
+5. **Private windows** — the shields pipeline was refactored to install per-session so private
+   windows get the **full adblock + cosmetic + CSP stack** on their in-memory partition.
 
 ## 🦁 v1.2.0 — Brave-style Shields (the adblocker grows up)
 

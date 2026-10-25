@@ -1,6 +1,6 @@
 # Aether Roadmap — v1.3 "Aether Search" & v1.4 "Customization Studio"
 
-> Status: **FRAMED 2026-10-25** — specs below are the contract the builds must satisfy.
+> Status: **FRAMED 2026-10-25** — Tier-1 items 1, 2, 3, 5 and 8 SHIPPED in v1.5.0 (bookmarks bar, session restore, downloads page, private windows, loading progress + site info) — specs below are the contract the builds must satisfy.
 > Process: every build lands as its own version tag, pushed to GitHub with CI green
 > before the next one starts (fix → commit → push → verify, the loop that got us here).
 
