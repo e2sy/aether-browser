@@ -112,8 +112,62 @@ export function aggregate(perEngine: TaggedResults[], n = 12): SearchResult[] {
 }
 
 /**
+ * Domain diversity pass (v1.6.0 Beast Mode): walk the ranked list, always
+ * prefer the next result whose hostname differs from the last two picks;
+ * when everything nearby is the same host, fall back to order. Deterministic.
+ * Stops the classic metasearch failure of YouTube+YouTube+YouTube at the top.
+ */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return String(url || '').toLowerCase()
+  }
+}
+
+export function diversify(list: SearchResult[], n = 12): SearchResult[] {
+  const pool = (list || []).map((r, i) => ({ r, i, host: hostOf(r.url) }))
+  const remaining = new Map<string, number>()
+  for (const p of pool) remaining.set(p.host, (remaining.get(p.host) || 0) + 1)
+  const out: SearchResult[] = []
+  const used = new Set<number>()
+
+  for (let pos = 0; pos < pool.length && out.length < n; pos++) {
+    const recent = out.length ? [hostOf(out[out.length - 1].url)] : []
+    // allowed = host different from the previous pick; fall back to everything
+    let best = -1
+    let bestCount = -1
+    for (const p of pool) {
+      if (used.has(p.i)) continue
+      if (recent.includes(p.host)) continue
+      const c = remaining.get(p.host) || 0
+      // most-constrained-first: emit the host with the most remaining copies
+      // (ties break to original order) — provably avoids trailing clumps
+      if (c > bestCount) {
+        best = p.i
+        bestCount = c
+      }
+    }
+    if (best === -1) {
+      for (const p of pool) {
+        if (used.has(p.i)) continue
+        best = p.i
+        break
+      }
+    }
+    const picked = pool.find((p) => p.i === best)
+    if (!picked) break
+    used.add(best)
+    remaining.set(picked.host, (remaining.get(picked.host) || 1) - 1)
+    out.push(picked.r)
+  }
+  return out
+}
+
+/**
  * Score-aware variant used by the real pipeline: lanes are pre-sorted by
- * scoreResult before interleaving, so the best of each source surfaces first.
+ * scoreResult before interleaving, so the best of each source surfaces first,
+ * then a diversity pass separates same-host clumps.
  * Deterministic tie-break: original order within a lane.
  */
 export function aggregateRanked(
@@ -132,7 +186,7 @@ export function aggregateRanked(
       )
       .map(({ r }) => r)
   }))
-  return aggregate(sorted, n)
+  return diversify(aggregate(sorted, n * 2), n)
 }
 
 /* ------------------------- local instant answers --------------------------- */

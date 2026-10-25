@@ -262,6 +262,7 @@ export const api = {
     addAdblockList: (url: string) => ipcRenderer.invoke('internal:adblock-add-list', url),
     removeAdblockList: (url: string) => ipcRenderer.invoke('internal:adblock-remove-list', url),
     instant: (q: string) => ipcRenderer.invoke('internal:instant', { q }),
+    suggest: (q: string) => ipcRenderer.invoke('internal:suggest', { q }),
     ask: (q: string) => stream('internal:ask', 'search:chunk', { q })
   }
 }

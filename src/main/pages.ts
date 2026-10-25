@@ -169,51 +169,396 @@ export const NEW_TAB_HTML = pageShell(
 export const SEARCH_HTML = pageShell(
   'Aether Search',
   `
-  <div style="width:min(680px,90vw); margin-top:7vh;">
-    <div style="display:flex; align-items:baseline; gap:10px;">
-      <div style="font-size:24px; font-weight:700; letter-spacing:-0.02em;">
-        aether<span style="color:var(--ax-accent)">Search</span>
+  <style>
+    .s-head { position:sticky; top:0; z-index:20; width:min(760px,94vw);
+      background:var(--ax-bg); padding:16px 0 12px; border-bottom:1px solid var(--ax-border); }
+    .s-logo-row { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+    .s-logo { font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+    .s-logo span { color:var(--ax-accent); }
+    .s-tag { font-size:11.5px; color:var(--ax-muted2); }
+    .s-bar { display:flex; gap:10px; position:relative; }
+    .s-inputwrap { flex:1; position:relative; }
+    .s-inputwrap input { width:100%; padding:13px 40px 13px 18px; font-size:14px; color:var(--ax-fg);
+      background:var(--ax-card); border:1px solid var(--ax-border); border-radius:12px; outline:none; }
+    .s-inputwrap input:focus { border-color:var(--ax-accent); }
+    .s-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%); width:22px; height:22px;
+      border:none; border-radius:50%; background:var(--ax-card2); color:var(--ax-muted);
+      font-size:13px; line-height:1; cursor:pointer; display:none; }
+    .s-clear:hover { color:var(--ax-fg); background:var(--ax-border-hi); }
+    #sugg { position:absolute; left:0; right:0; top:calc(100% + 6px); margin:0; padding:6px; list-style:none;
+      background:var(--ax-card); border:1px solid var(--ax-border-hi); border-radius:12px;
+      box-shadow:0 12px 32px rgba(0,0,0,.45); display:none; z-index:30; }
+    #sugg li { padding:9px 12px; font-size:13px; color:var(--ax-muted); border-radius:8px;
+      cursor:pointer; display:flex; gap:9px; align-items:center; }
+    #sugg li .mag { color:var(--ax-faint); font-size:12px; }
+    #sugg li.sel, #sugg li:hover { background:var(--ax-card2); color:var(--ax-fg); }
+    .s-btn { padding:13px 20px; font-size:13px; font-weight:600; color:#fff;
+      background:var(--ax-accent2); border:none; border-radius:12px; cursor:pointer; }
+    .s-btn:hover { filter:brightness(1.1); }
+    .s-btn.ghost { background:var(--ax-card); color:var(--ax-muted); border:1px solid var(--ax-border); }
+    .s-hint { margin-top:10px; font-size:12px; color:var(--ax-muted);
+      background:var(--ax-accent-soft); border:1px solid var(--ax-border-hi);
+      border-radius:10px; padding:8px 12px; }
+    .s-hint b { color:var(--ax-accent-tint); }
+    .s-main { width:min(760px,94vw); padding-bottom:60px; }
+    .s-instant { margin-top:18px; background:linear-gradient(135deg,var(--ax-accent-soft),transparent);
+      border:1px solid var(--ax-border-hi); border-radius:14px; padding:16px 20px; }
+    .s-instant .out { font-size:26px; font-weight:600; color:var(--ax-accent-tint); letter-spacing:-0.01em; }
+    .s-instant .in { margin-top:5px; font-size:11px; color:var(--ax-muted2); }
+    .s-panel { margin-top:18px; display:flex; gap:16px; background:var(--ax-card);
+      border:1px solid var(--ax-border); border-radius:14px; padding:18px 20px; }
+    .s-panel img { width:104px; height:104px; border-radius:10px; object-fit:cover; flex:none;
+      background:var(--ax-card2); }
+    .s-panel .pt { font-size:16px; font-weight:650; color:var(--ax-fg); }
+    .s-panel .pu { font-size:10.5px; letter-spacing:.07em; color:var(--ax-accent); margin-top:2px; }
+    .s-panel .px { font-size:12.5px; line-height:1.6; color:var(--ax-muted); margin-top:8px;
+      display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+    .s-status { margin-top:20px; color:var(--ax-muted); font-size:13px; }
+    .s-filters { margin-top:14px; display:flex; flex-wrap:wrap; gap:6px; }
+    .s-filters button { font-size:11px; padding:4px 11px; border-radius:20px; cursor:pointer;
+      border:1px solid var(--ax-border); background:var(--ax-card2); color:var(--ax-muted); }
+    .s-filters button.on { background:var(--ax-accent-soft); color:var(--ax-accent);
+      border-color:var(--ax-border-hi); font-weight:600; }
+    .s-stats { margin-top:8px; font-size:11px; color:var(--ax-faint); }
+    .s-results { margin-top:10px; padding:0; list-style:none; }
+    .s-res { padding:13px 16px; margin-bottom:8px; background:var(--ax-card2);
+      border:1px solid var(--ax-border); border-radius:10px; cursor:pointer;
+      display:flex; gap:12px; align-items:flex-start; }
+    .s-res:hover, .s-res.sel { border-color:var(--ax-border-hi); background:var(--ax-card); }
+    .s-res.sel { outline:1px solid var(--ax-accent); }
+    .s-tile { width:28px; height:28px; border-radius:8px; flex:none; display:flex; align-items:center;
+      justify-content:center; font-weight:700; font-size:13px; color:#fff; }
+    .s-body { min-width:0; flex:1; }
+    .s-title { font-size:13.5px; color:var(--ax-accent-tint); font-weight:600; overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap; }
+    .s-meta { display:flex; gap:8px; align-items:center; margin-top:3px; min-width:0; }
+    .s-url { font-size:11px; color:var(--ax-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .s-badge { font-size:9.5px; letter-spacing:.06em; padding:1px 7px; border-radius:20px;
+      background:var(--ax-accent-soft); color:var(--ax-accent); font-weight:600; flex:none; }
+    .s-snippet { font-size:12px; color:var(--ax-muted); margin-top:4px; line-height:1.55;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .s-actions { display:flex; flex-direction:column; gap:6px; flex:none; }
+    .s-actions button { width:26px; height:26px; border:1px solid var(--ax-border); border-radius:7px;
+      background:transparent; color:var(--ax-faint); font-size:12px; cursor:pointer; }
+    .s-actions button:hover { color:var(--ax-fg); background:var(--ax-card2); }
+    .s-related { margin-top:18px; }
+    .s-related .rl { font-size:11px; letter-spacing:.08em; color:var(--ax-faint); margin-bottom:8px; }
+    .s-related .chips { display:flex; flex-wrap:wrap; gap:7px; }
+    .s-related .chips button { font-size:12px; padding:7px 13px; border-radius:18px; cursor:pointer;
+      background:var(--ax-card2); border:1px solid var(--ax-border); color:var(--ax-muted); }
+    .s-related .chips button:hover { color:var(--ax-fg); border-color:var(--ax-border-hi); }
+    .s-ai { margin-top:18px; background:var(--ax-card); border:1px solid var(--ax-border);
+      border-radius:14px; padding:18px 20px; }
+    .s-ai-label { font-size:11px; letter-spacing:.09em; color:var(--ax-accent); margin-bottom:9px; }
+    .s-ai-body { font-size:14px; line-height:1.65; white-space:pre-wrap; }
+    .s-try { margin-top:22px; }
+    .s-try .tl { font-size:11px; letter-spacing:.08em; color:var(--ax-faint); margin-bottom:8px; }
+    .s-try .chips { display:flex; flex-wrap:wrap; gap:7px; }
+    .s-try .chips button { font-size:12px; padding:7px 13px; border-radius:18px; cursor:pointer;
+      background:var(--ax-card2); border:1px solid var(--ax-border); color:var(--ax-muted); }
+    .s-try .chips button:hover { color:var(--ax-fg); border-color:var(--ax-border-hi); }
+    .s-bangs { margin-top:14px; display:flex; flex-wrap:wrap; gap:7px; }
+    .s-bangs button { font-size:12px; padding:6px 12px; border-radius:18px; cursor:pointer;
+      background:transparent; border:1px dashed var(--ax-border-hi); color:var(--ax-muted2); }
+    .s-bangs b { color:var(--ax-accent); font-weight:700; }
+    .s-foot { margin-top:34px; padding-bottom:26px; color:var(--ax-faint); font-size:11px; line-height:1.7; }
+    #gfallback a { display:inline-block; padding:10px 18px; font-size:13px; font-weight:600; color:#fff;
+      background:var(--ax-accent2); border-radius:10px; cursor:pointer; text-decoration:none; }
+  </style>
+  <div class="s-head">
+    <div class="s-logo-row">
+      <div class="s-logo">aether<span>Search</span></div>
+      <div class="s-tag">beast-mode metasearch — every result says where it came from</div>
+    </div>
+    <div class="s-bar">
+      <div class="s-inputwrap">
+        <input id="q" type="text" placeholder="Search, or try !yt cats · 10 km to miles · time in tokyo"
+          autocomplete="off" spellcheck="false" />
+        <button id="clear" class="s-clear" title="Clear">×</button>
+        <ul id="sugg"></ul>
       </div>
-      <div style="font-size:11.5px; color:var(--ax-muted2);">the open metasearch — every result says where it came from</div>
+      <button id="go" class="s-btn">Search</button>
     </div>
-    <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
-      <input id="q" type="text" style="flex:1; padding:13px 18px; font-size:14px; color:var(--ax-fg);
-        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:12px; outline:none;" />
-      <button id="go" style="padding:13px 20px; font-size:13px; font-weight:600; color:#fff;
-        background:var(--ax-accent2); border:none; border-radius:12px; cursor:pointer;">Search</button>
-    </div>
-
-    <div id="instant" style="margin-top:18px; display:none; background:linear-gradient(135deg,var(--ax-accent-soft),var(--ax-accent)05);
-      border:1px solid var(--ax-border-hi); border-radius:14px; padding:16px 20px;">
-      <div id="instant-out" style="font-size:26px; font-weight:600; color:var(--ax-accent-tint); letter-spacing:-0.01em;"></div>
-      <div style="margin-top:5px; font-size:11px; color:var(--ax-muted2);">Aether instant answer — computed on this device, no network</div>
-    </div>
-
-    <div id="status" style="margin-top:20px; color:var(--ax-muted); font-size:13px;"></div>
-    <div id="chips" style="margin-top:10px; display:none; flex-wrap:wrap; gap:6px;"></div>
-    <div id="gfallback" style="margin-top:14px; display:none;"></div>
-    <div id="aiwrap" style="margin-top:18px; display:none; background:var(--ax-card); border:1px solid var(--ax-border);
-      border-radius:14px; padding:18px 20px;">
-      <div style="font-size:11px; letter-spacing:.09em; color:var(--ax-accent); margin-bottom:9px;">AI ANSWER — LOCAL MODEL</div>
-      <div id="answer" style="font-size:14px; line-height:1.65; white-space:pre-wrap;"></div>
-    </div>
-    <div id="sources" style="margin-top:18px; display:none;"></div>
-    <div style="margin-top:34px; padding-bottom:26px; color:var(--ax-faint); font-size:11px; line-height:1.7;">
-      Aether Search aggregates public sources, strips tracking parameters, deduplicates and ranks
-      results locally. It does not profile you and stores nothing beyond this device's history.
-    </div>
+    <div id="hint" class="s-hint" style="display:none;"></div>
   </div>
+  <main class="s-main">
+    <div id="instant" class="s-instant" style="display:none;"></div>
+    <div id="panel" class="s-panel" style="display:none;"></div>
+    <div id="status" class="s-status"></div>
+    <div id="filters" class="s-filters" style="display:none;"></div>
+    <ol id="results" class="s-results"></ol>
+    <div id="related" class="s-related" style="display:none;"></div>
+    <div id="try" class="s-try" style="display:none;"></div>
+    <div id="aiwrap" class="s-ai" style="display:none;">
+      <div class="s-ai-label">AI ANSWER — LOCAL MODEL</div>
+      <div id="answer" class="s-ai-body"></div>
+    </div>
+    <div id="gfallback" style="margin-top:14px; display:none;"></div>
+    <div class="s-foot">
+      Aether Search aggregates public sources, strips tracking parameters, deduplicates,
+      de-clumps same-domain results and ranks everything locally. No profiling, no ad network,
+      nothing stored beyond this device's history.
+    </div>
+  </main>
   `,
   `
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
-  function host(u) { return String(u || '').replace(/^https?:\\/\\//, '').split('/')[0] }
-  var gotData = false
+  function host(u) { return String(u || '').replace(/^https?:\\\\/\\\\//, '').split('/')[0] }
+  function $(id) { return document.getElementById(id) }
+
+  var state = { all: [], filter: 'All', sel: -1, query: '' }
+  var TILES = ['#5b8def', '#9a6ff0', '#e0679b', '#e0975b', '#4fb286', '#4fb0c6', '#c67f4f', '#7f8ff0', '#b05bd6', '#5ba7a0']
+  var TRY = ['qwen3 ollama', 'best mechanical keyboards 2026', '10 km to miles', '15% of 80', 'time in tokyo']
+  var BANG_SHOWN = [['g','Google'], ['yt','YouTube'], ['w','Wikipedia'], ['gh','GitHub'], ['so','Stack Overflow'], ['r','Reddit'], ['x','X (Twitter)'], ['a','Amazon'], ['fk','Flipkart'], ['sp','Spotify'], ['tr','Translate'], ['maps','Maps']]
+
+  function tileColor(h) {
+    var n = 0
+    for (var i = 0; i < h.length; i++) n = (n * 31 + h.charCodeAt(i)) >>> 0
+    return TILES[n % TILES.length]
+  }
+  function tileEl(h) {
+    var t = document.createElement('div')
+    t.className = 's-tile'
+    t.style.background = tileColor(h)
+    t.textContent = (h.replace(/^www\\./, '')[0] || '?').toUpperCase()
+    return t
+  }
+  function copyUrl(u) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(u).catch(function () { legacyCopy(u) })
+    } else legacyCopy(u)
+  }
+  function legacyCopy(u) {
+    var ta = document.createElement('textarea')
+    ta.value = u; ta.style.cssText = 'position:fixed;opacity:0'
+    document.body.appendChild(ta); ta.select()
+    try { document.execCommand('copy') } catch (e) {}
+    document.body.removeChild(ta)
+  }
+
+  /* ---------------- suggestions dropdown ---------------- */
+  var suggOpen = false, suggSel = -1, suggList = [], suggTimer = null
+  function hideSugg() { suggOpen = false; suggSel = -1; $('sugg').style.display = 'none' }
+  function renderSugg() {
+    var ul = $('sugg')
+    ul.innerHTML = ''
+    if (!suggList.length) { hideSugg(); return }
+    for (var i = 0; i < suggList.length; i++) {
+      var li = document.createElement('li')
+      if (i === suggSel) li.className = 'sel'
+      var mag = document.createElement('span'); mag.className = 'mag'; mag.textContent = '⌕'
+      li.appendChild(mag); li.appendChild(esc(suggList[i]))
+      ;(function (q) {
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); pickSugg(q) })
+      })(suggList[i])
+      ul.appendChild(li)
+    }
+    ul.style.display = 'block'
+    suggOpen = true
+  }
+  function pickSugg(q) { hideSugg(); $('q').value = q; run(q) }
+  function fetchSugg() {
+    var q = $('q').value.trim()
+    if (q.length < 3 || q.charAt(0) === '!') { suggList = []; renderSugg(); return }
+    window.aether.internal.suggest(q).then(function (list) {
+      var cur = $('q').value.trim()
+      if (cur !== q) return
+      suggList = (list || []).slice(0, 8); suggSel = -1; renderSugg()
+    }).catch(function () {})
+  }
+
+  /* ---------------- instant answers + bang hint ---------------- */
+  var hintTimer = null
+  function renderInstant(a) {
+    var box = $('instant')
+    if (!a || a.kind === 'bang') { box.style.display = 'none'; return }
+    box.innerHTML = ''
+    var out = esc(a.output); out.className = 'out'
+    var inr = document.createElement('div'); inr.className = 'in'
+    inr.textContent = (a.input || '') + ' — Aether instant answer, computed on this device, no network'
+    box.appendChild(out); box.appendChild(inr)
+    box.style.display = 'block'
+  }
+  function bangHint(a) {
+    var h = $('hint')
+    if (!a || a.kind !== 'bang') { h.style.display = 'none'; return }
+    h.innerHTML = ''
+    h.appendChild(esc('Press Enter to open '))
+    var b = document.createElement('b'); b.textContent = a.name + (a.output ? ' — ' + a.output : ' home')
+    h.appendChild(b)
+    h.appendChild(esc(' (bang !' + (a.input.replace(/^!+/, '').split(/\\s+/)[0] || '') + ')'))
+    h.style.display = 'block'
+  }
+  function livePreview() {
+    var q = $('q').value.trim()
+    $('clear').style.display = q ? 'block' : 'none'
+    if (hintTimer) clearTimeout(hintTimer)
+    if (!q) { $('hint').style.display = 'none'; $('instant').style.display = 'none'; hideSugg(); return }
+    hintTimer = setTimeout(function () {
+      var cur = $('q').value.trim()
+      if (cur !== q) return
+      window.aether.internal.instant(q).then(function (a) {
+        if ($('q').value.trim() !== q) return
+        bangHint(a)
+        renderInstant(a)
+      }).catch(function () {})
+      fetchSugg()
+    }, 170)
+  }
+
+  /* ---------------- results rendering ---------------- */
+  function statusMsg(t, isErr) {
+    var s = $('status')
+    s.textContent = t || ''
+    s.style.color = isErr ? 'var(--ax-danger)' : ''
+  }
+  function sourceCounts() {
+    var m = {}
+    for (var i = 0; i < state.all.length; i++) {
+      var src = state.all[i].source || 'web'
+      m[src] = (m[src] || 0) + 1
+    }
+    return m
+  }
+  function renderFilters() {
+    var box = $('filters')
+    var counts = sourceCounts()
+    var keys = Object.keys(counts)
+    if (!keys.length) { box.style.display = 'none'; return }
+    box.innerHTML = ''
+    var mk = function (label, val, n) {
+      var b = document.createElement('button')
+      b.textContent = label + (n != null ? ' ' + n : '')
+      if (state.filter === val) b.className = 'on'
+      b.addEventListener('click', function () { state.filter = val; state.sel = -1; renderFilters(); renderResults() })
+      return b
+    }
+    box.appendChild(mk('All', 'All', state.all.length))
+    keys.sort().forEach(function (k) { box.appendChild(mk(k, k, counts[k])) })
+    box.style.display = 'flex'
+  }
+  function renderStats(elapsedMs) {
+    var n = state.all.length
+    if (!n) return
+    var sc = sourceCounts()
+    var line = n + ' results · ' + Object.keys(sc).length + ' of ' + LAST_STATS.length + ' sources'
+    if (elapsedMs) line += ' · ' + (elapsedMs / 1000).toFixed(1) + ' s'
+    line += ' · tracking stripped'
+    var el = document.createElement('div')
+    el.className = 's-stats'
+    el.textContent = line
+    var box = $('filters')
+    var old = box.parentNode.querySelector('.s-stats')
+    if (old) old.remove()
+    box.parentNode.insertBefore(el, box.nextSibling)
+  }
+  function openResult(u) { window.aether.internal.open(u) }
+  function renderResults() {
+    var box = $('results')
+    box.innerHTML = ''
+    var list = state.filter === 'All' ? state.all : state.all.filter(function (r) { return (r.source || 'web') === state.filter })
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i]
+      var li = document.createElement('li')
+      li.className = 's-res' + (i === state.sel ? ' sel' : '')
+      var h = host(r.url)
+      li.appendChild(tileEl(h))
+      var body = document.createElement('div'); body.className = 's-body'
+      var t = esc(r.title); t.className = 's-title'
+      var meta = document.createElement('div'); meta.className = 's-meta'
+      var u = esc(h); u.className = 's-url'
+      meta.appendChild(u)
+      if (r.source) {
+        var badge = document.createElement('span'); badge.className = 's-badge'
+        badge.textContent = String(r.source).toUpperCase()
+        meta.appendChild(badge)
+      }
+      var sn = esc(r.snippet); sn.className = 's-snippet'
+      body.appendChild(t); body.appendChild(meta); body.appendChild(sn)
+      li.appendChild(body)
+      var acts = document.createElement('div'); acts.className = 's-actions'
+      var copy = document.createElement('button')
+      copy.title = 'Copy link'; copy.textContent = '⧉'
+      copy.addEventListener('click', function (url) {
+        return function (e) { e.stopPropagation(); copyUrl(url) }
+      }(r.url))
+      acts.appendChild(copy)
+      li.appendChild(acts)
+      ;(function (url) {
+        li.addEventListener('click', function () { openResult(url) })
+        li.addEventListener('auxclick', function (e) { if (e.button === 1) { e.preventDefault(); openResult(url) } })
+      })(r.url)
+      box.appendChild(li)
+    }
+    if (list.length) { $('status').textContent = ''; $('status').style.color = '' }
+  }
+  function renderPanel(p) {
+    var box = $('panel')
+    if (!p || !p.title) { box.style.display = 'none'; return }
+    box.innerHTML = ''
+    if (p.thumbnail) {
+      var img = document.createElement('img')
+      img.src = p.thumbnail; img.alt = ''
+      img.addEventListener('error', function () { img.remove() })
+      box.appendChild(img)
+    }
+    var body = document.createElement('div')
+    var t = document.createElement('div'); t.className = 'pt'; t.textContent = p.title
+    var u = document.createElement('div'); u.className = 'pu'; u.textContent = 'WIKIPEDIA · KNOWLEDGE PANEL'
+    var x = document.createElement('div'); x.className = 'px'; x.textContent = p.extract
+    body.appendChild(t); body.appendChild(u); body.appendChild(x)
+    var more = document.createElement('a')
+    more.href = '#'; more.textContent = 'Read on Wikipedia →'
+    more.style.cssText = 'display:inline-block;margin-top:10px;font-size:12px;color:var(--ax-accent);cursor:pointer'
+    more.addEventListener('click', function (e) { e.preventDefault(); openResult(p.url) })
+    body.appendChild(more)
+    box.appendChild(body)
+    box.style.display = 'flex'
+  }
+  function renderRelated(list) {
+    var box = $('related')
+    if (!list || !list.length) { box.style.display = 'none'; return }
+    box.innerHTML = ''
+    var l = document.createElement('div'); l.className = 'rl'; l.textContent = 'RELATED SEARCHES'
+    var chips = document.createElement('div'); chips.className = 'chips'
+    for (var i = 0; i < list.length; i++) {
+      var b = document.createElement('button')
+      b.textContent = list[i]
+      ;(function (q) { b.addEventListener('click', function () { window.aether.internal.search(q) }) })(list[i])
+      chips.appendChild(b)
+    }
+    box.appendChild(l); box.appendChild(chips)
+    box.style.display = 'block'
+  }
+  function renderTry() {
+    var box = $('try')
+    box.innerHTML = ''
+    var l = document.createElement('div'); l.className = 'tl'; l.textContent = 'TRY A SEARCH'
+    var chips = document.createElement('div'); chips.className = 'chips'
+    for (var i = 0; i < TRY.length; i++) {
+      var b = document.createElement('button'); b.textContent = TRY[i]
+      ;(function (q) { b.addEventListener('click', function () { $('q').value = q; run(q) }) })(TRY[i])
+      chips.appendChild(b)
+    }
+    box.appendChild(l); box.appendChild(chips)
+    var bl = document.createElement('div'); bl.className = 'tl'; bl.style.marginTop = '16px'
+    bl.textContent = 'BANGS — JUMP STRAIGHT TO A SITE'
+    var bangs = document.createElement('div'); bangs.className = 's-bangs'
+    for (var j = 0; j < BANG_SHOWN.length; j++) {
+      var bb = document.createElement('button')
+      var k = document.createElement('b'); k.textContent = '!' + BANG_SHOWN[j][0] + ' '
+      bb.appendChild(k); bb.appendChild(esc(BANG_SHOWN[j][1]))
+      ;(function (q) { bb.addEventListener('click', function () { $('q').value = q; $('q').focus(); livePreview() }) })('!' + BANG_SHOWN[j][0] + ' ')
+      bangs.appendChild(bb)
+    }
+    box.appendChild(bl); box.appendChild(bangs)
+    box.style.display = 'block'
+  }
   function showGoogle(q, url) {
-    var wrap = document.getElementById('gfallback')
+    var wrap = $('gfallback')
     wrap.innerHTML = ''
     var btn = document.createElement('a')
     btn.href = '#'
-    btn.style.cssText = 'display:inline-block;padding:10px 18px;font-size:13px;font-weight:600;color:#fff;background:var(--ax-accent2);border-radius:10px;cursor:pointer;text-decoration:none'
     btn.textContent = 'Search on Google instead'
     btn.addEventListener('click', function (e) {
       e.preventDefault()
@@ -222,126 +567,137 @@ export const SEARCH_HTML = pageShell(
     wrap.appendChild(btn)
     wrap.style.display = 'block'
   }
-  function renderInstant(q) {
-    var card = document.getElementById('instant')
-    if (!window.aether || !window.aether.internal || !window.aether.internal.instant) return
-    window.aether.internal.instant(q).then(function (a) {
-      if (a && a.output) {
-        document.getElementById('instant-out').textContent = a.input + ' = ' + a.output
-        card.style.display = 'block'
-      } else {
-        card.style.display = 'none'
-      }
-    }).catch(function () {})
-  }
-  function renderChips(stats) {
-    var chips = document.getElementById('chips')
-    chips.innerHTML = ''
-    if (!stats || !stats.length) { chips.style.display = 'none'; return }
-    for (var i = 0; i < stats.length; i++) {
-      var s = stats[i]
-      var chip = document.createElement('span')
-      chip.style.cssText = 'font-size:10.5px;padding:3px 9px;border-radius:20px;border:1px solid var(--ax-border);color:' + (s.error || !s.count ? 'var(--ax-faint)' : 'var(--ax-muted)') + ';background:var(--ax-card2)'
-      chip.textContent = s.error ? (s.source + ' — unavailable') : (s.source + ' · ' + s.count + ' results · ' + s.ms + ' ms')
-      chips.appendChild(chip)
-    }
-    chips.style.display = 'flex'
-  }
-  function renderSources(sources) {
-    var box = document.getElementById('sources')
-    box.innerHTML = ''
-    if (!sources || !sources.length) { box.style.display = 'none'; return }
-    for (var i = 0; i < sources.length; i++) {
-      var r = sources[i]
-      var card = document.createElement('a')
-      card.href = '#'
-      card.style.cssText = 'display:block;padding:12px 16px;margin-bottom:8px;background:var(--ax-card2);border:1px solid var(--ax-border);border-radius:10px'
-      var t = esc((i + 1) + '. ' + r.title); t.style.cssText = 'font-size:13px;color:var(--ax-accent-tint);font-weight:600'
-      var meta = document.createElement('div')
-      meta.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:3px'
-      var u = esc(host(r.url)); u.style.cssText = 'font-size:11px;color:var(--ax-faint)'
-      meta.appendChild(u)
-      if (r.source) {
-        var badge = document.createElement('span')
-        badge.style.cssText = 'font-size:9.5px;letter-spacing:.06em;padding:1px 7px;border-radius:20px;background:var(--ax-accent-soft);color:var(--ax-accent);font-weight:600'
-        badge.textContent = String(r.source).toUpperCase()
-        meta.appendChild(badge)
-      }
-      var s = esc(r.snippet); s.style.cssText = 'font-size:12px;color:var(--ax-muted);margin-top:4px'
-      card.appendChild(t); card.appendChild(meta); card.appendChild(s)
-      card.addEventListener('click', function (url) {
-        return function (e) { e.preventDefault(); window.aether.internal.open(url) }
-      }(r.url))
-      box.appendChild(card)
-    }
-    box.style.display = 'block'
-  }
+
+  /* ---------------- main run ---------------- */
+  var LAST_STATS = []
+  var gotData = false
   function run(q) {
+    q = String(q || '').trim()
     if (!q) return
-    document.getElementById('q').value = q
-    var status = document.getElementById('status')
-    var aiwrap = document.getElementById('aiwrap')
-    var answer = document.getElementById('answer')
-    var sources = document.getElementById('sources')
-    var gf = document.getElementById('gfallback')
-    status.style.color = ''
-    status.textContent = 'Searching the web — running all sources in parallel…'
-    aiwrap.style.display = 'none'
-    answer.textContent = ''
-    sources.style.display = 'none'
-    sources.innerHTML = ''
-    gf.style.display = 'none'
-    gf.innerHTML = ''
-    document.getElementById('instant').style.display = 'none'
-    document.getElementById('chips').style.display = 'none'
+    state.query = q
+    state.all = []; state.filter = 'All'; state.sel = -1
+    $('q').value = q
+    hideSugg(); $('hint').style.display = 'none'
+    $('instant').style.display = 'none'; $('panel').style.display = 'none'
+    $('filters').style.display = 'none'; $('results').innerHTML = ''
+    $('related').style.display = 'none'; $('try').style.display = 'none'
+    $('aiwrap').style.display = 'none'; $('answer').textContent = ''
+    $('gfallback').style.display = 'none'; $('gfallback').innerHTML = ''
+    var oldStats = document.querySelector('.s-stats'); if (oldStats) oldStats.remove()
     gotData = false
-    renderInstant(q)
+    var t0 = Date.now()
+    statusMsg('Searching the web — running every source in parallel…')
+
+    // resolve bangs / instant answers FIRST (local, instant) — a bang replaces
+    // the search entirely, so the web pipeline only starts for real queries
+    window.aether.internal.instant(q).then(function (a) {
+      if (a && a.kind === 'bang') {
+        statusMsg('Bang !' + (q.replace(/^!+/, '').split(/\\s+/)[0] || '') + ' → opening ' + a.name + '…')
+        window.aether.internal.open(a.url)
+        return
+      }
+      renderInstant(a)
+      startWeb(q, t0)
+    }).catch(function () { startWeb(q, t0) })
+  }
+
+  function startWeb(q, t0) {
+    if (state.query !== q) return
     var watchdog = setTimeout(function () {
       if (!gotData) {
-        status.textContent = 'The sources did not respond in time. Try again, or use Google below.'
-        status.style.color = 'var(--ax-danger)'
+        statusMsg('The sources did not respond in time. Try again, or use Google below.', true)
         showGoogle(q, '')
       }
     }, 25000)
+
     var req = window.aether.internal.ask(q)
     req.onData(function (d) {
       gotData = true
-      if (d.stats) renderChips(d.stats)
+      if (d.stats) LAST_STATS = d.stats
+      if (d.panel) renderPanel(d.panel)
       if (d.sources) {
-        renderSources(d.sources)
-        if (d.sources.length) {
-          status.textContent = ''
-        } else if (!d.error) {
-          status.textContent = 'No web results found for this query.'
-        }
+        state.all = d.sources
+        renderFilters(); renderResults(); renderStats(Date.now() - t0)
+        if (d.sources.length) statusMsg('')
+        else if (!d.error) statusMsg('No web results found for this query.')
       }
+      if (d.related) renderRelated(d.related)
       if (d.googleFallback) showGoogle(q, d.googleFallback)
       if (d.delta) {
-        aiwrap.style.display = 'block'
-        answer.textContent += d.delta
-        if (status.style.color !== 'var(--ax-danger)') status.textContent = ''
+        $('aiwrap').style.display = 'block'
+        $('answer').textContent += d.delta
+        if ($('status').style.color !== 'var(--ax-danger)') statusMsg('')
       }
-      if (d.error) {
-        status.textContent = d.error
-        status.style.color = 'var(--ax-danger)'
-      }
+      if (d.error) statusMsg(d.error, true)
       if (d.done) clearTimeout(watchdog)
     })
     req.result.then(function (r) {
       clearTimeout(watchdog)
       if (r && r.error && !gotData) {
-        status.textContent = String(r.error)
-        status.style.color = 'var(--ax-danger)'
+        statusMsg(String(r.error), true)
         showGoogle(q, '')
       }
     })
   }
-  document.getElementById('go').addEventListener('click', function () { run(document.getElementById('q').value.trim()) })
-  document.getElementById('q').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') run(document.getElementById('q').value.trim())
+
+  /* ---------------- keyboard ---------------- */
+  document.addEventListener('keydown', function (e) {
+    var inInput = document.activeElement === $('q')
+    // suggestions navigation
+    if (suggOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      suggSel = e.key === 'ArrowDown'
+        ? (suggSel + 1) % suggList.length
+        : (suggSel - 1 + suggList.length) % suggList.length
+      renderSugg()
+      return
+    }
+    if (suggOpen && e.key === 'Enter' && suggSel >= 0) {
+      e.preventDefault(); pickSugg(suggList[suggSel]); return
+    }
+    if (e.key === 'Escape' && suggOpen) { hideSugg(); return }
+    // result navigation (dropdown closed)
+    var list = state.filter === 'All' ? state.all : state.all.filter(function (r) { return (r.source || 'web') === state.filter })
+    if (!inInput && list.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      state.sel = e.key === 'ArrowDown'
+        ? Math.min(state.sel + 1, list.length - 1)
+        : Math.max(state.sel - 1, 0)
+      renderResults()
+      var el = $('results').children[state.sel]
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' })
+      return
+    }
+    if (!inInput && e.key === 'Enter' && state.sel >= 0 && list[state.sel]) {
+      e.preventDefault(); openResult(list[state.sel].url); return
+    }
+    if (!inInput && /^[1-9]$/.test(e.key) && list[Number(e.key) - 1]) {
+      e.preventDefault(); openResult(list[Number(e.key) - 1].url); return
+    }
+    if (e.key === '/' && !inInput) { e.preventDefault(); $('q').focus(); $('q').select() }
   })
+
+  $('go').addEventListener('click', function () { run($('q').value.trim()) })
+  $('clear').addEventListener('click', function () {
+    $('q').value = ''; $('clear').style.display = 'none'
+    $('hint').style.display = 'none'; $('instant').style.display = 'none'; hideSugg(); $('q').focus()
+  })
+  $('q').addEventListener('input', livePreview)
+  $('q').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (suggOpen && suggSel >= 0) pickSugg(suggList[suggSel])
+      else { hideSugg(); run($('q').value.trim()) }
+    }
+  })
+  document.addEventListener('click', function (e) {
+    if (suggOpen && !$('sugg').contains(e.target) && e.target !== $('q')) hideSugg()
+  })
+
   var params = new URLSearchParams(location.search)
-  run(params.get('q'))
+  var q0 = params.get('q')
+  if (q0 && q0.trim()) run(q0.trim())
+  else { renderTry(); $('q').focus() }
   `
 )
 

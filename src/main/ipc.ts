@@ -37,14 +37,17 @@ import {
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
 import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
-import { ENGINE_NAMES, tryEngine } from './search'
+import { ENGINE_NAMES, tryEngine, wikiPanel } from './search'
 import { normalizeAppearance } from './appearance'
 import {
   searchAll,
   instantAnswer,
+  evaluateMath,
   mergeSuggestions,
   searchSuggestions
 } from './search-engine'
+import { resolveBang } from './bangs'
+import { instantAnswerV2 } from './instant'
 import {
   respondPermission,
   listPermissions,
@@ -776,7 +779,18 @@ export function registerIpc(): void {
 
   ipcMain.handle('internal:instant', (e, payload: { q: string }) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
-    return instantAnswer(String(payload?.q || ''))
+    const q = String(payload?.q || '')
+    // v1.6.0: bangs resolve before everything — `!yt cats` is navigation, not a search
+    const bang = resolveBang(q)
+    if (bang) return { kind: 'bang', input: q, output: bang.query || bang.name, url: bang.url, name: bang.name }
+    return instantAnswerV2(q, { evaluateMath })
+  })
+
+  // v1.6.0: live suggestions for the search page dropdown (remote ac feed,
+  // fails silent+empty — the page merges its own history locally)
+  ipcMain.handle('internal:suggest', async (e, payload: { q: string }) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return searchSuggestions(String(payload?.q || ''))
   })
 
   ipcMain.handle('internal:ask', async (e, payload: { requestId: string; q: string }) => {
@@ -792,9 +806,14 @@ export function registerIpc(): void {
     try {
       let sources: SearchResult[] = []
       let stats: Array<{ source: string; count: number; ms: number; error?: string }> = []
+      // v1.6.0: knowledge panel + related searches run ALONGSIDE the sources,
+      // neither can slow the other down; both fail silent
+      const query = String(payload.q || '')
+      const panelP = wikiPanel(query)
+      const relatedP = searchSuggestions(query).then((s) => s.filter((x) => x.toLowerCase() !== query.toLowerCase()).slice(0, 8))
       try {
         // v1.3.0 Aether Search — every source in parallel, own ranking + badges
-        const outcome = await searchAll(String(payload.q || ''), (src) => tryEngine(src, String(payload.q || '')), ENGINE_NAMES)
+        const outcome = await searchAll(query, (src) => tryEngine(src, query), ENGINE_NAMES)
         sources = outcome.aggregated
         stats = outcome.stats
       } catch (err) {
@@ -803,11 +822,12 @@ export function registerIpc(): void {
             'Web search failed: ' +
             (err instanceof Error ? err.message : String(err)) +
             ' — you can still open this search on Google below.',
-          googleFallback: googleSearchUrl(String(payload.q || ''))
+          googleFallback: googleSearchUrl(query)
         })
         sources = []
       }
-      send({ sources, stats })
+      const [panel, related] = await Promise.all([panelP, relatedP])
+      send({ sources, stats, ...(panel ? { panel } : {}), ...(related.length ? { related } : {}) })
 
       const choice = await resolveBrain()
       if (!choice) {

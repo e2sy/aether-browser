@@ -33,6 +33,25 @@ const ENGINES: Engine[] = [
     name: 'Bing',
     url: (q) => `https://www.bing.com/search?q=${encodeURIComponent(q)}&count=20&setlang=en`,
     parse: parseBingResults
+  },
+  {
+    // v1.6.0: Wikipedia's free API — structured JSON, no scraping, extremely
+    // reliable; adds encyclopedic depth no HTML engine gives.
+    name: 'Wikipedia',
+    url: (q) =>
+      'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2' +
+      '&generator=search&gsrlimit=4&prop=extracts|pageimages&exintro=1&explaintext=1' +
+      '&pithumbsize=240&gsrsearch=' +
+      encodeURIComponent(q),
+    parse: parseWikipediaResults
+  },
+  {
+    // v1.6.0: Mojeek — an independent crawler with its OWN index (not a
+    // Google/Bing metasearch), UK-based, no tracking. Diversifies the result
+    // pool with sources the big engines under-rank.
+    name: 'Mojeek',
+    url: (q) => `https://www.mojeek.com/search?q=${encodeURIComponent(q)}`,
+    parse: parseMojeekResults
   }
 ]
 
@@ -206,4 +225,122 @@ function parseBingResults(html: string, n: number): SearchResult[] {
 /** Direct Google URL used as the final human fallback in the UI. */
 export function googleSearchUrl(query: string): string {
   return 'https://www.google.com/search?q=' + encodeURIComponent(String(query || '').trim())
+}
+
+/* ------------------------------ Wikipedia ------------------------------ */
+
+export interface WikiPanel {
+  title: string
+  extract: string
+  url: string
+  thumbnail?: string
+}
+
+interface WikiApiResponse {
+  query?: {
+    pages?: Array<{
+      title?: string
+      extract?: string
+      fullurl?: string
+      thumbnail?: { source?: string }
+    }>
+  }
+}
+
+/** Parse the Wikipedia generator=search JSON (formatversion=2). */
+export function parseWikipediaResults(body: string, n: number): SearchResult[] {
+  let data: WikiApiResponse
+  try {
+    data = JSON.parse(String(body || ''))
+  } catch {
+    return []
+  }
+  const pages = data?.query?.pages || []
+  const out: SearchResult[] = []
+  for (const p of pages) {
+    if (out.length >= n) break
+    if (!p?.title) continue
+    const extract = String(p.extract || '').replace(/\s+/g, ' ').trim()
+    out.push({
+      title: p.title,
+      url: p.fullurl || 'https://en.wikipedia.org/wiki/' + encodeURIComponent(p.title.replace(/\s+/g, '_')),
+      snippet: extract.slice(0, 320)
+    })
+  }
+  return out
+}
+
+/**
+ * Knowledge panel data for the best Wikipedia match: title, intro extract,
+ * thumbnail. Runs on its own lightweight call so the panel survives even
+ * when the results generator is rate-limited; fails silent (panel is sugar,
+ * never load-bearing).
+ */
+export async function wikiPanel(q: string, timeoutMs = 6000): Promise<WikiPanel | null> {
+  const query = String(q || '').trim()
+  if (!query) return null
+  try {
+    const url =
+      'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2' +
+      '&redirects=1&prop=extracts|pageimages&exintro=1&explaintext=1&pithumbsize=320' +
+      '&gsrlimit=1&generator=search&gsrsearch=' +
+      encodeURIComponent(query)
+    const res = await fetch(url, {
+      headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
+      signal: AbortSignal.timeout(timeoutMs)
+    })
+    if (!res.ok) return null
+    const pages = (await res.json() as WikiApiResponse)?.query?.pages || []
+    const p = pages[0]
+    if (!p?.title || !p.extract) return null
+    return {
+      title: p.title,
+      extract: String(p.extract).replace(/\s+/g, ' ').trim().slice(0, 600),
+      url: p.fullurl || 'https://en.wikipedia.org/wiki/' + encodeURIComponent(p.title.replace(/\s+/g, '_')),
+      ...(p.thumbnail?.source ? { thumbnail: p.thumbnail.source } : {})
+    }
+  } catch {
+    return null
+  }
+}
+
+/* ------------------------------- Mojeek -------------------------------- */
+
+/**
+ * Mojeek SERP markup (as of 2026): results are <li> inside
+ * ul.results-standard with <h2><a class="title" href>…, snippet in
+ * <p class="s">. The parser is deliberately tolerant — it falls back to
+ * any h2/anchor pairing inside li cards so a mild redesign keeps working.
+ */
+export function parseMojeekResults(html: string, n: number): SearchResult[] {
+  const dom = new JSDOM(html)
+  const doc = dom.window.document
+  const out: SearchResult[] = []
+
+  const cards = Array.from(doc.querySelectorAll('ul.results-standard li, li.result, li[class*="result"]'))
+  for (const li of cards) {
+    if (out.length >= n) break
+    const a = (li.querySelector('h2 a') || li.querySelector('a.title') || li.querySelector('a[href^="http"]')) as HTMLAnchorElement | null
+    if (!a) continue
+    const url = unwrapMojeekLink(a.href || '')
+    if (!url) continue
+    const title = (a.textContent || '').replace(/\s+/g, ' ').trim()
+    if (!title) continue
+    const snippet = (li.querySelector('p.s')?.textContent || li.querySelector('p')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 300)
+    out.push({ title, url, snippet })
+  }
+  return out
+}
+
+/** Mojeek links are direct; http(s) passes, anything else is dropped. */
+function unwrapMojeekLink(href: string): string {
+  try {
+    const abs = href.startsWith('//') ? 'https:' + href : href
+    return /^https?:\/\//i.test(abs) ? abs : ''
+  } catch {
+    return ''
+  }
 }
