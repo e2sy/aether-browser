@@ -1,13 +1,170 @@
 # Aether Roadmap
 
-> Status: **UPDATED 2026-10-25 after v1.6.0** — shipped so far: v1.3.0 Aether Search (metasearch
+> Status: **UPDATED 2026-10-25 — THE MASTER PLAN** — shipped so far: v1.3.0 Aether Search (metasearch
 > core), v1.4.0 Customization Studio, v1.4.1 Ollama auto-reconnect, v1.5.0 the real-browser core
 > (bookmarks bar, session restore, downloads page, private windows, progress + site info), and
 > **v1.6.0 Beast Search** (43 bangs, instant answers v2 — units/percent/world clock, Wikipedia +
 > Mojeek sources, domain-diversity ranking, knowledge panels, full keyboard UX) plus the
-> window-controls fix. Everything below is the contract the builds satisfied; the remaining
-> Tier-2/Tier-3 tables are what comes next.
+> window-controls fix.
+> The Master Plan below (118 items, 9 phases) is the contract to beat Brave/Chrome/Firefox on
+> security, looks, speed, and platform reach — desktop first, then Android/iOS. Historical
+> v1.3–v1.6 plans are kept at the bottom.
 > Process: every build lands as its own version tag, pushed with CI green before the next one.
+
+---
+
+# 🐉 THE MASTER PLAN — 118 items to beat Brave
+
+Audited 2026-10-25 against the actual codebase (dependency audit: 14 npm advisories incl.
+1 critical + a runtime `extract-zip` path-traversal with **no patched version**; sandbox posture:
+tabs sandboxed, chrome-UI window `sandbox:false`; CSP uses `unsafe-inline`). Numbers are
+execution order inside each phase, not strict priority — phases interleave.
+
+## Phase 0 — Security & Vulnerability Hardening (v1.7.0 "Harden") — 18 items
+
+1. **Kill the critical `tar` CVE** in the build tree — electron-builder 25→26.18.0 + `overrides` for stragglers
+2. **Replace `extract-zip` (advisory has NO patched release) with own hardened unzipper** — `safe-zip.ts`: rejects `../` traversal, absolute paths, symlink entries; enforced output containment
+3. **Zip-bomb defenses** — total uncompressed budget, per-entry cap, max-files cap, decompression-ratio kill switch
+4. **CRX/ZIP quarantine flow** — unpack → validate manifest → only then load; any failure wipes the staging dir (tighten the existing flow)
+5. **Extension permission consent screen** — show requested permissions before first enable, Chrome-style
+6. **Bump `@mozilla/readability` 0.5→0.6** (ReDoS advisory) + hostile-HTML extraction tests
+7. **electron-builder 26.18.0** — also fixes updater token-leak via cross-origin redirect + search-path injection
+8. **CSP v2 for every aether:// page** — nonce-based `script-src`, drop `unsafe-inline`, `object-src 'none'`, `form-action 'none'`
+9. **Navigation lockdown** — `will-navigate` guards on chrome UI + tabs; only omnibox/history/links may drive top-frame navigation
+10. **Electron fuses** — runAsNode off, nodeCliInspect off, embeddedAsarIntegrity on, cookieEncryption on
+11. **ASAR integrity + signing path** on release builds
+12. **XSS escape audit** — automated tests inject `<img onerror>` payloads through every bridge (suggestions, history titles, result snippets, file names) into every internal page
+13. **Permission grants review** — persistence model, "revoke all sites", idle-grant expiry
+14. **Certificate-error UX hardening** — no silent bypass; typed-consent "proceed anyway"; per-host memo
+15. **SECURITY.md + private disclosure channel + threat-model doc**
+16. **CI security gate** — `npm audit` fails the build on critical/high; Dependabot weekly
+17. **Sandbox re-audit of the chrome-UI window** (`sandbox:false` today) — attempt sandboxed preload with contextBridge-only glue
+18. **Secrets hygiene** — git-secrets pre-commit hook, PAT rotation guide, repo secret scan
+
+## Phase 1 — Default Browser & OS Integration (v1.7.x "Own the OS") — 14 items
+
+19. **`app.setAsDefaultProtocolClient`** for http/https on Windows/macOS/Linux
+20. **Settings "Default browser" card** — live `isDefaultBrowser` check, one-click set, per-OS manual fallback
+21. **File associations** — .html/.htm/.xhtml open in Aether (electron-builder fileAssociations)
+22. **Windows ProgID polish** — AppUserModelId + registry icons so Aether renders properly in Settings → Default apps
+23. **macOS LaunchServices** — CFBundleURLTypes/CFBundleDocumentTypes in the release pipeline
+24. **Linux .desktop MimeType** — x-scheme-handler/http;https;text/html + xdg-settings integration
+25. **Single-instance lock + second-instance forwarding** — clicking a link opens a tab in the running window
+26. **External-protocol dialog** — mailto:/magnet:/zoommtg: ask-once-per-scheme with remember
+27. **OS integration chrome** — Windows jump lists, macOS dock menu, taskbar download progress
+28. **System tray** — quick actions (new tab, new private, pause shields), close-to-tray option
+29. **Startup boost** — opt-in login item + pre-warmed hidden window for <700 ms warm start
+30. **Native notifications** — download complete, extension installed, update available
+31. **Badge counters** — macOS dock badge, Windows taskbar overlay icon
+32. **aether:// protocol registration** — internal links work from outside the browser
+
+## Phase 2 — Look & Feel: out-design Chrome/Brave/Firefox (v1.8.0 "Gorgeous") — 22 items
+
+33. **Vertical tabs mode** — full-height collapsible strip, pinned zone, fits Customization Studio
+34. **Tab groups** — named, colored, collapsible, saveable across restarts
+35. **Split view** — two tabs side-by-side in one window
+36. **Workspaces** — separate tab sets per project with own names/colors/icons
+37. **Command palette (Ctrl+K)** — every action/tab/setting/bookmark, fuzzy search
+38. **Tab hover previews** — live thumbnail cards (capturePage)
+39. **Native window effects** — Win11 Mica/Acrylic, macOS vibrancy, Linux blur
+40. **Animation system** — tab morphs, progress shimmer, page fades; honors prefers-reduced-motion
+41. **Toolbar customization** — drag-reorder controls, hide/show anything
+42. **Theme engine v2** — import/export `.aether-theme` files, per-site theme overrides
+43. **Glass mode** — depth-aware translucent chrome
+44. **New Tab v3** — editable widget grid: top sites, quick notes, RSS, calendar strip
+45. **Context menu v2** — iconed, grouped, with Aether actions (Summarize, Screenshot, Add to reading list)
+46. **Reading list** — separate from bookmarks, reading-time estimates
+47. **History v2** — day-grouped timeline, search, per-domain filters
+48. **Screenshot v2** — region-select overlay, annotate, full-page stitch
+49. **PDF mode** — themed viewer with TOC sidebar
+50. **Media mini-player** — unified play/pause across tabs, media-key support
+51. **PiP everywhere** — button on every video, drag-resize, always-on-top
+52. **Force-Dark v2** — per-site toggle + night scheduler
+53. **Sound control** — per-tab volume slider, mute-all, audio indicator upgrade
+54. **Font pack** — curated open fonts + per-element overrides
+
+## Phase 3 — Privacy: out-shield Brave (v1.9.0 "Fortress") — 14 items
+
+55. **Adblock v2** — uBO-syntax parity, EasyList + regional lists (incl. Indian lists), trusted sites
+56. **aether://shields dashboard** — blocked counts, per-site breakdown, data-saved estimate
+57. **Fingerprint randomization** — canvas/audio/webgl noise, timezone pockets, hardware profiles
+58. **Query-param scrubber** — strip utm/gclid/fbclid on every navigation, not just search
+59. **Bounce-tracking defense** — ephemeral partition for tracker redirects
+60. **HTTPS-only mode** — auto-upgrade + downgrade warning banner
+61. **DoH selector** — Cloudflare/Quad9/Google/custom
+62. **Cookie-consent auto-handler** — local heuristics click "reject all" (opt-in)
+63. **Clear-data dialog** — history/cache/cookies/site-data × time ranges
+64. **Site-data manager page** — per-site cookies, storage, service workers + wipe
+65. **Password breach monitor** — k-anonymity HIBP check (opt-in, no account)
+66. **Private window hardening v2** — no-disk-writes audit trail + Tor-mode experiment (SOCKS5 UI)
+67. **Per-site shields presets** — aggressive/standard/trust like Brave
+68. **Referrer & cross-site policy tightening** — strict-referrer default, per-site exceptions
+
+## Phase 4 — AI: the beast differentiator (v2.0 "Aether Intelligence") — 14 items
+
+69. **Page-aware chat v2** — streaming DOM-grounded answers with element citations, per-tab memory
+70. **Agent v2** — multi-step web tasks with approval checkpoints + undo
+71. **Smart tab orchestrator** — local-embedding clustering into auto tab groups
+72. **TL;DR badge** — summarize-on-load, opt-in per site
+73. **Local semantic history** — embeddings over history/bookmarks: "find that article about…"
+74. **Multimodal** — right-click image → "Ask AI about this" (llava-class Ollama models)
+75. **Voice control** — local STT → "open youtube", "summarize this tab"
+76. **AI translate v2** — full-page with layout preservation, inline dual-language view
+77. **Form-fill assistant** — local-only autofill with model extraction
+78. **Search depth modes** — quick/deep/academic/code re-ranking
+79. **Model manager v2** — VRAM calculator, per-task presets, benchmark page
+80. **Macro marketplace (local)** — import/export agent macros as JSON
+81. **AI privacy pledge page** — what never leaves the machine, documented and testable
+82. **Study/Work profiles** — model presets + distraction shields + session scopes
+
+## Phase 5 — Performance: faster than all of them (v2.1 "Swift") — 10 items
+
+83. **Cold-start budget < 1.5 s** — lazy-load modules, defer extension boot, profile-guided init
+84. **Warm-start < 700 ms** — startup boost + pre-warmed window (opt-in)
+85. **Memory governor** — smarter discard, per-tab memory column
+86. **aether://task-manager** — live per-tab CPU/memory/network
+87. **Paint holding** — no white flash during navigations
+88. **Omnibox first-paint < 100 ms** after window show
+89. **Installer diet** — strip locales, exclude dev assets, target < 90 MB
+90. **Battery saver** — throttle background tabs harder on battery
+91. **CI speed benchmark suite** — page-load fixtures as regression gate
+92. **Boot waterfall page** — dev-only startup-phase diagnostics (local-only)
+
+## Phase 6 — Ecosystem & Desktop Maturity (v2.2–2.3 "Everyday") — 14 items
+
+93. **Password vault v1** — safeStorage-encrypted, generator, autofill, export
+94. **Import everything** — Chrome/Edge/Firefox bookmarks+history+passwords (CSV) + HTML export
+95. **Multiple profiles** — avatars, per-profile themes/extensions, toolbar switcher
+96. **Auto-update flow** — electron-updater vs GitHub Releases, hash-verified, "What's new" card
+97. **Signed installers** — Windows Authenticode, macOS notarization, Linux repo signing
+98. **Package matrix** — nsis/msi/portable zip, deb/rpm/AppImage/flatpak, dmg/pkg, arm64
+99. **Crash reporter** — local minidumps + one-click GitHub issue prefill (no auto-send)
+100. **i18n** — extraction framework, English + Hindi first, RTL-ready
+101. **Accessibility pass** — keyboard-complete chrome, screen-reader labels, AA contrast
+102. **Shortcuts page + remapping** — aether://settings/shortcuts
+103. **Site-info manager page** — per-site permissions/cookies/zoom/shields in one place
+104. **Downloads v2** — scheduler, checksum verify, resume across restarts
+105. **Print & save-page completion** — MHTML save, print-to-PDF with headers
+106. **First-run wizard v2** — import, theme, search choice, Ollama check, tour
+
+## Phase 7 — Aether Everywhere: Mobile & beyond (v3.x "Odyssey") — 12 items
+
+107. **Extract `@aether/core`** — engine-agnostic packages (search, session, adblock rules, model glue) — the mobile foundation
+108. **Android v1** — WebView shell: Aether Search, bookmarks, reading mode, sync target
+109. **Android v2** — GeckoView engine: real extensions + Brave-class privacy on mobile
+110. **iOS v1** — WKWebView shell (Apple mandates WebKit): Aether Search + reader + sync
+111. **Mobile UI** — bottom-omnibox layout, gesture nav, tablet layouts
+112. **Cross-device sync (local-first)** — end-to-end encrypted, LAN pairing + export file, zero cloud accounts
+113. **Android default-browser + Custom Tabs** provider registration
+114. **iOS share extension** — save links/pages from other apps into Aether
+115. **Store pipeline** — Play Store, App Store, F-Droid packaging + compliance
+116. **Windows on ARM** build
+117. **Kiosk / digital-signage mode** — `--kiosk` fullscreen lockdown for Linux/Windows
+118. **Public power-user docs** — aether:// scheme reference, CLI flags, unattended install
+
+---
+
+# Historical plans (shipped)
 ---
 
 ## v1.3.0 — Aether Search (our own search engine)
