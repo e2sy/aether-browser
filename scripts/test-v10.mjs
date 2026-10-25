@@ -7,10 +7,10 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 
-const ROOT = path.dirname(new URL(import.meta.url).pathname)
+const ROOT = path.dirname(fileURLToPath(import.meta.url))
 const APP = path.resolve(ROOT, '..')
 
 let pass = 0
