@@ -54,7 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   showTray: true,
   closeToTray: false,
   startupBoost: false,
-  notifyDownloads: true
+  notifyDownloads: true,
+  tabOrientation: 'top'
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

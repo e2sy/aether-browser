@@ -1056,6 +1056,13 @@ export const SETTINGS_HTML = pageShell(
           </select>
         </div>
         <label><input type="checkbox" id="axclock" /> Show clock &amp; greeting on the new tab</label>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:4px">
+          <label style="font-size:13px; color:var(--ax-fg)">Tab strip</label>
+          <select id="tabOrientation" style="width:160px">
+            <option value="top">Top — classic horizontal strip</option>
+            <option value="left">Left — vertical panel with groups</option>
+          </select>
+        </div>
       </div>
       <div class="row-btns" style="margin-top:10px">
         <button class="muted-btn" id="axreset">Restore default look</button>
@@ -1260,6 +1267,7 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('axscaleVal').textContent = Math.round(axState.fontScale * 100) + '%'
       document.getElementById('axntbg').value = axState.newtabBg
       document.getElementById('axclock').checked = axState.newtabClock
+      document.getElementById('tabOrientation').value = s.tabOrientation === 'left' ? 'left' : 'top'
       axWire(); axMarkSwatch()
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
       document.getElementById('showBookmarksBar').checked = s.showBookmarksBar !== false
@@ -1482,6 +1490,9 @@ export const SETTINGS_HTML = pageShell(
     })
     document.getElementById('axclock').addEventListener('change', function (e) {
       axApply({ newtabClock: e.target.checked }, false)
+    })
+    document.getElementById('tabOrientation').addEventListener('change', function (e) {
+      save({ tabOrientation: (e.target as HTMLSelectElement).value === 'left' ? 'left' : 'top' })
     })
     document.getElementById('axreset').addEventListener('click', function () {
       save({ appearance: {} })

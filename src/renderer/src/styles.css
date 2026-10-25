@@ -2239,3 +2239,245 @@ browser-action-list::part(action):hover {
 .shields-link:hover {
   text-decoration: underline;
 }
+
+/* ============ VERTICAL TABS (#33) + TAB GROUPS (#34) — v1.8.0 ============ */
+.app.vtabs-on {
+  flex-direction: row;
+}
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.app.vtabs-on .chrome {
+  border-left: none;
+}
+.vtabs {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  z-index: 11;
+  transition: width 0.14s ease;
+}
+.vtabs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 4px;
+  -webkit-app-region: drag;
+}
+.vtabs-brand {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.vtabs-collapse {
+  -webkit-app-region: no-drag;
+}
+.vtabs-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 6px 8px;
+  scrollbar-width: thin;
+}
+.vtab-zone {
+  margin-bottom: 10px;
+}
+.vtab-zone-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 6px 2px;
+}
+.vtab-add-group {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+}
+.vtab-add-group:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.06);
+}
+.vtab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 8px;
+  border-radius: 7px;
+  cursor: default;
+  color: var(--fg);
+  margin-bottom: 1px;
+  -webkit-app-region: no-drag;
+}
+.vtab:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+.vtab.active {
+  background: rgba(255, 255, 255, 0.11);
+}
+.vtab.discarded .vtab-title,
+.vtab.hibernated .vtab-title {
+  opacity: 0.55;
+}
+.vtab-title {
+  flex: 1;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vtab-close {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.vtab:hover .vtab-close {
+  display: flex;
+}
+.vtab-close:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.1);
+}
+.vtab-fallback {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #3a3e49;
+  color: #9aa0ae;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.vtab-group {
+  margin: 2px 0;
+}
+.vtab-group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: default;
+  -webkit-app-region: no-drag;
+}
+.vtab-group-head:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.vtab-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.vtab-group-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vtab-count {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.vtab-chevron {
+  font-size: 10px;
+  color: var(--muted);
+}
+.vtab-newgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin: 4px 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  -webkit-app-region: no-drag;
+}
+.vtab-newgroup input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  padding: 5px 8px;
+  font-size: 12.5px;
+  outline: none;
+}
+.vtab-colors {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.vtab-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.vtab-color.sel {
+  border-color: #fff;
+}
+.vtab-create-btn {
+  font-size: 12px;
+  padding: 5px 0;
+}
+.vtab-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 8px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 12.5px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.vtab-new:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+/* collapsed rail mode */
+.vtabs.rail .vtab {
+  justify-content: center;
+  padding: 0;
+}
+.vtabs.rail .vtabs-head {
+  justify-content: center;
+}
+.win-controls-float {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 20;
+}

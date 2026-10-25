@@ -24,7 +24,7 @@ export const SIDEBAR_WIDTH = 400
 export interface WindowEntry {
   win: BrowserWindow
   tabs: TabManager
-  ui: { sidebarOpen: boolean }
+  ui: { sidebarOpen: boolean; /** vertical-tabs panel width (#33) — 0 when disabled */ vtabWidth: number }
   /** v1.5.0 build 5: private windows skip history writes + session persistence */
   private?: boolean
   /** measured chrome height (tab strip + toolbar + optional bookmarks bar) */
@@ -63,23 +63,24 @@ export function focusedEntry(): WindowEntry | undefined {
   return entryForWin(BrowserWindow.getFocusedWindow()) ?? allEntries().find((e) => !e.win.isDestroyed())
 }
 
-/** Re-fit the chrome height / sidebar split for one window. */
+/** Re-fit the chrome height / vertical-tabs / sidebar split for one window. */
 export function applyLayout(entry: WindowEntry): void {
   if (entry.win.isDestroyed()) return
   const [w, h] = entry.win.getContentSize()
   const chromeH = Math.max(CHROME_HEIGHT, entry.chromeH || CHROME_HEIGHT)
   const sidebar = entry.ui.sidebarOpen ? SIDEBAR_WIDTH : 0
+  const vtabs = Math.max(0, Math.min(400, entry.ui.vtabWidth || 0))
   entry.tabs.setBounds({
-    x: 0,
+    x: vtabs,
     y: chromeH,
-    width: Math.max(60, w - sidebar),
+    width: Math.max(60, w - sidebar - vtabs),
     height: Math.max(60, h - chromeH)
   })
 }
 
 export interface CreateWindowOptions {
   /** restore this tab set instead of a single blank tab (session restore) */
-  restore?: { tabs: SessionTab[]; active: number }
+  restore?: { tabs: SessionTab[]; active: number; groups?: unknown; tabGroups?: unknown }
   /** private window — in-memory session, no history/session writes (build 5) */
   private?: boolean
 }
@@ -128,7 +129,7 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   const entry: WindowEntry = {
     win,
     tabs: null as unknown as TabManager,
-    ui: { sidebarOpen: false },
+    ui: { sidebarOpen: false, vtabWidth: 0 },
     chromeH: CHROME_HEIGHT,
     ...(opts.private ? { private: true } : {})
   }
@@ -199,11 +200,14 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
 
   registerTabManager(entry.tabs)
   if (opts.restore && opts.restore.tabs.length) {
-    // session restore: rebuild every tab, re-pin, focus the recorded one
+    // session restore: rebuild every tab, re-pin, re-group, focus the recorded one
     let focusId = 0
+    entry.tabs.restoreGroups(opts.restore.groups, opts.restore.tabGroups)
     opts.restore.tabs.forEach((t, i) => {
       const id = entry.tabs.create(t.url, false)
       if (t.pinned) entry.tabs.setPinned(id, true)
+      const gid = (t as SessionTab & { groupId?: string | null }).groupId
+      if (gid) entry.tabs.setTabGroup(id, gid)
       if (i === opts.restore!.active) focusId = id
     })
     entry.tabs.activate(focusId || entry.tabs.listIds()[0])

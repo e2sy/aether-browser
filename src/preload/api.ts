@@ -92,7 +92,13 @@ export const api = {
     createBackground: (url: string) => ipcRenderer.invoke('tabs:create-bg', url),
     closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
     closeRight: (id: number) => ipcRenderer.invoke('tabs:closeRight', id),
-    zoom: (action: 'in' | 'out' | 'reset') => ipcRenderer.invoke('tabs:zoom', action)
+    zoom: (action: 'in' | 'out' | 'reset') => ipcRenderer.invoke('tabs:zoom', action),
+    /** tab groups (#34) — named, colored, collapsible */
+    groupCreate: (name: string, color?: string) => ipcRenderer.invoke('tabs:groupCreate', name, color),
+    groupUpdate: (id: string, patch: { name?: string; color?: string; collapsed?: boolean }) =>
+      ipcRenderer.invoke('tabs:groupUpdate', id, patch),
+    groupDelete: (id: string) => ipcRenderer.invoke('tabs:groupDelete', id),
+    groupAssign: (tabId: number, groupId: string | null) => ipcRenderer.invoke('tabs:groupAssign', tabId, groupId)
   },
 
   omnibox: {
@@ -104,7 +110,9 @@ export const api = {
     /** v1.5.0 — renderer reports its measured chrome height (bookmarks bar etc.) */
     setChromeHeight: (h: number) => ipcRenderer.invoke('ui:chromeHeight', h),
     /** v1.5.0 — toggle the bookmarks bar everywhere (menu / settings page) */
-    setBookmarksBar: (show: boolean) => ipcRenderer.invoke('ui:setBookmarksBar', show)
+    setBookmarksBar: (show: boolean) => ipcRenderer.invoke('ui:setBookmarksBar', show),
+    /** v1.8.0 (#33) — vertical tabs: renderer reports the left-panel width */
+    setVtabWidth: (w: number) => ipcRenderer.invoke('ui:vtabWidth', w)
   },
 
   win: {

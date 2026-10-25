@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useApp, upsertDownload } from './state/store'
 import type { DownloadState } from '../../shared/types'
 import TabStrip from './components/TabStrip'
+import VerticalTabs from './components/VerticalTabs'
 import Toolbar from './components/Toolbar'
 import BookmarksBar from './components/BookmarksBar'
 import Sidebar from './components/Sidebar'
@@ -14,14 +15,25 @@ export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
   const activeLoading = useApp((s) => s.tabs.find((t) => t.id === s.activeId)?.loading)
   const isPrivate = useApp((s) => s.isPrivate)
+  const tabOrientation = useApp((s) => s.tabOrientation)
   const set = useApp((s) => s.set)
   const chromeRef = useRef<HTMLDivElement>(null)
+  const isMac = window.aether.platform === 'darwin'
+
+  // v1.8.0 (#33) — vertical tabs need the tab strip gone from the top chrome
+  const vertical = tabOrientation === 'left'
 
   // v1.5.0 — bookmarks bar visibility: from settings, live from the menu toggle
   useEffect(() => {
     window.aether.settings
       .get()
-      .then((s) => set({ showBookmarksBar: (s as { showBookmarksBar?: boolean }).showBookmarksBar !== false }))
+      .then((s) => {
+        const st = s as { showBookmarksBar?: boolean; tabOrientation?: 'top' | 'left' }
+        set({
+          showBookmarksBar: st.showBookmarksBar !== false,
+          tabOrientation: st.tabOrientation === 'left' ? 'left' : 'top'
+        })
+      })
       .catch(() => undefined)
     const unsubBar = window.aether.state.onBookmarksBar((v) => set({ showBookmarksBar: Boolean(v) }))
     const unsubPriv = window.aether.state.onPrivate(() => set({ isPrivate: true }))
@@ -90,8 +102,8 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     const unsub = window.aether.state.subscribe((data) => {
-      const s = data as { tabs: never[]; activeId: number | null }
-      set({ tabs: s.tabs, activeId: s.activeId })
+      const s = data as { tabs: never[]; activeId: number | null; groups?: never[] }
+      set({ tabs: s.tabs, activeId: s.activeId, groups: (s.groups || []) as never })
     })
     const unsubMax = window.aether.state.onMaximized((m) => set({ maximized: Boolean(m) }))
     const unsubShow = window.aether.state.onSidebarShow((raw) => {
@@ -122,21 +134,39 @@ export default function App(): JSX.Element {
   }, [])
 
   return (
-    <div className="app">
-      <div className="chrome" ref={chromeRef}>
-        <TabStrip />
-        <Toolbar />
-        <BookmarksBar />
-        {activeLoading && <div className="load-progress" />}
-        {isPrivate && (
-          <div className="private-strip" title="Private window — Aether won't save history, cookies or site data from here">
-            <span className="private-dot" /> Private window — history &amp; site data are not saved
-          </div>
-        )}
-      </div>
-      <div className="body">
-        <div className="webarea" />
-        {sidebarOpen && <Sidebar />}
+    <div className={`app ${vertical ? 'vtabs-on' : ''}`}>
+      {vertical && <VerticalTabs />}
+      <div className="app-main">
+        <div className="chrome" ref={chromeRef}>
+          {!vertical && <TabStrip />}
+          <Toolbar />
+          <BookmarksBar />
+          {activeLoading && <div className="load-progress" />}
+          {isPrivate && (
+            <div className="private-strip" title="Private window — Aether won't save history, cookies or site data from here">
+              <span className="private-dot" /> Private window — history &amp; site data are not saved
+            </div>
+          )}
+          {vertical && !isMac && (
+            <div className="win-controls win-controls-float">
+              <button onClick={() => window.aether.win.minimize()} title="Minimize">
+                <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor" strokeWidth={1.1} /></svg>
+              </button>
+              <button onClick={() => window.aether.win.maximizeToggle()} title="Maximize">
+                <svg width="10" height="10" viewBox="0 0 10 10">
+                  <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth={1.1} />
+                </svg>
+              </button>
+              <button className="close" onClick={() => window.aether.win.close()} title="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth={1.1} /></svg>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="body">
+          <div className="webarea" />
+          {sidebarOpen && <Sidebar />}
+        </div>
       </div>
       <FindBar />
       <PermPrompt />

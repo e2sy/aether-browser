@@ -16,11 +16,23 @@ export interface TabMeta {
   discarded: boolean
   /** Light sleep: muted + throttled at 1 fps — wakes instantly on activation */
   hibernated: boolean
+  /** Tab group membership (#34) — null/absent = ungrouped */
+  groupId?: string | null
 }
 
 export interface TabsState {
   tabs: TabMeta[]
   activeId: number | null
+  /** tab groups in strip order (#34) */
+  groups?: TabGroupInfo[]
+}
+
+/** Serializable group metadata for the renderer + session store. */
+export interface TabGroupInfo {
+  id: string
+  name: string
+  color: string
+  collapsed: boolean
 }
 
 export interface ChatMsg {
@@ -81,6 +93,8 @@ export interface Settings {
   startupBoost: boolean
   /** v1.7.0 (#30) — native notification when a download completes */
   notifyDownloads: boolean
+  /** v1.8.0 (#33) — tab strip orientation: classic top strip or left panel */
+  tabOrientation: 'top' | 'left'
 }
 
 /** A loaded unpacked extension (persisted across boots). */

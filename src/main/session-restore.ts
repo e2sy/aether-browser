@@ -18,12 +18,18 @@ import path from 'node:path'
 export interface SessionTab {
   url: string
   pinned: boolean
+  /** v1.8.0 (#34) — group membership by group id (group defined on the window) */
+  groupId?: string | null
 }
 
 export interface SessionWindow {
   tabs: SessionTab[]
   /** index into `tabs` of the tab that should be focused after restore */
   active: number
+  /** v1.8.0 (#34) — the window's tab groups, saved across restarts */
+  groups?: unknown
+  /** v1.8.0 (#34) — tabId→groupId map (tab ids are the array indexes at save time) */
+  tabGroups?: unknown
 }
 
 export interface SessionSnapshot {
@@ -114,7 +120,12 @@ export interface RawSession {
 export interface SessionEntryLike {
   win: { isDestroyed(): boolean }
   tabs: {
-    getState(): { tabs: Array<{ id: number; url: string; pinned: boolean }>; activeId: number | null }
+    getState(): {
+      tabs: Array<{ id: number; url: string; pinned: boolean; groupId?: string | null }>
+      activeId: number | null
+    }
+    /** tab groups (#34) — snapshot for the session store */
+    groupSnapshot(): { groups: unknown; tabGroups: Record<string, string | null> }
   }
   /** private windows (v1.5.0 build 5) must never hit the disk */
   private?: boolean
@@ -128,9 +139,17 @@ export function snapshotFromEntries(entries: SessionEntryLike[]): SessionSnapsho
     if (e.win.isDestroyed()) continue
     const st = e.tabs.getState()
     if (!st.tabs.length) continue
-    const tabs = st.tabs.map((t) => ({ url: t.url, pinned: t.pinned }))
+    const tabs = st.tabs.map((t) => ({ url: t.url, pinned: t.pinned, groupId: t.groupId ?? null }))
     const ai = st.activeId !== null ? st.tabs.findIndex((t) => t.id === st.activeId) : 0
-    windows.push({ tabs, active: Math.max(0, ai) })
+    const snap = e.tabs.groupSnapshot()
+    // remap live tab ids → array indexes so restore can re-bind after new ids are minted
+    const idxOf = new Map<number, number>(st.tabs.map((t, i) => [t.id, i]))
+    const tabGroups: Record<string, string | null> = {}
+    for (const [tidStr, gid] of Object.entries(snap.tabGroups)) {
+      const i = idxOf.get(Number(tidStr))
+      if (i !== undefined && gid) tabGroups[String(i)] = gid
+    }
+    windows.push({ tabs, active: Math.max(0, ai), groups: snap.groups, tabGroups })
   }
   return { windows, savedAt: Date.now(), cleanExit: false }
 }

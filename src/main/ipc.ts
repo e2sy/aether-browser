@@ -176,6 +176,33 @@ export function registerIpc(): void {
     fromSender(e)?.tabs.reorder(Number(from), Number(to))
   })
 
+  // tab groups (#34) — named, colored, collapsible, saved across restarts
+  ipcMain.handle('tabs:groupCreate', (e, name: string, color?: string) => {
+    guard(e, 'tabs:groupCreate')
+    return fromSender(e)?.tabs.createGroup(String(name || ''), color) ?? null
+  })
+  ipcMain.handle('tabs:groupUpdate', (e, id: string, patch: { name?: string; color?: string; collapsed?: boolean }) => {
+    guard(e, 'tabs:groupUpdate')
+    return (
+      fromSender(e)?.tabs.updateGroup(String(id || ''), {
+        ...(patch && typeof patch === 'object' ? patch : {})
+      }) ?? false
+    )
+  })
+  ipcMain.handle('tabs:groupDelete', (e, id: string) => {
+    guard(e, 'tabs:groupDelete')
+    return fromSender(e)?.tabs.deleteGroup(String(id || '')) ?? false
+  })
+  ipcMain.handle('tabs:groupAssign', (e, tabId: number, groupId: string | null) => {
+    guard(e, 'tabs:groupAssign')
+    return (
+      fromSender(e)?.tabs.setTabGroup(
+        Number(tabId),
+        groupId === null || groupId === undefined ? null : String(groupId)
+      ) ?? false
+    )
+  })
+
   // tab extras: pin / mute / duplicate / discard / hibernate / popout / bulk close
   ipcMain.handle('tabs:setPinned', (e, id: number, pinned: boolean) => {
     guard(e, 'tabs:setPinned')
@@ -235,6 +262,19 @@ export function registerIpc(): void {
     const px = Math.max(CHROME_MIN, Math.min(CHROME_MAX, Math.round(Number(h) || 0)))
     if (px !== entry.chromeH) {
       entry.chromeH = px
+      applyLayout(entry)
+    }
+  })
+
+  // v1.8.0 (#33) — vertical tabs: renderer reports its left-panel width so
+  // the web area shifts right by exactly that amount
+  ipcMain.handle('ui:vtabWidth', (e, w: number) => {
+    guard(e, 'ui:vtabWidth')
+    const entry = fromSender(e)
+    if (!entry) return
+    const px = Math.max(0, Math.min(400, Math.round(Number(w) || 0)))
+    if (px !== entry.ui.vtabWidth) {
+      entry.ui.vtabWidth = px
       applyLayout(entry)
     }
   })

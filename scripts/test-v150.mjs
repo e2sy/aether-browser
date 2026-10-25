@@ -189,7 +189,9 @@ function fakeEntry(tabs, activeId, opts = {}) {
     win: { isDestroyed: () => Boolean(opts.destroyed) },
     private: opts.private,
     tabs: {
-      getState: () => ({ tabs: tabs.map((t, i) => ({ id: ids[i], ...t })), activeId })
+      getState: () => ({ tabs: tabs.map((t, i) => ({ id: ids[i], ...t })), activeId }),
+      // v1.8.0 build 10 — tab groups ride along in every snapshot
+      groupSnapshot: () => ({ groups: [], tabGroups: {} })
     }
   }
 }

@@ -1,5 +1,14 @@
 import { BrowserWindow, WebContentsView, Rectangle } from 'electron'
 import type { TabMeta, TabsState } from '../shared/types'
+import {
+  makeGroup,
+  renameGroup,
+  recolorGroup,
+  toggleGroupCollapsed,
+  deleteGroup,
+  sanitizeGroups,
+  type TabGroup
+} from './tabgroups'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
 import { shouldBlockWillNavigate, blockReason } from './navlock'
 import { isExternalCandidate, maybeOpenExternal } from './extproto'
@@ -13,6 +22,8 @@ interface Tab extends TabMeta {
   view: WebContentsView | null
   /** monotonic clock of last activation — drives the memory saver */
   lastActiveAt: number
+  /** tab group membership (#34) — null = ungrouped */
+  groupId: string | null
 }
 
 const hostOf = (url: string): string => {
@@ -56,6 +67,9 @@ export class TabManager {
   private saverTimer: NodeJS.Timeout | null = null
   /** URLs of recently closed tabs, most recent last — drives Ctrl+Shift+T. */
   private closedStack: string[] = []
+  /** Tab groups (#34) — metadata + tab→group map, restored with the session */
+  groups: TabGroup[] = []
+  private tabGroupOf = new Map<number, string | null>()
   activeId: number | null = null
 
   constructor(
@@ -86,6 +100,7 @@ export class TabManager {
       audible: false,
       discarded: false,
       hibernated: false,
+      groupId: null,
       lastActiveAt: Date.now()
     }
     this.tabs.set(id, tab)
@@ -631,6 +646,80 @@ export class TabManager {
     this.emit()
   }
 
+  // ---------- tab groups (#34) ----------
+
+  /** Create a group. Returns the group or null when the name is bad/duplicate. */
+  createGroup(name: string, color?: string): TabGroup | null {
+    const g = makeGroup({ name, color }, this.groups)
+    if (!g) return null
+    this.groups.push(g)
+    this.emit()
+    return g
+  }
+
+  updateGroup(id: string, patch: { name?: string; color?: string; collapsed?: boolean }): boolean {
+    let changed = false
+    if (patch.name !== undefined) {
+      this.groups = renameGroup(this.groups, id, patch.name)
+      changed = true
+    }
+    if (patch.color !== undefined) {
+      this.groups = recolorGroup(this.groups, id, patch.color)
+      changed = true
+    }
+    if (patch.collapsed !== undefined) {
+      this.groups = toggleGroupCollapsed(this.groups, id, patch.collapsed)
+      changed = true
+    }
+    if (changed) this.emit()
+    return changed
+  }
+
+  /** Delete a group — members become ungrouped, tabs survive. */
+  deleteGroup(id: string): boolean {
+    const map: Record<string, string | null> = {}
+    for (const [tid, gid] of this.tabGroupOf) map[String(tid)] = gid ?? null
+    const res = deleteGroup(this.groups, id, map)
+    if (res.groups.length === this.groups.length) return false
+    this.groups = res.groups
+    this.tabGroupOf = new Map<number, string | null>(
+      Object.entries(res.tabGroups).map(([k, v]) => [Number(k), v])
+    )
+    this.emit()
+    return true
+  }
+
+  /** Assign/unassign a tab. Unknown ids are ignored (fail-closed). */
+  setTabGroup(tabId: number, groupId: string | null): boolean {
+    if (!this.tabs.has(tabId)) return false
+    if (groupId !== null && !this.groups.some((g) => g.id === groupId)) return false
+    this.tabGroupOf.set(tabId, groupId)
+    this.emit()
+    return true
+  }
+
+  /** Group snapshot for session restore (sanitized by the caller's schema). */
+  groupSnapshot(): { groups: TabGroup[]; tabGroups: Record<string, string | null> } {
+    const map: Record<string, string | null> = {}
+    for (const [tid, gid] of this.tabGroupOf) if (gid) map[String(tid)] = gid
+    return { groups: this.groups, tabGroups: map }
+  }
+
+  /** Restore groups from a session snapshot (before tabs are recreated). */
+  restoreGroups(groups: unknown, tabGroups: unknown): void {
+    const gs = sanitizeGroups(groups)
+    this.groups = gs
+    this.tabGroupOf = new Map()
+    const raw = (tabGroups && typeof tabGroups === 'object' ? tabGroups : {}) as Record<string, unknown>
+    for (const [k, v] of Object.entries(raw)) {
+      const tid = Number(k)
+      if (Number.isInteger(tid) && typeof v === 'string' && gs.some((g) => g.id === v)) {
+        this.tabGroupOf.set(tid, v)
+      }
+    }
+    this.emit()
+  }
+
   /** Keep pinned tabs first (stable within each group). */
   private normalizeOrder(): void {
     const rank = (id: number): number => (this.tabs.get(id)?.pinned ? 0 : 1)
@@ -709,9 +798,10 @@ export class TabManager {
         muted: t.muted,
         audible: t.audible,
         discarded: t.discarded,
-        hibernated: t.hibernated
+        hibernated: t.hibernated,
+        groupId: this.tabGroupOf.get(t.id) ?? null
       }))
-    return { tabs, activeId: this.activeId }
+    return { tabs, activeId: this.activeId, groups: this.groups }
   }
 
   private emit(): void {

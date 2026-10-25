@@ -1,9 +1,13 @@
 import { create } from 'zustand'
-import type { TabMeta, Settings, Bookmark, SidebarMode, DownloadState } from '../../../shared/types'
+import type { TabMeta, Settings, Bookmark, SidebarMode, DownloadState, TabGroupInfo } from '../../../shared/types'
 
 interface AppState {
   tabs: TabMeta[]
   activeId: number | null
+  /** tab groups (#34) — synced from tabs:state */
+  groups: TabGroupInfo[]
+  /** v1.8.0 (#33) — tab strip orientation */
+  tabOrientation: 'top' | 'left'
   sidebarOpen: boolean
   /** one-shot request (from app menu) to open the sidebar on a given tab */
   sidebarMode: SidebarMode | null
@@ -24,6 +28,8 @@ interface AppState {
 export const useApp = create<AppState>((set) => ({
   tabs: [],
   activeId: null,
+  groups: [],
+  tabOrientation: 'top',
   sidebarOpen: false,
   sidebarMode: null,
   maximized: false,

@@ -122,7 +122,7 @@ ok(process.platform === 'win32' || (fs.statSync(hooks).mode & 0o111) !== 0, 'pre
 const pkg = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf-8'))
 ok(pkg.scripts['scan:secrets'] !== undefined, 'npm run scan:secrets available')
 ok(pkg.scripts['hooks:install'] !== undefined, 'npm run hooks:install available')
-ok(pkg.version === '1.7.0', 'version is 1.7.0 (Phase 0 milestone)')
+ok(pkg.version >= '1.7.0', 'version is at least 1.7.0 (Phase 0 milestone; Phase 2 moved on)')
 
 const hyg = fs.readFileSync(path.join(APP, 'docs', 'SECURITY-HYGIENE.md'), 'utf-8')
 ok(hyg.includes('Rotation runbook') || hyg.includes('rotation runbook'), 'SECURITY-HYGIENE has the rotation runbook')
