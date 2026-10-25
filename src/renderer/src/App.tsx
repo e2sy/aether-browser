@@ -10,6 +10,7 @@ import FindBar from './components/FindBar'
 import PermPrompt from './components/PermPrompt'
 import ZoomBubble from './components/ZoomBubble'
 import DownloadBar from './components/DownloadBar'
+import CommandPalette from './components/CommandPalette'
 
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
@@ -123,6 +124,17 @@ export default function App(): JSX.Element {
       const d = raw as DownloadState | null
       if (d && d.id) upsertDownload(d)
     })
+    // command palette (#37) — bookmarks are ranked as commands
+    window.aether.bookmarks
+      .list()
+      .then((l) => set({ bookmarks: (Array.isArray(l) ? l : []) as never }))
+      .catch(() => undefined)
+    const unsubBm = window.aether.bookmarks.onChanged(() => {
+      window.aether.bookmarks
+        .list()
+        .then((l) => set({ bookmarks: (Array.isArray(l) ? l : []) as never }))
+        .catch(() => undefined)
+    })
     return () => {
       unsub()
       unsubMax()
@@ -130,6 +142,7 @@ export default function App(): JSX.Element {
       unsubToggle()
       unsubZoom()
       unsubDl()
+      unsubBm()
     }
   }, [])
 
@@ -172,6 +185,7 @@ export default function App(): JSX.Element {
       <PermPrompt />
       <ZoomBubble />
       <DownloadBar />
+      <CommandPalette />
     </div>
   )
 }

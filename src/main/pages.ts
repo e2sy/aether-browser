@@ -111,10 +111,22 @@ export const NEW_TAB_HTML = pageShell(
       letter-spacing:.08em; background:var(--ax-accent-soft); border:none; border-radius:8px; padding:6px 10px;
       cursor:pointer;">AI</button>
   </form>
-  <div style="margin-top:44px; width:min(640px,88vw);">
-    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
-    <div id="top" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;"></div>
-    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin:26px 0 14px;" id="bm-label">BOOKMARKS</div>
+  <div style="margin-top:44px; width:min(640px,88vw); display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:start;" id="widgets">
+    <div>
+      <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
+      <div id="top" style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;"></div>
+    </div>
+    <div>
+      <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;">QUICK NOTES</div>
+      <textarea id="quicknotes" placeholder="Scratchpad — saved on this device as you type…"
+        style="width:100%; min-height:170px; resize:vertical; padding:12px 14px; font-size:13px; line-height:1.55; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:12px; outline:none;
+        font-family:inherit;"></textarea>
+      <div id="notes-status" style="font-size:10.5px; color:var(--ax-faint); margin-top:5px; text-align:right;">saved locally</div>
+    </div>
+  </div>
+  <div style="margin-top:26px; width:min(640px,88vw);">
+    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;" id="bm-label">BOOKMARKS</div>
     <div id="bm" style="display:flex; flex-direction:column; gap:8px;"></div>
   </div>
   <div style="margin-top:auto; padding:18px; color:var(--ax-faint); font-size:11px;">
@@ -216,6 +228,24 @@ export const NEW_TAB_HTML = pageShell(
   } catch (e) {
     bridgeError('Browser bridge unavailable (' + (e && e.message) + ') — fully quit Aether and start it again. If it keeps happening, run: npm run build')
   }
+  // quick notes widget (New Tab v3, #44) — debounced save, sanitized by main
+  try {
+    var nt = document.getElementById('quicknotes')
+    var nsStatus = document.getElementById('notes-status')
+    var nsTimer = null
+    window.aether.notes.get().then(function (txt) {
+      nt.value = typeof txt === 'string' ? txt : ''
+    }).catch(function () {})
+    nt.addEventListener('input', function () {
+      if (nsTimer) clearTimeout(nsTimer)
+      nsStatus.textContent = 'saving…'
+      nsTimer = setTimeout(function () {
+        window.aether.notes.set(nt.value).then(function () {
+          nsStatus.textContent = 'saved locally'
+        }).catch(function () { nsStatus.textContent = 'could not save' })
+      }, 500)
+    })
+  } catch (e) {}
   `
 )
 
@@ -788,21 +818,27 @@ const MGR_CSS = `
   .none { border:none; background:transparent; color:var(--ax-muted); cursor:default; }
 `
 
-function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string): string {
+function mgrShell(title: string, heading: string, withClear: boolean, body: string, script: string, withDomain = false): string {
   const clearBtn = withClear ? '<button class="muted-btn" id="clear">Clear all</button>' : ''
+  const domainSel = withDomain ? '<select id="domain" style="max-width:180px"><option value="">All sites</option></select>' : ''
+  const count = withDomain ? '<span id="count" style="font-size:11.5px;color:var(--ax-muted);align-self:center"></span>' : ''
   return pageShell(
     title,
     `
     <div class="wrap">
       <div class="head">
         <h1>${heading}</h1>
+        ${domainSel}
         <input id="q" type="text" placeholder="Search…" />
+        ${count}
         ${clearBtn}
       </div>
       <div class="rows" id="rows"></div>
       <div class="empty2" id="empty" style="display:none">Nothing here yet.</div>
     </div>
-    <style>${MGR_CSS}</style>
+    <style>${MGR_CSS}
+    .day-head { padding:14px 4px 6px; font-size:12px; font-weight:700; letter-spacing:.05em; color:var(--ax-muted); text-transform:uppercase; border-bottom:1px solid var(--ax-border); margin-bottom:4px; }
+    </style>
     `,
     script
   )
@@ -821,13 +857,48 @@ export const HISTORY_HTML = mgrShell(
     if (d.toDateString() === today.toDateString()) return hm
     return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm
   }
+  function dayLabel(ts) {
+    var d = new Date(ts), today = new Date(), y = new Date(today.getTime() - 86400000)
+    if (d.toDateString() === today.toDateString()) return 'Today'
+    if (d.toDateString() === y.toDateString()) return 'Yesterday'
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  }
   var current = []
+  var currentDomain = ''
+  function domainOptions(items) {
+    var freq = {}
+    items.forEach(function (h) { freq[h.host] = (freq[h.host] || 0) + 1 })
+    return Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a] })
+  }
+  function renderDomainPicker(items) {
+    var sel = document.getElementById('domain')
+    sel.innerHTML = ''
+    var all = document.createElement('option'); all.value = ''; all.textContent = 'All sites'; sel.appendChild(all)
+    domainOptions(items).forEach(function (h) {
+      var o = document.createElement('option'); o.value = h; o.textContent = h.replace(/^www\\./, ''); sel.appendChild(o)
+    })
+    sel.value = currentDomain
+    if (currentDomain && !domainOptions(items).includes(currentDomain)) { currentDomain = ''; sel.value = '' }
+  }
   function render(items) {
     current = items
+    renderDomainPicker(items)
     var rows = document.getElementById('rows')
     rows.innerHTML = ''
-    document.getElementById('empty').style.display = items.length ? 'none' : 'block'
-    items.forEach(function (h) {
+    var visible = currentDomain ? items.filter(function (h) { return h.host === currentDomain }) : items
+    document.getElementById('empty').style.display = visible.length ? 'none' : 'block'
+    document.getElementById('count').textContent = visible.length
+      ? visible.length + ' page' + (visible.length === 1 ? '' : 's')
+      : ''
+    var lastDay = ''
+    visible.forEach(function (h) {
+      var dl = dayLabel(h.ts)
+      if (dl !== lastDay) {
+        lastDay = dl
+        var head = document.createElement('div'); head.className = 'day-head'
+        head.textContent = dl
+        rows.appendChild(head)
+      }
       var row = document.createElement('div'); row.className = 'row'
       var ic = document.createElement('div'); ic.className = 'ic none'
       ic.textContent = (h.host || '?').replace(/^www\\./, '').charAt(0).toUpperCase()
@@ -850,11 +921,16 @@ export const HISTORY_HTML = mgrShell(
   }
   function load() { window.aether.history.search(document.getElementById('q').value).then(render) }
   document.getElementById('q').addEventListener('input', load)
+  document.getElementById('domain').addEventListener('change', function (e) {
+    currentDomain = e.target.value || ''
+    render(current)
+  })
   document.getElementById('clear').addEventListener('click', function () {
     if (confirm('Clear ALL browsing history?')) { window.aether.history.clear(); render([]) }
   })
   load()
-  `
+  `,
+  true
 )
 
 export const BOOKMARKS_HTML = mgrShell(

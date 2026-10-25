@@ -3,7 +3,7 @@ import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
 import { resolveInput } from './resolve'
-import { entryForSender, applyLayout, allEntries } from './windows'
+import { entryForSender, applyLayout, allEntries, createBrowserWindow } from './windows'
 import { setShowBookmarksBar } from './menu'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
 import {
@@ -59,6 +59,7 @@ import {
 import { forgetCertMemos } from './certs'
 import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { createTray, destroyTray, applyStartupBoost } from './osshell'
+import { getNotes, setNotes } from './quicknotes'
 import { listMacros, saveMacro, deleteMacro, getMacro, updateMacro, exportMacro, importMacro } from './macros'
 import {
   listExtensionInfos,
@@ -299,6 +300,12 @@ export function registerIpc(): void {
   ipcMain.handle('win:close', (e) => {
     guard(e, 'win:close')
     fromSender(e)?.win.close()
+  })
+
+  // command palette (#37) — spawn a private window from anywhere
+  ipcMain.handle('win:newPrivate', (e) => {
+    guard(e, 'win:newPrivate')
+    createBrowserWindow(undefined, { private: true })
   })
 
   // ---------- settings / bookmarks / history ----------
@@ -639,6 +646,17 @@ export function registerIpc(): void {
   ipcMain.handle('extproto:forget', (e) => {
     guard(e, 'extproto:forget')
     return forgetExternalChoices()
+  })
+
+  // quick notes widget (New Tab v3 — Master Plan #44); internal pages only
+  ipcMain.handle('notes:get', (e) => {
+    guard(e, 'notes:get')
+    return getNotes()
+  })
+
+  ipcMain.handle('notes:set', (e, text: string) => {
+    guard(e, 'notes:set')
+    return setNotes(text)
   })
 
   // ---------- page memory (local, per-domain) ----------

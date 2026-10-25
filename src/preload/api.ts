@@ -118,7 +118,9 @@ export const api = {
   win: {
     minimize: () => ipcRenderer.invoke('win:minimize'),
     maximizeToggle: () => ipcRenderer.invoke('win:maximizeToggle'),
-    close: () => ipcRenderer.invoke('win:close')
+    close: () => ipcRenderer.invoke('win:close'),
+    /** v1.8.0 (#37) — command palette: new private window */
+    newPrivate: () => ipcRenderer.invoke('win:newPrivate')
   },
 
   ai: {
@@ -185,6 +187,12 @@ export const api = {
   extproto: {
     list: () => ipcRenderer.invoke('extproto:list'),
     forget: () => ipcRenderer.invoke('extproto:forget')
+  },
+
+  /** quick notes widget (New Tab v3) */
+  notes: {
+    get: () => ipcRenderer.invoke('notes:get'),
+    set: (text: string) => ipcRenderer.invoke('notes:set', text)
   },
 
   /** local per-domain page memory */

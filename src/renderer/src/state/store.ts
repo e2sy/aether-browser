@@ -22,6 +22,8 @@ interface AppState {
   showBookmarksBar: boolean
   /** v1.5.0 — this window is private (in-memory session, nothing saved) */
   isPrivate: boolean
+  /** v1.8.0 (#37) — command palette visibility */
+  paletteOpen: boolean
   set: (patch: Partial<AppState>) => void
 }
 
@@ -39,6 +41,7 @@ export const useApp = create<AppState>((set) => ({
   zoom: null,
   showBookmarksBar: true,
   isPrivate: false,
+  paletteOpen: false,
   set: (patch) => set(patch)
 }))
 
