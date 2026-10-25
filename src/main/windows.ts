@@ -23,6 +23,8 @@ export interface WindowEntry {
   ui: { sidebarOpen: boolean }
   /** v1.5.0 build 5: private windows skip history writes + session persistence */
   private?: boolean
+  /** measured chrome height (tab strip + toolbar + optional bookmarks bar) */
+  chromeH: number
 }
 
 const entries = new Map<number, WindowEntry>()
@@ -61,12 +63,13 @@ export function focusedEntry(): WindowEntry | undefined {
 export function applyLayout(entry: WindowEntry): void {
   if (entry.win.isDestroyed()) return
   const [w, h] = entry.win.getContentSize()
+  const chromeH = Math.max(CHROME_HEIGHT, entry.chromeH || CHROME_HEIGHT)
   const sidebar = entry.ui.sidebarOpen ? SIDEBAR_WIDTH : 0
   entry.tabs.setBounds({
     x: 0,
-    y: CHROME_HEIGHT,
+    y: chromeH,
     width: Math.max(60, w - sidebar),
-    height: Math.max(60, h - CHROME_HEIGHT)
+    height: Math.max(60, h - chromeH)
   })
 }
 
@@ -106,7 +109,9 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   const entry: WindowEntry = {
     win,
     tabs: null as unknown as TabManager,
-    ui: { sidebarOpen: false }
+    ui: { sidebarOpen: false },
+    chromeH: CHROME_HEIGHT,
+    ...(opts.private ? { private: true } : {})
   }
   entries.set(win.id, entry)
 

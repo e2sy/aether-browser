@@ -48,7 +48,8 @@ export const DEFAULT_SETTINGS: Settings = {
   memorySaver: 30,
   extensions: [],
   appearance: DEFAULT_APPEARANCE,
-  restoreSession: true
+  restoreSession: true,
+  showBookmarksBar: true
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

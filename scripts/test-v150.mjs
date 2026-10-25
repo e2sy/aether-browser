@@ -78,6 +78,22 @@ await build({
   logLevel: 'warning'
 })
 
+// second bundle: the settings store (mergedSettings / DEFAULT_SETTINGS)
+const settingsEntry = path.join(tmp, 'src', 'main', 'testable-settings.ts')
+fs.writeFileSync(
+  settingsEntry,
+  `export { DEFAULT_SETTINGS, mergedSettings } from './store'`
+)
+await build({
+  entryPoints: [settingsEntry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile: path.join(tmp, 'bundle-settings.mjs'),
+  alias: { electron: electronStub },
+  logLevel: 'warning'
+})
+
 const mod = await import(outfile)
 const {
   isRestorableUrl,
@@ -210,5 +226,15 @@ ok(dlSanitizeName('CON') === '_CON', 'reserved device name prefixed')
 ok(dlSanitizeName('name. . ') === 'name', 'trailing dots/spaces trimmed')
 ok(dlSanitizeName('') === 'download', 'empty name falls back')
 
-console.log(`\nv1.5.0 build 2 (downloads): ${pass} passed, ${fail} failed`)
+console.log(`\nv1.5.0 build 2 (downloads): OK — running build 3 sections`)
+
+console.log('\n[8] bookmarks bar — settings contract')
+const { DEFAULT_SETTINGS, mergedSettings } = await import(path.join(tmp, 'bundle-settings.mjs'))
+ok(DEFAULT_SETTINGS.showBookmarksBar === true, 'bookmarks bar defaults to visible')
+ok(DEFAULT_SETTINGS.restoreSession === true, 'session restore defaults to on')
+const st = mergedSettings()
+ok(st.showBookmarksBar === true && st.restoreSession === true, 'mergedSettings fills both new keys')
+ok(typeof st.showBookmarksBar === 'boolean' && typeof st.restoreSession === 'boolean', 'both keys are real booleans')
+
+console.log(`\nv1.5.0 build 3 (bookmarks bar): ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

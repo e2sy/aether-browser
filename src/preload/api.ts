@@ -62,7 +62,9 @@ export const api = {
     /** per-site zoom feedback for the zoom bubble */
     onZoom: subscribe('zoom:changed'),
     /** download progress for the download bar */
-    onDownload: subscribe('download:progress')
+    onDownload: subscribe('download:progress'),
+    /** v1.5.0 — bookmarks bar visibility toggled from the menu / settings */
+    onBookmarksBar: subscribe('chrome:bookmarksBar')
   },
 
   tabs: {
@@ -84,6 +86,8 @@ export const api = {
     hibernate: (id: number) => ipcRenderer.invoke('tabs:hibernate', id),
     /** move a tab out into its own window */
     popout: (id: number) => ipcRenderer.invoke('tabs:popout', id),
+    /** v1.5.0 — middle-click a bookmarks-bar item: open without activating */
+    createBackground: (url: string) => ipcRenderer.invoke('tabs:create-bg', url),
     closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
     closeRight: (id: number) => ipcRenderer.invoke('tabs:closeRight', id),
     zoom: (action: 'in' | 'out' | 'reset') => ipcRenderer.invoke('tabs:zoom', action)
@@ -94,7 +98,11 @@ export const api = {
   },
 
   ui: {
-    setSidebar: (open: boolean) => ipcRenderer.invoke('ui:setSidebar', open)
+    setSidebar: (open: boolean) => ipcRenderer.invoke('ui:setSidebar', open),
+    /** v1.5.0 — renderer reports its measured chrome height (bookmarks bar etc.) */
+    setChromeHeight: (h: number) => ipcRenderer.invoke('ui:chromeHeight', h),
+    /** v1.5.0 — toggle the bookmarks bar everywhere (menu / settings page) */
+    setBookmarksBar: (show: boolean) => ipcRenderer.invoke('ui:setBookmarksBar', show)
   },
 
   win: {
@@ -231,7 +239,9 @@ export const api = {
     is: (url: string) => ipcRenderer.invoke('bookmarks:is', url),
     list: () => ipcRenderer.invoke('bookmarks:list'),
     search: (q: string) => ipcRenderer.invoke('bookmarks:search', q),
-    remove: (url: string) => ipcRenderer.invoke('bookmarks:remove', url)
+    remove: (url: string) => ipcRenderer.invoke('bookmarks:remove', url),
+    /** v1.5.0 — list changed (toggle/remove anywhere, incl. bookmarks page) */
+    onChanged: subscribe('bookmarks:changed')
   },
 
   history: {

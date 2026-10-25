@@ -14,6 +14,8 @@ interface AppState {
   downloads: DownloadState[]
   /** last zoom feedback for the bubble */
   zoom: { percent: number; ts: number } | null
+  /** v1.5.0 — bookmarks bar visibility (settings + live menu toggle) */
+  showBookmarksBar: boolean
   set: (patch: Partial<AppState>) => void
 }
 
@@ -27,6 +29,7 @@ export const useApp = create<AppState>((set) => ({
   bookmarks: [],
   downloads: [],
   zoom: null,
+  showBookmarksBar: true,
   set: (patch) => set(patch)
 }))
 

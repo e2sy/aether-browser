@@ -646,6 +646,7 @@ export const SETTINGS_HTML = pageShell(
       <div class="label">Behavior</div>
       <div class="opts">
         <label><input type="checkbox" id="confirmAgentActions" /> Agent asks before every action</label>
+        <label><input type="checkbox" id="showBookmarksBar" /> Show the bookmarks bar (Ctrl+Shift+B)</label>
         <label><input type="checkbox" id="usePageContext" /> Sidebar chat sees the current page</label>
         <label><input type="checkbox" id="pageMemory" /> Remember page conversations per site (local memory)</label>
         <label><input type="checkbox" id="adblock" /> Block ads &amp; trackers (EasyList + EasyPrivacy)</label>
@@ -780,6 +781,7 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('axclock').checked = axState.newtabClock
       axWire(); axMarkSwatch()
       document.getElementById('confirmAgentActions').checked = !!s.confirmAgentActions
+      document.getElementById('showBookmarksBar').checked = s.showBookmarksBar !== false
       document.getElementById('usePageContext').checked = !!s.usePageContext
       document.getElementById('pageMemory').checked = s.pageMemory !== false
       document.getElementById('adblock').checked = !!s.adblock
@@ -1006,6 +1008,10 @@ export const SETTINGS_HTML = pageShell(
     radios[i].addEventListener('change', function (e) { if (e.target.checked) save({ searchMode: e.target.value }) })
   }
   document.getElementById('confirmAgentActions').addEventListener('change', function (e) { save({ confirmAgentActions: e.target.checked }) })
+  document.getElementById('showBookmarksBar').addEventListener('change', function (e) {
+    // ui.setBookmarksBar persists AND broadcasts to every window — don't double-save
+    try { window.aether.ui.setBookmarksBar(e.target.checked) } catch (err) { save({ showBookmarksBar: e.target.checked }) }
+  })
   document.getElementById('usePageContext').addEventListener('change', function (e) { save({ usePageContext: e.target.checked }) })
   document.getElementById('pageMemory').addEventListener('change', function (e) { save({ pageMemory: e.target.checked }) })
   document.getElementById('adblock').addEventListener('change', function (e) { save({ adblock: e.target.checked }) })

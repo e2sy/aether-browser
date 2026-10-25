@@ -3,7 +3,8 @@ import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
 import { resolveInput } from './resolve'
-import { entryForSender, applyLayout } from './windows'
+import { entryForSender, applyLayout, allEntries } from './windows'
+import { setShowBookmarksBar } from './menu'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
 import {
   settings,
@@ -68,8 +69,18 @@ import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
 import type { MacroStep } from '../shared/types'
 
 const HISTORY_WINDOW = 20
+/** sane bounds for the measured chrome height (tab strip + toolbar + bar) */
+const CHROME_MIN = 60
+const CHROME_MAX = 600
 
 const aborts = new Map<string, AbortController>()
+
+/** Send a chrome-wide event to every live browser window. */
+function broadcastToAll(channel: string, payload: unknown): void {
+  for (const entry of allEntries()) {
+    if (!entry.win.isDestroyed()) entry.win.webContents.send(channel, payload)
+  }
+}
 
 /** Guard helper — throws for unauthorized senders so pages can't drive the browser.
  *
@@ -119,6 +130,13 @@ export function registerIpc(): void {
   ipcMain.handle('tabs:create', (e, url?: string) => {
     guard(e, 'tabs:create')
     return fromSender(e)?.tabs.create(url && /^https?:\/\//i.test(url) ? url : undefined)
+  })
+
+  // v1.5.0 — middle-click on the bookmarks bar: open without stealing focus
+  ipcMain.handle('tabs:create-bg', (e, url?: string) => {
+    guard(e, 'tabs:create-bg')
+    const u = typeof url === 'string' && /^https?:\/\//i.test(url) ? url : undefined
+    if (u) fromSender(e)?.tabs.create(u, false)
   })
 
   ipcMain.handle('tabs:list', (e) => {
@@ -200,6 +218,25 @@ export function registerIpc(): void {
     applyLayout(entry)
   })
 
+  // v1.5.0 — renderer measures its chrome (tab strip + toolbar + bookmarks
+  // bar); the web-area view must sit exactly below it.
+  ipcMain.handle('ui:chromeHeight', (e, h: number) => {
+    guard(e, 'ui:chromeHeight')
+    const entry = fromSender(e)
+    if (!entry) return
+    const px = Math.max(CHROME_MIN, Math.min(CHROME_MAX, Math.round(Number(h) || 0)))
+    if (px !== entry.chromeH) {
+      entry.chromeH = px
+      applyLayout(entry)
+    }
+  })
+
+  // v1.5.0 — toggle the bookmarks bar everywhere (menu checkbox / settings)
+  ipcMain.handle('ui:setBookmarksBar', (e, show: boolean) => {
+    guard(e, 'ui:setBookmarksBar')
+    setShowBookmarksBar(Boolean(show))
+  })
+
   ipcMain.handle('win:minimize', (e) => {
     guard(e, 'win:minimize')
     fromSender(e)?.win.minimize()
@@ -248,13 +285,16 @@ export function registerIpc(): void {
 
   ipcMain.handle('bookmarks:toggle', (e, entry: { url: string; title: string }) => {
     guard(e, 'bookmarks:toggle')
-    return toggleBookmark(entry)
+    const now = toggleBookmark(entry)
+    broadcastToAll('bookmarks:changed', {})
+    return now
   })
   ipcMain.handle('bookmarks:is', (e, url: string) => isBookmarked(String(url || '')))
   ipcMain.handle('bookmarks:list', (e) => bookmarks.data)
   ipcMain.handle('bookmarks:remove', (e, url: string) => {
     guard(e, 'bookmarks:remove')
     removeBookmark(String(url || ''))
+    broadcastToAll('bookmarks:changed', {})
   })
   ipcMain.handle('bookmarks:search', (e, q: string) => {
     guard(e, 'bookmarks:search')

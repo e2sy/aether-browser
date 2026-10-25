@@ -47,6 +47,95 @@ body {
   z-index: 10;
 }
 
+/* ---------- bookmarks bar (v1.5.0) ---------- */
+.bookmarks-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--bg);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-top: 1px solid var(--border);
+}
+.bookmarks-bar::-webkit-scrollbar {
+  display: none;
+}
+.bm-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 180px;
+  flex: none;
+  background: transparent;
+}
+.bm-item:hover {
+  background: var(--bg3);
+  border-color: var(--bg4);
+}
+.bm-ic {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex: none;
+  background: rgba(124, 140, 255, 0.16);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+.bm-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bm-empty {
+  font-size: 12px;
+  color: var(--faint);
+  padding: 0 8px;
+  user-select: none;
+}
+.bm-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  background: var(--bg2);
+  border: 1px solid var(--bg4);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.bm-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.bm-menu button:hover {
+  background: var(--bg3);
+}
+.bm-menu button.danger {
+  color: var(--danger);
+}
+
 .tabstrip {
   height: 36px;
   display: flex;

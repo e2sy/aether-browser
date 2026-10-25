@@ -69,6 +69,8 @@ export interface Settings {
   appearance: AppearanceSettings
   /** v1.5.0 — reopen the tabs/windows from the previous session at boot */
   restoreSession: boolean
+  /** v1.5.0 — show the bookmarks bar under the toolbar */
+  showBookmarksBar: boolean
 }
 
 /** A loaded unpacked extension (persisted across boots). */

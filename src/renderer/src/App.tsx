@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useApp, upsertDownload } from './state/store'
 import type { DownloadState } from '../../shared/types'
 import TabStrip from './components/TabStrip'
 import Toolbar from './components/Toolbar'
+import BookmarksBar from './components/BookmarksBar'
 import Sidebar from './components/Sidebar'
 import FindBar from './components/FindBar'
 import PermPrompt from './components/PermPrompt'
@@ -12,6 +13,32 @@ import DownloadBar from './components/DownloadBar'
 export default function App(): JSX.Element {
   const sidebarOpen = useApp((s) => s.sidebarOpen)
   const set = useApp((s) => s.set)
+  const chromeRef = useRef<HTMLDivElement>(null)
+
+  // v1.5.0 — bookmarks bar visibility: from settings, live from the menu toggle
+  useEffect(() => {
+    window.aether.settings
+      .get()
+      .then((s) => set({ showBookmarksBar: (s as { showBookmarksBar?: boolean }).showBookmarksBar !== false }))
+      .catch(() => undefined)
+    const unsub = window.aether.state.onBookmarksBar((v) => set({ showBookmarksBar: Boolean(v) }))
+    return unsub
+  }, [])
+
+  // v1.5.0 — report the measured chrome height so the web view sits exactly
+  // below it (the bookmarks bar changes the chrome's height dynamically)
+  useEffect(() => {
+    const el = chromeRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const send = (): void => {
+      const h = Math.round(el.getBoundingClientRect().height)
+      if (h > 0) void window.aether.ui.setChromeHeight(h)
+    }
+    const ro = new ResizeObserver(send)
+    ro.observe(el)
+    send()
+    return () => ro.disconnect()
+  }, [])
 
   // v1.4.0 Customization Studio — accent + UI zoom live on the chrome
   useEffect(() => {
@@ -90,9 +117,10 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      <div className="chrome">
+      <div className="chrome" ref={chromeRef}>
         <TabStrip />
         <Toolbar />
+        <BookmarksBar />
       </div>
       <div className="body">
         <div className="webarea" />

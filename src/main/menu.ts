@@ -1,8 +1,22 @@
 import { app, Menu, MenuItemConstructorOptions, clipboard, shell } from 'electron'
 import type { WebContents } from 'electron'
 import type { TabManager } from './tabs'
-import { focusedEntry, createBrowserWindow, popoutTab } from './windows'
+import { focusedEntry, createBrowserWindow, popoutTab, allEntries } from './windows'
 import { contextMenuItems } from './extensions'
+import { mergedSettings, settings } from './store'
+
+/** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
+ *  rebuild the menu so the checkbox stays truthful. */
+export function setShowBookmarksBar(show: boolean): void {
+  const next = Boolean(show)
+  if (mergedSettings().showBookmarksBar === next) return
+  settings.data = { ...settings.data, showBookmarksBar: next }
+  settings.save()
+  for (const entry of allEntries()) {
+    if (!entry.win.isDestroyed()) entry.win.webContents.send('chrome:bookmarksBar', next)
+  }
+  Menu.setApplicationMenu(buildMenu())
+}
 
 export function buildMenu(): Menu {
   const tabs = (): TabManager | undefined => focusedEntry()?.tabs
@@ -153,6 +167,13 @@ export function buildMenu(): Menu {
           click: () => withActive((tm, id) => tm.zoom(id, 'reset'))
         },
         { type: 'separator' },
+        {
+          label: 'Show Bookmarks Bar',
+          type: 'checkbox',
+          checked: mergedSettings().showBookmarksBar !== false,
+          accelerator: 'CmdOrCtrl+Shift+B',
+          click: (item): void => setShowBookmarksBar(item.checked)
+        },
         { role: 'togglefullscreen' }
       ]
     },
