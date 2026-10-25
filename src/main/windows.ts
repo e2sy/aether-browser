@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import { TabManager } from './tabs'
 import { registerTabManager, unregisterTabManager } from './extensions'
 import { scheduleSessionSave, type SessionTab } from './session-restore'
+import { CHROME_SHELL_LOCK } from './navlock'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -138,6 +139,15 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   win.webContents.on('did-finish-load', () => {
     if (entry.private && !win.isDestroyed()) win.webContents.send('win:private', true)
   })
+  // navlock: the chrome shell is pure first-party UI — it must never navigate
+  // anywhere (an injected script or a stray link must not replace the browser
+  // chrome). Reloads/devtools are issued by the main process, not in-page.
+  win.webContents.on('will-navigate', (e, targetUrl) => {
+    if (!CHROME_SHELL_LOCK) return
+    e.preventDefault()
+    console.warn('[navlock] chrome-shell blocked ->', String(targetUrl).slice(0, 120))
+  })
+  win.webContents.on('will-attach-webview', (e) => e.preventDefault())
   win.on('resize', () => applyLayout(entry))
   win.on('maximize', () => {
     if (!win.isDestroyed()) win.webContents.send('win:maximized', true)

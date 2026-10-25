@@ -1,6 +1,7 @@
 import { BrowserWindow, WebContentsView, Rectangle } from 'electron'
 import type { TabMeta, TabsState } from '../shared/types'
 import { addHistory, getZoomLevel, setZoomLevel, mergedSettings } from './store'
+import { shouldBlockWillNavigate, blockReason } from './navlock'
 import { onContextMenu } from './menu'
 import { resolveInput } from './resolve'
 import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './errmap'
@@ -188,6 +189,17 @@ export class TabManager {
       if (/^https?:/i.test(popupUrl)) this.create(popupUrl, true)
       return { action: 'deny' }
     })
+    // navlock: in-page navigation attempts are policy-checked (see navlock.ts).
+    // Internal pages must only move through the bridge; web pages may browse
+    // freely except into file:// and other privileged schemes.
+    wc.on('will-navigate', (e, targetUrl) => {
+      if (shouldBlockWillNavigate(wc.getURL(), targetUrl)) {
+        e.preventDefault()
+        console.warn('[navlock] blocked:', blockReason(wc.getURL(), targetUrl), '->', String(targetUrl).slice(0, 120))
+      }
+    })
+    // navlock: <webview> is not part of the threat model — refuse attachment
+    wc.on('will-attach-webview', (e) => e.preventDefault())
     wc.on('context-menu', (_e, params) => onContextMenu(wc, params, this))
     wc.on('found-in-page', (_e, result) => {
       this.sendToChrome('find:result', {

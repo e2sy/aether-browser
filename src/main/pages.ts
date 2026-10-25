@@ -5,6 +5,7 @@
  * (outside the template placeholders below).
  */
 import { app, nativeTheme } from 'electron'
+import crypto from 'node:crypto'
 import { appearanceCss } from './appearance'
 import { mergedSettings } from './store'
 
@@ -23,21 +24,73 @@ const BASE_CSS = `
   a { color:inherit; text-decoration:none; }
 `
 
+/**
+ * CSP v2 — the XSS backstop for every internal page.
+ *
+ * Scripts execute ONLY with a per-boot random nonce. Any script that
+ * untrusted content manages to inject (a `<script>` from a history title,
+ * a search snippet, a bookmark name, a suggestion row…) has no nonce, so
+ * Chromium refuses to run it. Inline event handlers are equally dead —
+ * internal pages use addEventListener exclusively.
+ *
+ * `style-src 'unsafe-inline'` stays by deliberate tradeoff: internal pages
+ * style themselves through `style="…"` attributes everywhere, and nonce-ing
+ * style BLOCKS does not cover style attributes. Style injection can
+ * exfiltrate at worst; it cannot execute code. Script execution is the
+ * threat that matters — and it is now nonce-locked.
+ *
+ * Everything else is closed: no objects, no frames (meta) + frame-ancestors
+ * none (header — meta CSP ignores frame-ancestors), no form action, no
+ * base hijack. Nonce rotates every boot, so even a captured past page
+ * cannot run today.
+ */
+export function internalCsp(nonce: string, asHeader = false): string {
+  const parts = [
+    "default-src 'none'",
+    `script-src 'nonce-${nonce}'`,
+    "style-src 'unsafe-inline'",
+    'img-src https: data:',
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'"
+  ]
+  if (asHeader) parts.push("frame-ancestors 'none'")
+  return parts.join('; ')
+}
+
 function pageShell(title: string, body: string, script: string): string {
+  const nonce = crypto.randomBytes(16).toString('base64')
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data:;">
+<meta http-equiv="Content-Security-Policy" content="${internalCsp(nonce)}">
 <title>${title}</title>
 <style>${BASE_CSS}</style>
 <style>${appearanceCss(mergedSettings().appearance, nativeTheme.shouldUseDarkColors)}</style>
 </head>
 <body>
 ${body}
-<script>${script}</script>
+<script nonce="${nonce}">${script}</script>
 </body>
 </html>`
+}
+
+/**
+ * Response headers for serving an internal page: re-emits the page's own CSP
+ * as a real HTTP header (meta CSP ignores `frame-ancestors`, headers don't —
+ * so internal pages can never be framed by a hostile page) and disables
+ * MIME sniffing. Extracts the nonce from the page's meta tag so header and
+ * meta always agree.
+ */
+export function pageSecurityHeaders(html: string): Record<string, string> {
+  const m = /<meta http-equiv="Content-Security-Policy" content="[^"]*script-src 'nonce-([^']+)'/.exec(html)
+  const nonce = m ? m[1] : crypto.randomBytes(16).toString('base64')
+  return {
+    'content-type': 'text/html; charset=utf-8',
+    'content-security-policy': internalCsp(nonce, true),
+    'x-content-type-options': 'nosniff'
+  }
 }
 
 export const NEW_TAB_HTML = pageShell(

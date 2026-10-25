@@ -6,7 +6,7 @@ import { app, Menu, protocol, session } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
-import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML } from './pages'
+import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, pageSecurityHeaders } from './pages'
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
@@ -58,7 +58,7 @@ app.whenReady().then(() => {
   protocol.handle('aether', (req) => {
     const url = new URL(req.url)
     const html = INTERNAL_PAGES[url.hostname] || '<h1>404</h1>'
-    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+    return new Response(html, { headers: pageSecurityHeaders(html) })
   })
 
   // Identify as a regular Chrome so Google / YouTube treat us normally
