@@ -50,6 +50,9 @@ stubModule(
    }`
 )
 stubModule('extract-zip', `module.exports = async function () { throw new Error('no extraction in unit tests') }`)
+/* v1.7.0: crx.ts -> safe-zip.ts imports yauzl — the extractor is never called
+ * here (parseCrx is pure), so stub the reader */
+stubModule('yauzl', `module.exports = { open: () => { throw new Error('no extraction in unit tests') } }`)
 stubModule(
   'electron-chrome-extensions',
   `module.exports = class ElectronChromeExtensions { constructor() {} on() {} getContextMenuItems() { return [] } addTab() {} selectTab() {} }`

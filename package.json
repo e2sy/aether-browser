@@ -1,7 +1,7 @@
 {
   "name": "aether-browser",
   "version": "1.6.0",
-  "description": "Open-source AI browser — full Chromium compatibility, powered by your local Ollama model. Multi-window, CRX one-click install, tiered memory saver.",
+  "description": "Open-source AI browser \u2014 full Chromium compatibility, powered by your local Ollama model. Multi-window, CRX one-click install, tiered memory saver.",
   "main": "out/main/index.js",
   "author": {
     "name": "Aether Browser contributors",
@@ -22,7 +22,7 @@
     "build": "electron-vite build && node scripts/patch-preload-sandbox.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "electron-vite preview",
-    "test": "node scripts/test-v04.mjs && node scripts/test-v10.mjs && node scripts/test-v11.mjs && node scripts/test-v111.mjs && node scripts/test-v113.mjs && node scripts/test-v115.mjs && node scripts/test-v116.mjs && node scripts/test-v117.mjs && node scripts/test-v120.mjs && node scripts/test-v130.mjs && node scripts/test-v140.mjs && node scripts/test-v150.mjs && node scripts/test-v160.mjs",
+    "test": "node scripts/test-v04.mjs && node scripts/test-v10.mjs && node scripts/test-v11.mjs && node scripts/test-v111.mjs && node scripts/test-v113.mjs && node scripts/test-v115.mjs && node scripts/test-v116.mjs && node scripts/test-v117.mjs && node scripts/test-v120.mjs && node scripts/test-v130.mjs && node scripts/test-v140.mjs && node scripts/test-v150.mjs && node scripts/test-v160.mjs && node scripts/test-v170.mjs",
     "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "repair:electron": "node scripts/ensure-electron.mjs",
     "dist": "electron-vite build && electron-builder",
@@ -30,14 +30,14 @@
   },
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.30.0",
-    "@mozilla/readability": "^0.5.0",
+    "@mozilla/readability": "^0.6.0",
     "electron-chrome-extensions": "^3.10.1",
-    "extract-zip": "^2.0.1",
     "jsdom": "^24.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tldts-experimental": "^6.1.86",
     "turndown": "^7.1.2",
+    "yauzl": "^3.4.0",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
@@ -46,9 +46,10 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/turndown": "^5.0.5",
+    "@types/yauzl": "^3.4.0",
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^45.0.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^3.0.0",
     "esbuild": "^0.25.12",
     "typescript": "^5.5.4",

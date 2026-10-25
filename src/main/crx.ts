@@ -16,7 +16,7 @@ import { app, dialog, BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import extract from 'extract-zip'
+import { safeUnzip } from './safe-zip'
 import type { ExtensionInfo } from '../shared/types'
 import { installFromFolder } from './extensions'
 
@@ -85,10 +85,12 @@ export async function installExtensionFromFile(filePath: string): Promise<Extens
   }
   if (!dir) throw new Error('Could not create an install folder')
 
+  // Hardened extraction (safe-zip): rejects traversal/symlinks/zip bombs.
+  // The staging dir is treated as tainted on ANY failure and wiped.
   const zipPath = dir + '.zip'
   fs.writeFileSync(zipPath, zip)
   try {
-    await extract(zipPath, { dir })
+    await safeUnzip(zipPath, dir)
   } catch (err) {
     fs.rmSync(dir, { recursive: true, force: true })
     throw new Error('Could not unpack the archive: ' + (err instanceof Error ? err.message : String(err)))
