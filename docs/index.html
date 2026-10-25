@@ -85,7 +85,7 @@
   <p>The open-source, AI-native browser — full Chromium compatibility, powered 100% by your local
      Ollama model. No cloud, no API keys, no telemetry.</p>
   <div class="badges">
-    <span class="badge">v1.2.0</span>
+    <span class="badge">v1.4.0</span>
     <span class="badge">GPL-3.0</span>
     <span class="badge">Windows · macOS · Linux</span>
     <span class="badge">Electron + Chromium</span>
@@ -94,6 +94,7 @@
 
 <nav class="toc">
   <a href="#install">Install</a>
+  <a href="ollama-guide.html">Ollama guide</a>
   <a href="#models">Models</a>
   <a href="#ai">AI features</a>
   <a href="#agent">Agent</a>
@@ -117,7 +118,7 @@ ollama pull qwen3.5:9b        # great tool calling, ~6 GB
 #   smaller machine?  ollama pull qwen3.5:4b   (~2.5 GB)
 
 # 2. Clone &amp; run Aether
-git clone https://github.com/YOUR_USER/aether-browser.git
+git clone https://github.com/e2sy/aether-browser.git
 cd aether-browser
 npm install
 npm run dev</code></pre>
@@ -150,6 +151,9 @@ npm run dev</code></pre>
     <div class="note"><b>Which model for the agent?</b> Tool calling quality matters most. Good
       picks: <code>qwen3.5:9b</code> (16 GB RAM), <code>qwen3.5:4b</code> or
       <code>llama3.2:3b</code> (8 GB RAM). Chat and search work well with anything.</div>
+    <div class="note"><b>Connecting your Ollama?</b> Models already on disk are detected automatically —
+      for the full walkthrough (fine-tuned GGUF, remote hosts, troubleshooting the red dot) read
+      the <a href="ollama-guide.html">Ollama connection guide →</a></div>
   </section>
 
   <!-- ============ AI FEATURES ============ -->

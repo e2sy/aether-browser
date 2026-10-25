@@ -101,6 +101,20 @@ export default function Sidebar(): JSX.Element {
     return window.aether.models.onChanged(() => void refresh())
   }, [refresh])
 
+  // auto-reconnect: while Ollama is down, poll every 10s and recheck on window
+  // focus — the moment the user starts Ollama, Aether connects by itself
+  const ollamaDown = Boolean(health && !health.ollama)
+  useEffect(() => {
+    if (!ollamaDown) return
+    const timer = window.setInterval(() => void refresh(), 10_000)
+    const onFocus = (): void => void refresh()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [ollamaDown, refresh])
+
   useEffect(() => {
     chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight })
   }, [messages, streaming])
@@ -436,12 +450,15 @@ export default function Sidebar(): JSX.Element {
 
       {health && !health.ollama && !health.cloud && (
         <div className="ollama-hint">
-          <b>Ollama is not running.</b>
+          <b>Ollama is not reachable.</b>
           <br />
-          Install from <span className="code">ollama.com</span>, then:
+          Aether auto-reconnects the moment Ollama is running — already
+          installed models (<span className="code">ollama list</span>) are
+          detected automatically. Don&apos;t have it yet? Install from{' '}
+          <span className="code">ollama.com</span>, then:
           <div className="code block">ollama pull qwen3.5:9b</div>
           <button className="retry" onClick={() => void refresh()}>
-            Retry connection
+            Retry now
           </button>
           <button
             className="retry ghost"

@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Connect Aether to Ollama — Setup Guide</title>
+<meta name="description" content="Step-by-step guide: connect Aether Browser to your local Ollama models. Auto-detection, custom fine-tuned models, remote Ollama hosts and troubleshooting." />
+<style>
+  :root {
+    --bg: #16171b; --bg2: #1e2026; --bg3: #262932;
+    --text: #e8eaf0; --muted: #9aa0ae; --dim: #7d828f;
+    --accent: #7c8cff; --accent2: #5b6cff;
+    --ok: #4ade80; --warn: #fbbf24; --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.7 -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd, .mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  code { background: var(--bg3); border-radius: 5px; padding: 1.5px 6px; font-size: 0.86em; color: #b9c0ff; }
+  kbd {
+    background: var(--bg3); border: 1px solid #3a3e49; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 7px; font-size: 0.8em; white-space: nowrap;
+  }
+  pre {
+    background: var(--bg2); border: 1px solid #2e313a; border-radius: 12px;
+    padding: 14px 18px; overflow-x: auto; font-size: 13px; line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 22px 90px; }
+  header.hero {
+    padding: 64px 22px 46px; text-align: center;
+    background: radial-gradient(1000px 380px at 50% -80px, rgba(91, 108, 255, 0.28), transparent 70%);
+    border-bottom: 1px solid #26282f;
+  }
+  header.hero h1 { font-size: 38px; margin: 0 0 10px; letter-spacing: -0.02em; }
+  header.hero h1 span { color: var(--accent); }
+  header.hero p { color: var(--muted); max-width: 660px; margin: 0 auto; }
+  .crumbs { font-size: 13px; margin-bottom: 14px; }
+  nav.toc {
+    position: sticky; top: 0; z-index: 5; backdrop-filter: blur(8px);
+    background: rgba(22, 23, 27, 0.88); border-bottom: 1px solid #26282f;
+    display: flex; gap: 4px; overflow-x: auto; padding: 10px 22px;
+    font-size: 12.5px; white-space: nowrap;
+  }
+  nav.toc a { color: var(--muted); padding: 5px 11px; border-radius: 8px; }
+  nav.toc a:hover { color: var(--text); background: var(--bg3); text-decoration: none; }
+  section { margin-top: 52px; }
+  h2 { font-size: 24px; letter-spacing: -0.01em; border-left: 3px solid var(--accent2); padding-left: 13px; }
+  h3 { font-size: 16.5px; margin: 30px 0 8px; color: #cfd4e4; }
+  p  { color: #c9cede; }
+  li { color: #c9cede; margin: 5px 0; }
+  .note {
+    background: rgba(91, 108, 255, 0.09); border: 1px solid rgba(124, 140, 255, 0.3);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 16px 0;
+  }
+  .warn {
+    background: rgba(251, 191, 36, 0.07); border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 16px 0;
+  }
+  .ok {
+    background: rgba(74, 222, 128, 0.07); border: 1px solid rgba(74, 222, 128, 0.3);
+    border-radius: 12px; padding: 12px 16px; font-size: 13.5px; margin: 16px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 9px 13px; border-bottom: 1px solid #2b2e37; vertical-align: top; }
+  th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; }
+  td:first-child { white-space: nowrap; }
+  .steps { counter-reset: step; margin: 18px 0; padding: 0; list-style: none; }
+  .steps li {
+    counter-increment: step; position: relative; padding: 14px 18px 14px 58px;
+    background: var(--bg2); border: 1px solid #2b2e37; border-radius: 14px; margin: 10px 0;
+  }
+  .steps li::before {
+    content: counter(step); position: absolute; left: 16px; top: 14px;
+    width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    background: var(--accent2); color: #fff; font-weight: 700; font-size: 14px;
+  }
+  .steps b { display: block; margin-bottom: 3px; }
+  .dot-inline { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 2px -1px 0; }
+  .d-ok { background: var(--ok); } .d-bad { background: var(--danger); }
+  .d-cloud { background: var(--warn); } .d-wait { background: var(--dim); }
+  footer { margin-top: 70px; color: var(--dim); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="crumbs"><a href="index.html">← Aether Browser docs</a></div>
+  <h1>Connect Aether to <span>Ollama</span></h1>
+  <p>Everything Aether's AI — chat, AI search answers and the agent — runs on your own Ollama
+     models at <code>http://127.0.0.1:11434</code>. If Ollama is installed and running, Aether
+     finds your models by itself. This guide gets you from zero to green dot, and covers custom
+     fine-tuned models, remote hosts and every common failure.</p>
+</header>
+
+<nav class="toc">
+  <a href="#quick">60-second setup</a>
+  <a href="#how">How it connects</a>
+  <a href="#your-model">Use your own model</a>
+  <a href="#verify">Verify it works</a>
+  <a href="#remote">Remote / custom host</a>
+  <a href="#trouble">Troubleshooting</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- ============ QUICK START ============ -->
+  <section id="quick">
+    <h2>60-second setup</h2>
+    <p>Already ran <code>ollama pull …</code> once? Then you are one step away. This is the exact
+       path for a Windows machine with Ollama installed and models already on disk:</p>
+    <ol class="steps">
+      <li><b>Start the Ollama app</b>
+        Open it from the Start menu. It lives in the system tray (you may need to click the
+        <code>^</code> chevron). Ollama runs as a background server — closing the window keeps it
+        running, quitting the tray icon stops it.</li>
+      <li><b>Confirm it answers</b>
+        In any terminal: <code>ollama list</code> should print your models. If the list works, the
+        server is up — the CLI talks to the same server Aether uses.</li>
+      <li><b>Open Aether's AI sidebar</b>
+        Click the ✨ sidebar icon in the toolbar (or press <kbd>Ctrl+Shift+A</kbd>). Within a
+        moment the status dot turns green <span class="dot-inline d-ok"></span> and your models
+        appear in the dropdown next to it — picked automatically, no configuration screen.</li>
+      <li><b>Ask something</b>
+        Chat, AI search answers and the agent all use this model now. Done.</li>
+    </ol>
+    <div class="ok"><b>Saw the red dot first?</b> Since v1.4.1 Aether auto-reconnects: while Ollama
+      is offline it re-checks every 10 seconds and whenever the window gets focus. Start Ollama at
+      any time — Aether connects by itself within seconds. No restart needed. On older versions,
+      click the ⟳ button or <i>Retry now</i>.</div>
+  </section>
+
+  <!-- ============ HOW ============ -->
+  <section id="how">
+    <h2>How the connection works</h2>
+    <p>Aether never phones home — it talks straight to the Ollama HTTP server on your machine:</p>
+    <table>
+      <tr><th>Piece</th><th>Detail</th></tr>
+      <tr><td>Endpoint</td><td><code>http://127.0.0.1:11434</code> — the Ollama default. Override with the
+        <code>AETHER_OLLAMA_URL</code> environment variable (see <a href="#remote">remote hosts</a>).</td></tr>
+      <tr><td>Health check</td><td><code>GET /api/tags</code> with a short timeout. This is what the status
+        dot shows — same call the <code>ollama list</code> CLI makes.</td></tr>
+      <tr><td>Auto-detection</td><td>On connect, Aether reads your installed models and picks a default:
+        it prefers Qwen-family models with tool calling, falling back to the first model on disk. You can
+        override the choice in the dropdown at any time — the pick is saved.</td></tr>
+      <tr><td>Auto-reconnect</td><td>While the dot is red, Aether re-checks every 10 s and on window focus.
+        Ollama coming online is detected without any click.</td></tr>
+      <tr><td>Where it runs</td><td>In the main process (Node), not the web view — so there are no CORS or
+        proxy issues, and requests never leave your machine.</td></tr>
+    </table>
+    <div class="note"><b>One server, everything shares it.</b> The AI sidebar (Chat / Agent /
+      Models), AI search answers and the omnibox all resolve through the same local brain. Select
+      a model once and it applies everywhere.</div>
+  </section>
+
+  <!-- ============ YOUR MODEL ============ -->
+  <section id="your-model">
+    <h2>Use your own model (fine-tunes, GGUF, anything)</h2>
+    <p>Aether works with <b>any</b> model Ollama serves — including your own fine-tuned GGUF from
+       Hugging Face. Say you have this library:</p>
+    <pre><code>C:\Users\you&gt; ollama list
+NAME                                              ID            SIZE      MODIFIED
+coder:latest                                      100e5c7ae56f  4.3 GB    3 days ago
+hf.co/mayankbhaskarr/qwen3-4b-coder-ft-gguf:latest  557cfa5d33cd  4.3 GB  3 days ago</code></pre>
+    <p>The moment Aether connects, both appear in the model dropdown in the sidebar header. Pick
+       one and it is stored as your brain:</p>
+    <ul>
+      <li><b>Switch models</b> — dropdown in the sidebar header. Applies to chat, AI search and the
+          agent immediately.</li>
+      <li><b>Models tab</b> — <kbd>Ctrl+Shift+M</kbd> opens the full model manager: details
+          (parameters, quantization, disk size), delete, and the in-app library where you can pull
+          any tag from Ollama or Hugging Face without a terminal.</li>
+      <li><b>Agent quality tip</b> — the agent depends on <i>tool calling</i>. Qwen-family models
+          handle it well; a 4B fine-tune works, but for heavy multi-step automation a 7–9B model
+          gives noticeably steadier step planning.</li>
+      <li><b>First answer is slow?</b> That's Ollama loading the model into RAM/VRAM (a 4.3 GB model
+          takes a few seconds). Follow-up answers stream instantly while the model stays loaded.</li>
+    </ul>
+    <div class="note"><b>Pulling a new model in-app:</b> Models tab → type the exact tag
+      (<code>hf.co/user/model-GGUF</code>, <code>qwen3.5:4b</code>, …) or pick a catalog card →
+      Pull. Progress streams live; the model appears in your dropdown the moment it finishes.</div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section id="verify">
+    <h2>Verify it works</h2>
+    <p>Three checks, ten seconds:</p>
+    <ol class="steps">
+      <li><b>The dot is green</b> <span class="dot-inline d-ok"></span>
+        Green = Ollama reachable and a local model selected. Yellow
+        <span class="dot-inline d-cloud"></span> = Ollama offline but an optional cloud fallback is
+        answering chat. Red <span class="dot-inline d-bad"></span> = neither (see
+        <a href="#trouble">troubleshooting</a>). Hover the dot for the exact status.</li>
+      <li><b>Your model is in the dropdown</b>
+        Open the header dropdown — every entry is a real model on your disk, straight from
+        <code>ollama list</code>.</li>
+      <li><b>Send a message</b>
+        In Chat, ask anything — the reply streams token by token from your machine. Or open
+        <code>aether://search</code>, search something and watch the cited AI answer build on the
+        right.</li>
+    </ol>
+    <div class="ok"><b>Extra confirmation:</b> run <code>ollama ps</code> in a terminal right after an
+      Aether reply — you'll see your model listed as loaded, with Aether as the recent caller.</div>
+  </section>
+
+  <!-- ============ REMOTE ============ -->
+  <section id="remote">
+    <h2>Remote or custom Ollama host</h2>
+    <p>Want Aether to use Ollama running on another machine (a GPU box, a home server, WSL2)? Point
+       the <code>AETHER_OLLAMA_URL</code> environment variable at it before starting Aether:</p>
+    <pre><code># Windows (PowerShell)
+$env:AETHER_OLLAMA_URL = "http://192.168.1.50:11434"; npm run dev
+
+# Windows (CMD)
+set AETHER_OLLAMA_URL=http://192.168.1.50:11434 && npm run dev
+
+# Linux / macOS
+AETHER_OLLAMA_URL=http://192.168.1.50:11434 npm run dev</code></pre>
+    <p>On the machine running Ollama, expose it beyond localhost first:</p>
+    <pre><code># Server side — allow LAN connections
+OLLAMA_HOST=0.0.0.0 ollama serve     # or set it in the service config</code></pre>
+    <ul>
+      <li><b>WSL2 note</b> — Ollama inside WSL is reachable from Windows Aether at
+          <code>http://127.0.0.1:11434</code> only with WSL's mirrored networking; otherwise bind it
+          and use the WSL IP.</li>
+      <li><b>No Ollama anywhere?</b> Aether also accepts any OpenAI-compatible endpoint (LM Studio,
+          Groq, OpenRouter) as an opt-in <i>cloud fallback</i> for chat and AI search —
+          Settings → AI → cloud fallback. The agent always stays local.</li>
+      <li><b>Security</b> — only expose Ollama to networks you trust; it has no authentication.</li>
+    </ul>
+  </section>
+
+  <!-- ============ TROUBLESHOOTING ============ -->
+  <section id="trouble">
+    <h2>Troubleshooting</h2>
+    <h3>Red dot, but <code>ollama list</code> works in the terminal</h3>
+    <p>This is the most confusing state — and the answer is usually timing. The CLI succeeding
+       <i>proves</i> the server is up right now, so Aether's last check simply ran before that.
+       The check happens at sidebar open; Ollama may have still been starting after boot (its
+       first-load can lag a few seconds on Windows). Fixes, in order of convenience:</p>
+    <ul>
+      <li>Wait ~10 s with the Aether window focused — auto-reconnect (v1.4.1+) will flip the dot
+          green by itself.</li>
+      <li>Click the ⟳ button in the sidebar header, or <i>Retry now</i> in the red hint box.</li>
+      <li>Make sure the Ollama <b>tray app</b> is running, not just a terminal — <code>ollama
+          list</code> in a terminal starts a temporary CLI that talks to the server; it does not
+          start the server. Start-menu → Ollama starts the background server.</li>
+    </ul>
+    <h3>“Ollama is not reachable” persists</h3>
+    <ul>
+      <li>Open <code>http://127.0.0.1:11434</code> in any browser — it should say
+          <b>“Ollama is running”</b>. If not, the server truly isn't up: start it from the Start
+          menu, or run <code>ollama serve</code>.</li>
+      <li>Different port? Check <code>echo %OLLAMA_HOST%</code> (CMD) / <code>$env:OLLAMA_HOST</code>
+          (PowerShell). If you moved it, set <code>AETHER_OLLAMA_URL</code> to match
+          (e.g. <code>http://127.0.0.1:11500</code>).</li>
+      <li>Proxy software (Clash, corporate proxies) can intercept localhost calls for Electron
+          apps. Add an exclusion for <code>127.0.0.1</code> / enable "bypass local addresses".</li>
+    </ul>
+    <h3>Model missing from the dropdown</h3>
+    <ul>
+      <li>Press ⟳ to refresh the list; the Models tab always shows the live inventory too.</li>
+      <li>Model pulled while Aether was already running? The Models tab and the dropdown refresh
+          automatically the moment a pull finishes.</li>
+      <li>Typo'd tag in a manual pull? The tag must match exactly what
+          <code>ollama list</code> shows, including the <code>:latest</code> suffix.</li>
+    </ul>
+    <h3>Answers are very slow</h3>
+    <ul>
+      <li>First call after boot always includes model load time — subsequent replies are fast
+          while it stays warm.</li>
+      <li>A 9B model on a machine without a GPU can take a while per token; a 4B model
+          (<code>qwen3.5:4b</code>, your 4B fine-tune) is dramatically quicker on CPU.</li>
+      <li>Check what else holds VRAM — another loaded model can force a reload every time.
+          <code>ollama ps</code> shows what's resident.</li>
+    </ul>
+    <h3>The agent errors but chat works</h3>
+    <p>The agent needs <b>tool calling</b>, not just chat. Some small models ignore the tool
+       format. Pick a Qwen-family model for agent runs — the chat models will still handle chat,
+       search and write helpers fine.</p>
+  </section>
+
+  <footer>
+    Aether Browser — GPL-3.0 · <a href="https://github.com/e2sy/aether-browser">GitHub</a> ·
+    <a href="index.html">Full documentation</a>
+  </footer>
+
+</div>
+</body>
+</html>
