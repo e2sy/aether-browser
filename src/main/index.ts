@@ -14,6 +14,13 @@ import { installPermissionHandlers } from './permissions'
 import { initExtensions } from './extensions'
 import { installDownloadHandler } from './downloads'
 import {
+  initSessionRestore,
+  loadSession,
+  wasUncleanShutdown,
+  flushSessionNow,
+  cancelScheduledSessionSave
+} from './session-restore'
+import {
   setPreloadPath,
   setUiPreloadPath,
   createBrowserWindow,
@@ -87,7 +94,23 @@ app.whenReady().then(() => {
 
   setPreloadPath(path.join(__dirname, '../preload/index.js'))
   setUiPreloadPath(path.join(__dirname, '../preload/ui.js'))
-  createBrowserWindow()
+
+  // v1.5.0 — session restore: "continue where you left off". The smoke test
+  // runs against a reused profile dir, so it always boots fresh.
+  initSessionRestore(() => allEntries())
+  const restoreOn = mergedSettings().restoreSession !== false && !process.env.AETHER_SMOKE
+  const snap = restoreOn ? loadSession() : null
+  if (snap) {
+    if (wasUncleanShutdown()) console.log('[session] previous run exited uncleanly — restoring anyway')
+    let tabCount = 0
+    for (const w of snap.windows) {
+      createBrowserWindow(undefined, { restore: w })
+      tabCount += w.tabs.length
+    }
+    console.log(`[session] restored ${snap.windows.length} window(s), ${tabCount} tab(s)`)
+  } else {
+    createBrowserWindow()
+  }
 
   // AETHER_PROBE=<url> — boot, load the URL in a real tab, dump everything
   // (navigation events, console messages, DOM state) then exit. The site
@@ -383,4 +406,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// v1.5.0 — write the session synchronously with the clean-exit marker so the
+// next boot knows this run ended on purpose (drives crash detection).
+app.on('before-quit', () => {
+  cancelScheduledSessionSave()
+  flushSessionNow(allEntries(), true)
 })

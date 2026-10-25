@@ -47,7 +47,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' },
   memorySaver: 30,
   extensions: [],
-  appearance: DEFAULT_APPEARANCE
+  appearance: DEFAULT_APPEARANCE,
+  restoreSession: true
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

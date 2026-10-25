@@ -1,0 +1,169 @@
+/**
+ * v1.5.0 "real-browser" tests — one section per build.
+ *
+ * Build 1 — session restore: URL restorability, window/snapshot sanitization
+ * (garbage in -> null out, never throws), caps, active-index remapping,
+ * snapshot-from-entries (private windows excluded), clean-exit flag contract.
+ *
+ * Run:  node scripts/test-v150.mjs
+ */
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { build } from 'esbuild'
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url))
+const APP = path.resolve(ROOT, '..')
+
+let pass = 0
+let fail = 0
+function ok(cond, name) {
+  if (cond) {
+    pass++
+    console.log('  ✓', name)
+  } else {
+    fail++
+    console.log('  ✗ FAIL:', name)
+  }
+}
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-test150-'))
+
+function stubModule(name, code) {
+  const dir = path.join(tmp, 'node_modules', name)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'index.js'), code)
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, main: 'index.js' }))
+}
+
+stubModule('electron', `module.exports = { app: { getPath: () => '${tmp.replace(/\\/g, '/')}/userdata' } }`)
+// the stub is bundled IN (via alias) so Node never has to named-import a CJS module
+const electronStub = path.join(tmp, 'electron-stub.mjs')
+fs.writeFileSync(electronStub, `const app = { getPath: () => '${tmp.replace(/\\/g, '/')}/userdata' }\nexport { app }\n`)
+fs.cpSync(path.join(APP, 'src'), path.join(tmp, 'src'), { recursive: true })
+
+const entry = path.join(tmp, 'src', 'main', 'testable-v150.ts')
+fs.writeFileSync(
+  entry,
+  `export {
+     isRestorableUrl, sanitizeWindow, sanitizeSession, snapshotFromEntries,
+     loadSession, writeSessionNow, wasUncleanShutdown, forgetSession,
+     type SessionSnapshot, type SessionWindow, type SessionTab
+   } from './session-restore'`
+)
+
+const outfile = path.join(tmp, 'bundle-v150.mjs')
+await build({
+  entryPoints: [entry],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  outfile,
+  alias: { electron: electronStub },
+  logLevel: 'silent'
+})
+
+const mod = await import(outfile)
+const {
+  isRestorableUrl,
+  sanitizeWindow,
+  sanitizeSession,
+  snapshotFromEntries,
+  loadSession,
+  writeSessionNow,
+  wasUncleanShutdown,
+  forgetSession
+} = mod
+
+console.log('\n[1] session restore — URL restorability')
+ok(isRestorableUrl('https://example.com') === true, 'https restored')
+ok(isRestorableUrl('http://neverssl.com/page?x=1') === true, 'http restored')
+ok(isRestorableUrl('aether://history') === true, 'internal manager pages restored')
+ok(isRestorableUrl('aether://bookmarks') === true, 'bookmarks page restored')
+ok(isRestorableUrl('aether://newtab') === false, 'newtab never restored')
+ok(isRestorableUrl('aether://search?q=x') === false, 'search page never restored')
+ok(isRestorableUrl('aether://error?u=https://x') === false, 'error page never restored')
+ok(isRestorableUrl('devtools://devtools/bundled/x') === false, 'devtools never restored')
+ok(isRestorableUrl('about:blank') === false, 'about: never restored')
+ok(isRestorableUrl('data:text/html,hi') === false, 'data: never restored')
+ok(isRestorableUrl('') === false, 'empty never restored')
+ok(isRestorableUrl('not a url') === false, 'scheme-less junk never restored')
+ok(isRestorableUrl(undefined) === false, 'undefined never restored')
+
+console.log('\n[2] session restore — window sanitization')
+const win1 = sanitizeWindow({ tabs: [{ url: 'aether://newtab', pinned: false }, { url: 'https://a.com', pinned: true }, { url: 'https://b.com', pinned: false }], active: 1 })
+ok(win1 && win1.tabs.length === 2, 'newtab dropped, rest kept')
+ok(win1 && win1.tabs[0].pinned === true, 'pinned flag survives')
+ok(win1 && win1.active === 0, 'active index remapped to kept tab (originally 1)')
+const win2 = sanitizeWindow({ tabs: [{ url: 'aether://newtab' }], active: 0 })
+ok(win2 === null, 'all-newtab window dropped')
+ok(sanitizeWindow(null) === null, 'null window dropped')
+ok(sanitizeWindow({}) === null, 'tabless window dropped')
+ok(sanitizeWindow({ tabs: 'nope' }) === null, 'hostile tabs field dropped')
+ok(sanitizeWindow({ tabs: [null, undefined, 42, { url: 'https://ok.com' }], active: 99 }) !== null, 'hostile members skipped, rest kept')
+const win3 = sanitizeWindow({ tabs: [{ url: 'https://a.com' }, { url: 'https://b.com' }], active: 99 })
+ok(win3 && win3.active === 1, 'out-of-range active clamped')
+const win4 = sanitizeWindow({ tabs: [{ url: 'https://a.com' }], active: 'garbage' })
+ok(win4 && win4.active === 0, 'non-numeric active falls back to 0')
+
+console.log('\n[3] session restore — snapshot sanitization')
+ok(sanitizeSession(null) === null, 'null snapshot -> null')
+ok(sanitizeSession('junk') === null, 'string snapshot -> null')
+ok(sanitizeSession({ windows: 'nope' }) === null, 'hostile windows field -> null')
+ok(sanitizeSession({ windows: [{ tabs: [{ url: 'aether://newtab' }] }] }) === null, 'all-empty snapshot -> null')
+const s1 = sanitizeSession({
+  windows: [
+    { tabs: [{ url: 'https://a.com' }, { url: 'aether://newtab' }], active: 0 },
+    { tabs: [{ url: 'x-not-a-url' }] },
+    { tabs: [{ url: 'https://b.com' }] }
+  ],
+  savedAt: 123,
+  cleanExit: 1
+})
+ok(s1 && s1.windows.length === 2, 'dead windows pruned')
+ok(s1 && s1.savedAt === 123 && s1.cleanExit === true, 'metadata preserved')
+const s2 = sanitizeSession({ windows: Array.from({ length: 20 }, (_, i) => ({ tabs: [{ url: 'https://w' + i + '.com' }] })) })
+ok(s2 && s2.windows.length === 10, 'window cap enforced (10)')
+const manyTabs = { windows: [{ tabs: Array.from({ length: 80 }, (_, i) => ({ url: 'https://t' + i + '.com' })), active: 0 }] }
+ok(sanitizeSession(manyTabs).windows[0].tabs.length === 50, 'tab cap enforced (50/window)')
+const s3 = sanitizeSession({ windows: [{ tabs: [{ url: 'https://a.com' }] }] })
+ok(s3 && s3.savedAt > 0 && s3.cleanExit === false, 'defaults filled (savedAt, cleanExit)')
+
+console.log('\n[4] session restore — snapshot from live entries')
+function fakeEntry(tabs, activeId, opts = {}) {
+  const ids = tabs.map((_, i) => i + 1)
+  return {
+    win: { isDestroyed: () => Boolean(opts.destroyed) },
+    private: opts.private,
+    tabs: {
+      getState: () => ({ tabs: tabs.map((t, i) => ({ id: ids[i], ...t })), activeId })
+    }
+  }
+}
+const snapA = snapshotFromEntries([
+  fakeEntry([{ url: 'https://a.com', pinned: false }, { url: 'https://b.com', pinned: true }], 2),
+  fakeEntry([{ url: 'https://c.com', pinned: false }], 1, { destroyed: true })
+])
+ok(snapA.windows.length === 1 && snapA.windows[0].tabs.length === 2, 'destroyed windows excluded')
+ok(snapA.windows[0].active === 1, 'active index computed from activeId')
+const snapB = snapshotFromEntries([fakeEntry([{ url: 'https://secret.com' }], 1, { private: true })])
+ok(snapB.windows.length === 0, 'private windows excluded from the snapshot')
+const snapC = snapshotFromEntries([fakeEntry([{ url: 'https://a.com' }], 1)])
+ok(snapshotFromEntries(snapC.windows.length ? [] : []).windows.length === 0, 'empty entry list -> empty snapshot')
+
+console.log('\n[5] session restore — disk round-trip + clean-exit contract')
+writeSessionNow({ windows: [{ tabs: [{ url: 'https://x.com', pinned: false }], active: 0 }], savedAt: 42 })
+ok(wasUncleanShutdown() === true, 'no cleanExit flag -> unclean shutdown detected')
+const loaded = loadSession()
+ok(loaded && loaded.windows.length === 1 && loaded.windows[0].tabs[0].url === 'https://x.com', 'snapshot survives the disk round-trip')
+writeSessionNow({ windows: [{ tabs: [{ url: 'https://x.com', pinned: false }], active: 0 }], savedAt: 42, cleanExit: true })
+ok(wasUncleanShutdown() === false, 'cleanExit flag -> clean shutdown detected')
+forgetSession()
+ok(loadSession() === null, 'forgetSession removes the snapshot')
+ok(wasUncleanShutdown() === false, 'missing snapshot -> not an unclean shutdown')
+fs.writeFileSync(path.join(tmp, 'userdata', 'session.json'), '{corrupted!!')
+ok(loadSession() === null, 'corrupted session.json -> null, no throw')
+
+console.log(`\nv1.5.0 build 1 (session restore): ${pass} passed, ${fail} failed`)
+process.exit(fail ? 1 : 0)

@@ -12,6 +12,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { TabManager } from './tabs'
 import { registerTabManager, unregisterTabManager } from './extensions'
+import { scheduleSessionSave, type SessionTab } from './session-restore'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -20,6 +21,8 @@ export interface WindowEntry {
   win: BrowserWindow
   tabs: TabManager
   ui: { sidebarOpen: boolean }
+  /** v1.5.0 build 5: private windows skip history writes + session persistence */
+  private?: boolean
 }
 
 const entries = new Map<number, WindowEntry>()
@@ -67,7 +70,14 @@ export function applyLayout(entry: WindowEntry): void {
   })
 }
 
-export function createBrowserWindow(url?: string): WindowEntry {
+export interface CreateWindowOptions {
+  /** restore this tab set instead of a single blank tab (session restore) */
+  restore?: { tabs: SessionTab[]; active: number }
+  /** private window — in-memory session, no history/session writes (build 5) */
+  private?: boolean
+}
+
+export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}): WindowEntry {
   // app icon for the taskbar / title bar in dev & unpackaged runs (packaged
   // builds get their icon from electron-builder, so a missing file is fine)
   const iconPath = path.join(__dirname, '../../build/icon.png')
@@ -105,6 +115,7 @@ export function createBrowserWindow(url?: string): WindowEntry {
     preloadPath,
     () => {
       if (!win.isDestroyed()) win.webContents.send('tabs:state', entry.tabs.getState())
+      if (!entry.private) scheduleSessionSave()
     },
     {
       onEmpty: (w) => {
@@ -126,6 +137,7 @@ export function createBrowserWindow(url?: string): WindowEntry {
     entry.tabs.stopMemorySaver()
     unregisterTabManager(entry.tabs)
     entries.delete(win.id)
+    if (!entry.private) scheduleSessionSave()
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -135,7 +147,18 @@ export function createBrowserWindow(url?: string): WindowEntry {
   }
 
   registerTabManager(entry.tabs)
-  entry.tabs.create(url)
+  if (opts.restore && opts.restore.tabs.length) {
+    // session restore: rebuild every tab, re-pin, focus the recorded one
+    let focusId = 0
+    opts.restore.tabs.forEach((t, i) => {
+      const id = entry.tabs.create(t.url, false)
+      if (t.pinned) entry.tabs.setPinned(id, true)
+      if (i === opts.restore!.active) focusId = id
+    })
+    entry.tabs.activate(focusId || entry.tabs.listIds()[0])
+  } else {
+    entry.tabs.create(url)
+  }
   entry.tabs.startMemorySaver()
   applyLayout(entry)
   return entry

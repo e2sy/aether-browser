@@ -67,6 +67,8 @@ export interface Settings {
   extensions: ExtensionRecord[]
   /** v1.4.0 Customization Studio — themes, accent, fonts, new-tab look */
   appearance: AppearanceSettings
+  /** v1.5.0 — reopen the tabs/windows from the previous session at boot */
+  restoreSession: boolean
 }
 
 /** A loaded unpacked extension (persisted across boots). */
