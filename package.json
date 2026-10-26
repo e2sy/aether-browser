@@ -55,7 +55,7 @@
     "electron-builder": "^26.18.0",
     "electron-vite": "^3.0.0",
     "esbuild": "^0.25.12",
-    "typescript": "^5.5.4",
+    "typescript": "^7.0.2",
     "vite": "^6.0.0"
   }
 }
