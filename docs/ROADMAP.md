@@ -4,9 +4,10 @@
 > core), v1.4.0 Customization Studio, v1.4.1 Ollama auto-reconnect, v1.5.0 the real-browser core
 > (bookmarks bar, session restore, downloads page, private windows, progress + site info), **v1.6.0
 > Beast Search**, v1.7.0 security + default browser + OS chrome, v1.8.0 UI/UX wave, v1.9.0 privacy
-> fortress, v2.0.0 the AI milestone, v2.1.0 omnibox suggestions v2 + window-controls fix, and
+> fortress, v2.0.0 the AI milestone, v2.1.0 omnibox suggestions v2 + window-controls fix,
 > **v2.2.0 real-browser staples (bookmark import/export, print, save-as-PDF, spellcheck,
-> download-location options)**.
+> download-location options)**, and **v2.3.0 the power batch (password manager with an
+> OS-keychain vault, PWA web apps, Tab search Ctrl+Shift+A)**.
 > The Master Plan below (118 items, 9 phases) is the contract to beat Brave/Chrome/Firefox on
 > security, looks, speed, and platform reach — desktop first, then Android/iOS. Historical
 > v1.3–v1.6 plans are kept at the bottom.
@@ -23,23 +24,28 @@ bookmark import from Chrome/Edge/Brave/Chromium profiles + universal HTML export
 Save Page as PDF (Ctrl+S), spellcheck with right-click fixes, download-location prompt + custom
 folder. New codecs are pure + round-trip tested (test-v211, 45 assertions).
 
+✅ **Landed in v2.3.0 (build 17, 2026-10-26)** — punch-list item #4 (Tab search, Ctrl+Shift+A,
+with the AI sidebar moved to Ctrl+E) plus the priority-table batch from the field: **password
+manager** (OS-keychain vault, save bar, context-menu save/fill/generate, `aether://passwords`,
+blocklist), **PWA web apps** (manifest install → chromeless bridgeless window, jump list / dock,
+Settings card), and the manager-page groundwork. test-v230: 119 assertions.
+
 The rest, ranked, still open:
 
 1. **Omnibox inline autocomplete** — type-ahead ghost text (Chrome-style) completing from the top suggestion; Tab accepts
 2. **Omnibox paste-and-go** — middle-click paste navigates straight to the URL, skips the dropdown
 3. **Tab hover previews** — live thumbnail card after 600ms hover (Phase 2 leftovers: #40-42)
-4. **Tab search (Ctrl+Shift+A)** — fuzzy filter across open tabs, like Chrome's tab search bubble
-5. **Per-extension permission consent screen** (#5) — the last unshipped Phase-0 item
-6. **Certificate-error UX (#14)** — real interstitial with "proceed anyway" escape hatch instead of the generic error page
-7. **Chrome-UI sandbox re-audit (#17)** — get the first-party chrome window to `sandbox:true` (split the extension glue preload)
-8. **Auto-update channel (#87)** — signed updates via electron-updater + GitHub Releases, plus update badge in Settings
-9. **PDF viewer polish** — zoom controls, TOC sidebar, form-fill pass on the built-in viewer
-10. **Find-in-page v2** — match count in the bar, highlight-all, Ctrl+G cycles
-11. **Session tiles on New Tab** — "continue where you left off" cards for the last session's tabs
-12. **Download bubbles v2** — per-download virus-scan hook + duplicate-name handling
-13. **Keyboard shortcut editor** — remap every binding in Settings (Phase 6 #99)
-14. **i18n skeleton** — en/hi/de first locales, externalized strings (Phase 6 #100)
-15. **Performance budgets (#86-90)** — startup < 1.5s cold, paint < 100ms, tab-switch < 50ms, memory ceiling alarms — measured in CI
+4. **Per-extension permission consent screen** (#5) — the last unshipped Phase-0 item
+5. **Certificate-error UX (#14)** — real interstitial with "proceed anyway" escape hatch instead of the generic error page
+6. **Chrome-UI sandbox re-audit (#17)** — get the first-party chrome window to `sandbox:true` (split the extension glue preload)
+7. **Auto-update channel (#87)** — signed updates via electron-updater + GitHub Releases, plus update badge in Settings
+8. **PDF viewer polish** — zoom controls, TOC sidebar, form-fill pass on the built-in viewer
+9. **Find-in-page v2** — match count in the bar, highlight-all, Ctrl+G cycles
+10. **Session tiles on New Tab** — "continue where you left off" cards for the last session's tabs
+11. **Download bubbles v2** — per-download virus-scan hook + duplicate-name handling
+12. **Keyboard shortcut editor** — remap every binding in Settings (Phase 6 #99)
+13. **i18n skeleton** — en/hi/de first locales, externalized strings (Phase 6 #100)
+14. **Performance budgets (#86-90)** — startup < 1.5s cold, paint < 100ms, tab-switch < 50ms, memory ceiling alarms — measured in CI
 
 ---
 

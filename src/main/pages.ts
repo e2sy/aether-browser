@@ -1176,6 +1176,215 @@ export const DOWNLOADS_HTML = mgrShell(
   `
 )
 
+export const PASSWORDS_HTML = mgrShell(
+  'Passwords',
+  'Passwords',
+  false,
+  `
+  <div id="keywarn" style="display:none; margin-bottom:14px; padding:11px 14px; background:var(--ax-danger-bg); border:1px solid var(--ax-danger-border);
+    border-radius:10px; color:var(--ax-danger); font-size:12.5px; line-height:1.5"></div>
+  <div id="addpanel" style="display:none; margin-bottom:18px; padding:14px 16px; background:var(--ax-card2);
+    border:1px solid var(--ax-border); border-radius:12px">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+      <input id="addUrl" placeholder="https://example.com" style="flex:2 1 220px; padding:10px 12px; font-size:13px; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:10px; outline:none" />
+      <input id="addUser" placeholder="username or email" style="flex:2 1 180px; padding:10px 12px; font-size:13px; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:10px; outline:none" />
+      <input id="addPass" type="password" placeholder="password" style="flex:2 1 180px; padding:10px 12px; font-size:13px; color:var(--ax-fg);
+        background:var(--ax-card); border:1px solid var(--ax-border); border-radius:10px; outline:none" />
+    </div>
+    <div style="display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap">
+      <button class="save-btn" id="addSave">Save login</button>
+      <button class="muted-btn" id="addGen" style="color:var(--ax-accent)">Generate strong password</button>
+      <button class="muted-btn" id="addCancel" style="color:var(--ax-muted2)">Cancel</button>
+      <span id="addStrength" style="font-size:11.5px; color:var(--ax-muted)"></span>
+      <span id="addMsg" style="font-size:11.5px; color:var(--ax-danger)"></span>
+    </div>
+  </div>
+  <div id="blockedWrap" style="display:none; margin-top:26px">
+    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:10px">NEVER SAVE ON THESE SITES</div>
+    <div class="rows" id="blockedRows"></div>
+  </div>
+  `,
+  `
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d }
+  var state = { records: [], blocked: [], available: true }
+  var addBtn = document.createElement('button')
+  addBtn.className = 'action-btn'
+  addBtn.textContent = 'Add login'
+  var head = document.querySelector('.head')
+  if (head) head.appendChild(addBtn)
+  var warn = document.getElementById('keywarn')
+
+  function copyText(text, okMsg) {
+    var done = function () { flash(okMsg) }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { legacyCopy(text); done() })
+    } else { legacyCopy(text); done() }
+  }
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    } catch (err) { /* best effort */ }
+  }
+  var flashTimer = null
+  function flash(msg) {
+    var el = document.getElementById('count')
+    if (!el) return
+    el.textContent = msg
+    if (flashTimer) clearTimeout(flashTimer)
+    flashTimer = setTimeout(function () { render() }, 2500)
+  }
+  function strengthChip(v) {
+    var span = document.createElement('span')
+    var labels = ['very weak', 'weak', 'fair', 'strong', 'excellent']
+    var colors = ['var(--ax-danger)', 'var(--ax-danger)', 'var(--ax-warn, #d9a441)', 'var(--ax-ok)', 'var(--ax-ok)']
+    span.textContent = labels[Math.max(0, Math.min(4, v || 0))]
+    span.style.cssText = 'flex:none;font-size:10.5px;color:' + colors[Math.max(0, Math.min(4, v || 0))] +
+      ';border:1px solid currentColor;border-radius:7px;padding:2px 7px'
+    return span
+  }
+  function render() {
+    var q = document.getElementById('q').value.trim().toLowerCase()
+    var rows = document.getElementById('rows')
+    rows.innerHTML = ''
+    var visible = state.records.filter(function (r) {
+      if (!q) return true
+      return (r.host + ' ' + r.username).toLowerCase().indexOf(q) >= 0
+    })
+    document.getElementById('empty').style.display = visible.length ? 'none' : 'block'
+    document.getElementById('empty').textContent = state.records.length
+      ? 'No logins match “' + q + '”.'
+      : 'No saved logins yet. Aether offers to save when you sign in — or use Add login.'
+    document.getElementById('count').textContent = state.records.length
+      ? state.records.length + ' login' + (state.records.length === 1 ? '' : 's') : ''
+    visible.forEach(function (r) {
+      var row = document.createElement('div'); row.className = 'row'
+      var ic = document.createElement('div'); ic.className = 'ic none'
+      ic.textContent = (r.host || '?').replace(/^www\\./, '').charAt(0).toUpperCase()
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(r.username || '(no username)'); t.className = 't'
+      var u = esc(r.host); u.className = 'u'
+      meta.appendChild(t); meta.appendChild(u)
+      var copy = document.createElement('button')
+      copy.className = 'muted-btn'; copy.style.fontSize = '11px'; copy.style.color = 'var(--ax-accent)'
+      copy.textContent = 'Copy password'
+      copy.title = 'Decrypts with the OS keychain and copies'
+      copy.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.creds.reveal(r.id).then(function (pw) {
+          if (!pw) { flash('could not decrypt'); return }
+          copyText(pw, 'password copied — paste it, then clear your clipboard')
+        }).catch(function () { flash('could not decrypt') })
+      })
+      var del = document.createElement('button'); del.className = 'del'; del.textContent = '\\u00d7'
+      del.title = 'Delete saved login'
+      del.addEventListener('click', function (e) {
+        e.stopPropagation()
+        window.aether.creds.remove(r.id).then(load)
+      })
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(strengthChip(r.strong)); row.appendChild(copy); row.appendChild(del)
+      rows.appendChild(row)
+    })
+    var bwrap = document.getElementById('blockedWrap')
+    var brows = document.getElementById('blockedRows')
+    brows.innerHTML = ''
+    bwrap.style.display = state.blocked.length ? 'block' : 'none'
+    state.blocked.forEach(function (host) {
+      var row = document.createElement('div'); row.className = 'row'
+      var ic = document.createElement('div'); ic.className = 'ic none'; ic.textContent = '\\u00d7'
+      var meta = document.createElement('div'); meta.className = 'meta'
+      var t = esc(host); t.className = 't'
+      var u = document.createElement('div'); u.className = 'u'
+      u.textContent = 'Aether will never offer to save logins here'
+      meta.appendChild(t); meta.appendChild(u)
+      var un = document.createElement('button')
+      un.className = 'muted-btn'; un.style.fontSize = '11px'
+      un.textContent = 'Allow again'
+      un.addEventListener('click', function () { window.aether.creds.unblock(host).then(load) })
+      row.appendChild(ic); row.appendChild(meta); row.appendChild(un)
+      brows.appendChild(row)
+    })
+  }
+  function load() {
+    window.aether.creds.list().then(function (v) {
+      state.records = v.records || []
+      state.blocked = v.blocked || []
+      state.available = v.available !== false
+      warn.style.display = state.available ? 'none' : 'block'
+      warn.textContent = 'The OS keychain is unavailable, so password saving is disabled on this system. ' +
+        'Aether refuses to store passwords unencrypted — enable a keyring service (Windows: automatic, macOS: automatic, Linux: gnome-keyring or kwallet) and reopen this page.'
+      render()
+    }).catch(function () { /* bridge down */ })
+  }
+  document.getElementById('q').addEventListener('input', render)
+  addBtn.addEventListener('click', function () {
+    var p = document.getElementById('addpanel')
+    p.style.display = p.style.display === 'none' ? 'block' : 'none'
+    document.getElementById('addMsg').textContent = ''
+  })
+  document.getElementById('addCancel').addEventListener('click', function () {
+    document.getElementById('addpanel').style.display = 'none'
+  })
+  document.getElementById('addPass').addEventListener('input', function (e) {
+    var v = e.target.value || ''
+    var score = 0
+    if (v.length >= 8) score = 1
+    if (v.length >= 10 && (/[^A-Za-z0-9]/.test(v) || /[A-Z]/.test(v)) && /[0-9]/.test(v)) score = 2
+    if (v.length >= 12 && /[^A-Za-z0-9]/.test(v) && /[0-9]/.test(v) && /[A-Z]/.test(v)) score = 3
+    if (v.length >= 16 && /[^A-Za-z0-9]/.test(v) && /[0-9]/.test(v) && /[A-Z]/.test(v)) score = 4
+    var labels = ['very weak', 'weak', 'fair', 'strong', 'excellent']
+    document.getElementById('addStrength').textContent = v ? 'strength: ' + labels[score] : ''
+  })
+  document.getElementById('addGen').addEventListener('click', function () {
+    var pools = ['abcdefghijkmnopqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '!@#$%^&*()-_=+[]{};:,.?']
+    var all = pools.join('')
+    var out = []
+    for (var i = 0; i < pools.length; i++) {
+      var arr = new Uint32Array(1); window.crypto.getRandomValues(arr)
+      out.push(pools[i][arr[0] % pools[i].length])
+    }
+    while (out.length < 20) {
+      var arr2 = new Uint32Array(1); window.crypto.getRandomValues(arr2)
+      out.push(all[arr2[0] % all.length])
+    }
+    for (var j = out.length - 1; j > 0; j--) {
+      var arr3 = new Uint32Array(1); window.crypto.getRandomValues(arr3)
+      var k = arr3[0] % (j + 1)
+      var tmp = out[j]; out[j] = out[k]; out[k] = tmp
+    }
+    var field = document.getElementById('addPass')
+    field.value = out.join('')
+    field.dispatchEvent(new Event('input'))
+  })
+  document.getElementById('addSave').addEventListener('click', function () {
+    var url = document.getElementById('addUrl').value.trim()
+    var user = document.getElementById('addUser').value
+    var pass = document.getElementById('addPass').value
+    window.aether.creds.add(url, user, pass).then(function (res) {
+      if (!res || !res.ok) {
+        document.getElementById('addMsg').textContent = (res && res.error) || 'could not save'
+        return
+      }
+      document.getElementById('addpanel').style.display = 'none'
+      document.getElementById('addUrl').value = ''
+      document.getElementById('addUser').value = ''
+      document.getElementById('addPass').value = ''
+      document.getElementById('addStrength').textContent = ''
+      load()
+    }).catch(function () { document.getElementById('addMsg').textContent = 'could not save' })
+  })
+  load()
+  `
+)
+
 export const PRIVACY_HTML = pageShell(
   'AI privacy pledge',
   `
@@ -1418,6 +1627,23 @@ export const SETTINGS_HTML = pageShell(
     </div>
 
     <div class="sec">
+      <div class="label">Passwords</div>
+      <div class="opts" style="margin-top:6px">
+        <label><input type="checkbox" id="pmEnabled" /> Offer to save passwords and let me fill them (vault stays encrypted with the OS keychain — nothing leaves this device)</label>
+      </div>
+      <div class="row-btns" style="margin-top:10px">
+        <button class="save-btn" id="pmOpen">Open password manager…</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Web apps</div>
+      <div class="hint" style="margin-bottom:10px">Install any site as its own desktop app — it opens in a dedicated window without browser chrome, keeps your logins, and shows up in the Start-menu jump list / dock. Right-click any page → “Install … as app”.</div>
+      <div id="appsList" style="display:flex; flex-direction:column; gap:6px"></div>
+      <div id="appsEmpty" style="display:none; font-size:12px; color:var(--ax-faint); padding:6px 2px">No web apps installed yet.</div>
+    </div>
+
+    <div class="sec">
       <div class="label">Import &amp; export</div>
       <div class="hint" style="margin-bottom:10px">Bring your bookmarks from Chrome, Edge, Brave or Chromium on this machine in one click, or import any browser’s exported bookmarks HTML file. Export writes the universal format every browser understands.</div>
       <div id="impSrc" style="display:flex; flex-direction:column; gap:6px"></div>
@@ -1592,6 +1818,8 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('notifyDownloads').checked = s.notifyDownloads !== false
       document.getElementById('spellcheck').checked = s.spellcheck !== false
       document.getElementById('askDownloadLocation').checked = !!s.askDownloadLocation
+      document.getElementById('pmEnabled').checked = s.passwordManager !== false
+      renderApps()
       document.getElementById('dlDir').textContent = s.downloadDir || 'Saving to the default Downloads folder'
       renderImportSources()
       renderShieldPresets(s)
@@ -1993,6 +2221,41 @@ export const SETTINGS_HTML = pageShell(
   document.getElementById('notifyDownloads').addEventListener('change', function (e) { save({ notifyDownloads: e.target.checked }) })
   document.getElementById('spellcheck').addEventListener('change', function (e) { save({ spellcheck: e.target.checked }) })
   document.getElementById('askDownloadLocation').addEventListener('change', function (e) { save({ askDownloadLocation: e.target.checked }) })
+  document.getElementById('pmEnabled').addEventListener('change', function (e) { save({ passwordManager: e.target.checked }) })
+  document.getElementById('pmOpen').addEventListener('click', function () { window.aether.internal.open('aether://passwords') })
+  function renderApps() {
+    window.aether.apps.list().then(function (apps) {
+      var box = document.getElementById('appsList')
+      box.innerHTML = ''
+      document.getElementById('appsEmpty').style.display = apps.length ? 'none' : 'block'
+      apps.forEach(function (a) {
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--ax-card2);border:1px solid var(--ax-border);border-radius:10px'
+        var ic = document.createElement('div')
+        ic.className = 'ic none'
+        ic.textContent = (a.shortName || a.name || '?').charAt(0).toUpperCase()
+        var meta = document.createElement('div')
+        meta.style.cssText = 'min-width:0;flex:1'
+        var t = document.createElement('div')
+        t.textContent = a.name
+        t.style.cssText = 'font-size:13px;color:var(--ax-fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+        var u = document.createElement('div')
+        u.textContent = a.url
+        u.style.cssText = 'font-size:11px;color:var(--ax-muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+        meta.appendChild(t); meta.appendChild(u)
+        var open = document.createElement('button')
+        open.className = 'save-btn'
+        open.textContent = 'Open'
+        open.addEventListener('click', function () { window.aether.apps.launch(a.id) })
+        var del = document.createElement('button')
+        del.className = 'muted-btn'
+        del.textContent = 'Remove'
+        del.addEventListener('click', function () { window.aether.apps.remove(a.id).then(renderApps) })
+        row.appendChild(ic); row.appendChild(meta); row.appendChild(open); row.appendChild(del)
+        box.appendChild(row)
+      })
+    }).catch(function () { /* bridge down — ignore */ })
+  }
   document.getElementById('dlChoose').addEventListener('click', async function () {
     try {
       const dir = await window.aether.downloads.chooseDir()

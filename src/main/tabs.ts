@@ -19,6 +19,7 @@ import { resolveInput } from './resolve'
 import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPageUrl, CRASH_CODE } from './errmap'
 import { noteSiteHost, forgetSiteHost } from './adblock'
 import { notifyTabAdded, notifyTabRemoved, notifyTabSelected } from './extensions'
+import { noteCredContext, forgetCredContext, wireCredCapture } from './passwords'
 
 interface Tab extends TabMeta {
   view: WebContentsView | null
@@ -238,6 +239,11 @@ export class TabManager {
     // navlock: <webview> is not part of the threat model — refuse attachment
     wc.on('will-attach-webview', (e) => e.preventDefault())
     wc.on('context-menu', (_e, params) => onContextMenu(wc, params, this))
+    // v2.3.0 password manager: private-window registry + login submit hook
+    // (injection is settings-gated + http(s)-only inside wireCredCapture)
+    noteCredContext(wc.id, Boolean(this.hooks.private))
+    wireCredCapture(wc, Boolean(this.hooks.private))
+    wc.once('destroyed', () => forgetCredContext(wc.id))
     wc.on('found-in-page', (_e, result) => {
       this.sendToChrome('find:result', {
         tabId: tab.id,

@@ -24,6 +24,10 @@ interface AppState {
   isPrivate: boolean
   /** v1.8.0 (#37) — command palette visibility */
   paletteOpen: boolean
+  /** v2.3.0 — tab search overlay (Ctrl+Shift+A, Chrome parity) */
+  tabSearchOpen: boolean
+  /** v2.3.0 — password save bar prompt (main → chrome) */
+  credPrompt: { requestId: string; host: string; url?: string; username: string } | null
   set: (patch: Partial<AppState>) => void
 }
 
@@ -42,6 +46,8 @@ export const useApp = create<AppState>((set) => ({
   showBookmarksBar: true,
   isPrivate: false,
   paletteOpen: false,
+  tabSearchOpen: false,
+  credPrompt: null,
   set: (patch) => set(patch)
 }))
 

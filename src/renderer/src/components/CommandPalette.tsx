@@ -69,6 +69,10 @@ export default function CommandPalette(): JSX.Element | null {
       if (useApp.getState().activeId != null) void window.aether.tabs.close(useApp.getState().activeId as number)
     })
     t('New private window', 'Ctrl+Shift+N', 'action', () => void window.aether.win.newPrivate())
+    t('Search tabs', 'Ctrl+Shift+A', 'action', () => {
+      set({ paletteOpen: false, tabSearchOpen: true })
+    })
+    t('Password manager', 'Ctrl+Shift+Y', 'page', () => void window.aether.tabs.create('aether://passwords'))
     t('Toggle AI sidebar', 'Ctrl+E', 'action', () => {
       const openNow = useApp.getState().sidebarOpen
       set({ sidebarOpen: !openNow })

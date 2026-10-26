@@ -10,6 +10,8 @@ import { addReading } from './readinglist'
 import { notify } from './osshell'
 import { printActive, savePageAsPdf } from './printpdf'
 import { importFromFileFlow, exportBookmarksFlow } from './bkmimport'
+import { saveLoginFromContext, fillLoginFor, generateAndFill } from './passwords'
+import { appForHost, launchApp, installFromTab } from './apps'
 
 /** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
  *  rebuild the menu so the checkbox stays truthful. */
@@ -158,9 +160,20 @@ export function buildMenu(): Menu {
           click: (): void => tabs()?.sendToChrome('omnibox:focus', {})
         },
         {
-          label: 'Toggle AI Sidebar',
+          label: 'Search Tabs…',
           accelerator: 'CmdOrCtrl+Shift+A',
+          click: (): void => tabs()?.sendToChrome('tabsearch:show', {})
+        },
+        {
+          label: 'Toggle AI Sidebar',
+          accelerator: 'CmdOrCtrl+E',
           click: (): void => tabs()?.sendToChrome('sidebar:toggle', {})
+        },
+        { type: 'separator' },
+        {
+          label: 'Password Manager',
+          accelerator: 'CmdOrCtrl+Shift+Y',
+          click: (): void => openInternal('aether://passwords')
         }
       ]
     },
@@ -379,6 +392,60 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
     })
   }
 
+  // v2.3.0 password manager — right-click inside an editable field (or any
+  // page when the vault has a login for this site) to save / fill / generate.
+  // (Electron 45 dropped inputFieldType from the typings; the Save probe
+  // self-explains via a notification when the page has no login form.)
+  const pageUrlCred = wc.getURL()
+  if (/^https?:/i.test(pageUrlCred) && mergedSettings().passwordManager !== false) {
+    if (params.isEditable) {
+      items.push(
+        {
+          label: 'Save login…',
+          click: (): void => saveLoginFromContext(wc)
+        },
+        {
+          label: 'Fill saved password',
+          click: (): void => fillLoginFor(wc)
+        },
+        {
+          label: 'Generate strong password',
+          click: (): void => generateAndFill(wc)
+        },
+        { type: 'separator' }
+      )
+    }
+  }
+
+  // v2.3.0 web apps — install the site as its own window (or relaunch it)
+  const pageUrlApp = wc.getURL()
+  if (/^https?:/i.test(pageUrlApp)) {
+    const installed = appForHost(pageUrlApp)
+    if (installed) {
+      items.push({
+        label: `Open “${installed.name}” in its window`,
+        click: (): void => {
+          launchApp(installed.id)
+        }
+      })
+    } else {
+      items.push({
+        label: `Install ${hostLabel(pageUrlApp)} as app…`,
+        click: (): void => {
+          const tabId = findTabIdByWc(wc, tm)
+          if (tabId === null) {
+            notify('Install failed', 'This tab is no longer available')
+            return
+          }
+          void installFromTab(tm, tabId).then((res) => {
+            if (res.ok) notify('App installed', `${res.name} — find it in Settings → Web apps`)
+            else notify('Install failed', res.error || 'unknown error')
+          })
+        }
+      })
+    }
+  }
+
   // Aether actions group (#45) — reading list + screenshot on any page
   const pageUrl = wc.getURL()
   if (/^https?:/i.test(pageUrl)) {
@@ -429,4 +496,26 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
   )
 
   Menu.buildFromTemplate(items).popup()
+}
+
+/** "example.com" from a URL for context-menu labels; '' when unparseable. */
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return 'this site'
+  }
+}
+
+/** Which tab of this manager owns the given webContents? */
+function findTabIdByWc(wc: WebContents, tm: TabManager): number | null {
+  try {
+    for (const id of tm.listIds()) {
+      const t = tm.get(id)
+      if (t && t.view && t.view.webContents === wc) return id
+    }
+  } catch {
+    /* destroyed */
+  }
+  return null
 }

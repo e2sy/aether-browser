@@ -66,7 +66,11 @@ export const api = {
     /** v1.5.0 — bookmarks bar visibility toggled from the menu / settings */
     onBookmarksBar: subscribe('chrome:bookmarksBar'),
     /** v1.5.0 — this window is private (badge + no-history indicator) */
-    onPrivate: subscribe('win:private')
+    onPrivate: subscribe('win:private'),
+    /** v2.3.0 — menu → open the tab-search overlay (Ctrl+Shift+A) */
+    onTabSearchShow: subscribe('tabsearch:show'),
+    /** v2.3.0 — password manager save bar prompt */
+    onCredPrompt: subscribe('creds:prompt')
   },
 
   tabs: {
@@ -103,6 +107,37 @@ export const api = {
 
   omnibox: {
     suggest: (q: string) => ipcRenderer.invoke('omnibox:suggest', q)
+  },
+
+  /** v2.3.0 — password manager (vault + save bar + blocklist) */
+  creds: {
+    list: () => ipcRenderer.invoke('creds:list') as Promise<{
+      available: boolean
+      records: Array<{ id: string; host: string; url?: string; username: string; strong: number; ts: number }>
+      blocked: string[]
+    }>,
+    /** decrypt one saved password on demand (manager page only) */
+    reveal: (id: string) => ipcRenderer.invoke('creds:reveal', id) as Promise<string>,
+    add: (url: string, username: string, password: string) =>
+      ipcRenderer.invoke('creds:add', url, username, password) as Promise<{ ok: boolean; error?: string }>,
+    remove: (id: string) => ipcRenderer.invoke('creds:remove', id),
+    block: (host: string) => ipcRenderer.invoke('creds:block', host),
+    unblock: (host: string) => ipcRenderer.invoke('creds:unblock', host),
+    /** answer the save bar: save=true stores it, never=block the site;
+     *  usernameOverride applies an edited username before saving */
+    respond: (requestId: string, save: boolean, never: boolean, usernameOverride?: string) =>
+      ipcRenderer.invoke('creds:respond', requestId, save, never, usernameOverride ?? '')
+  },
+
+  /** v2.3.0 — installed web apps (PWA "Install as app") */
+  apps: {
+    list: () => ipcRenderer.invoke('apps:list') as Promise<
+      Array<{ id: string; name: string; shortName: string; url: string; host: string; iconPath?: string; manifest: boolean; createdAt: number }>
+    >,
+    install: (tabId: number) =>
+      ipcRenderer.invoke('apps:install', tabId) as Promise<{ ok: boolean; id?: string; name?: string; error?: string }>,
+    launch: (id: string) => ipcRenderer.invoke('apps:launch', id) as Promise<number | null>,
+    remove: (id: string) => ipcRenderer.invoke('apps:remove', id) as Promise<boolean>
   },
 
   ui: {

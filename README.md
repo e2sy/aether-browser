@@ -6,14 +6,15 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v2.2.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v2.3.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v2.2.0)
+## ✨ Features (v2.3.0)
 
 | Feature | What it does |
 |---|---|
+| 🔐 **Password manager + 🚀 web apps + 🔎 tab search (v2.3.0)** | **Password manager** — Aether offers to save logins when you sign in (a save bar with an editable username), right-click any field to **Save login… / Fill saved password / Generate strong password**, and manage everything on `aether://passwords` (search, strength chips, copy-with-decrypt, manual add with a generator, "never save" blocklist). The vault encrypts every pair with the **OS keychain** (DPAPI / Keychain / libsecret) — no plaintext ever touches disk, and the one IPC channel a web page may call is write-only with the host derived from the sender's real URL. **Web apps (PWA)** — right-click → "Install … as app" installs any site as its own chromeless desktop window (webmanifest name/icons/start-url when present, title+favicon fallback), launches from the context menu, Settings card, **Windows jump list** and **macOS dock menu**. **Tab search (Ctrl+Shift+A)** — Chrome-parity fuzzy switcher over open tabs with per-row close; the AI sidebar moved to Ctrl+E |
 | 📦 **Migration & daily-driver staples (v2.2.0)** | **One-click bookmark import** — Aether scans this machine for **Chrome / Edge / Brave / Chromium** profiles and lists them in Settings ("Chrome — Default · 42 bookmarks → Import"), plus **import from any browser's exported HTML file** and **Chrome-JSON**. **Export** writes the universal Netscape format every browser understands (folder groups preserved, round-trip tested). **Print… (Ctrl+P)** opens the native print dialog; **Save Page as PDF (Ctrl+S)** via a save dialog. **Spellcheck** (en-US) with right-click fixes + add-to-dictionary. **Download options** — "ask where to save each file" (native save dialog) and a custom default download folder |
 | 🤖 **AI, everywhere it helps (v2.0.0)** | **TL;DR toasts** — list hosts in Settings (e.g. `en.wikipedia.org`) and pages from them get an automatic **3-bullet summary from your local model** in a dismissible toast while the tab loads (private windows excluded). **AI search depth modes** — Quick / **Deep** (synthesis across all 14 sources) / **Academic** (prefers .edu/.gov, structured review) / **Code** (docs & Stack Overflow) — each mode reshapes the prompt and the source budget. **Semantic history** — "Find that article…" on `aether://history` describes what you remember and Ollama embeddings (`nomic-embed-text`) rank your 300 most recent visits & bookmarks by meaning, vectors cached locally. **VRAM calculator** — the model manager honestly estimates weights + KV cache + overhead per quant before you pull, so "fits in 8 GB" claims don't embarrass the browser |
 | 🪟 **Your default browser (v1.7.0)** | One click in Settings → Aether registers as a **default-browser candidate on Windows/macOS/Linux**, opens the OS chooser, and **URLs from other apps open as foreground tabs in the running window** (second-instance forwarding). `.htm/.html` file associations included — the flagship feature that makes Aether a *real* daily driver |
@@ -41,6 +42,16 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🏰 **Hardened by the Master Plan** | `npm audit` **0 vulnerabilities**; internal pages serve a **nonce-based CSP** (`unsafe-inline` is dead), a **will-navigate lock** keeps web pages out of privileged schemes, **Electron fuses** (RunAsNode off, cookie encryption, ASAR integrity) ship in every build, extensions extract through a **zip-hardening gate** (traversal/symlink/bomb-proof), an **XSS regression gate** runs in CI, and **Dependabot + an npm-audit CI gate** watch the supply chain — see [SECURITY.md](SECURITY.md) |
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 📦 v2.3.0 — passwords, web apps, tab search (build 17)
+
+The "make it a real browser" power batch:
+
+- **Password manager** — a save bar slides up when you sign in (username editable, "Never" blocklists the site), right-click any field for **Save login… / Fill saved password / Generate strong password** (20-char, unambiguous-charset, copied to clipboard), and `aether://passwords` manages the vault: search, strength chips, copy-with-decrypt, manual add + generator, and the "never save on these sites" blocklist. Every pair is encrypted with **safeStorage** — DPAPI on Windows, Keychain on macOS, libsecret/kwallet on Linux; if no keychain exists the vault **refuses to store** with a clear explanation instead of falling back to plaintext. Hosts always come from the sender's real URL (a page cannot plant rows for another site), subdomains never autofill across registrable domains, private windows are excluded, and the whole flow is gated by a Settings toggle.
+- **Web apps (PWA install-as-app)** — right-click → "Install example.com as app…". The installer reads the site's **webmanifest** (name, start_url, best non-maskable raster icon) and degrades to the tab's title + favicon. Apps open in a dedicated chromeless window **with no Aether bridge** (real apps never see `window.aether`), same-origin popups stay inside the window, other https links open as browser tabs. Launch from the context menu, Settings → Web apps, the **Windows jump list** and **macOS dock menu**; `--aether-app=<id>` cold-starts from the OS.
+- **Tab search (Ctrl+Shift+A)** — Chrome parity at last: a fuzzy switcher over this window's tabs (title/URL/host ranked, host hits boosted, pinned & active tiebreaks) with Enter-to-switch and a per-row close button; also in the app menu (Edit → Search Tabs…) so it works from any page. The **AI sidebar moved to Ctrl+E** (menu, toolbar tooltip and the command palette all updated).
+- **Manager pages & cards** — new `aether://passwords` page + Settings cards for Passwords and Web apps; command palette gained "Search tabs" and "Password manager".
+- **119 new tests** (tab ranking, strength bins, generator determinism, field pickers, cross-domain autofill refusal, injection-safe fill/probe/generate scripts, manifest parsing, icon picking, app-id slugs, arg parsing) + 23 static wiring gates — **1,366 total across 29 suites**.
 
 ## 📦 v2.2.0 — real-browser staples (build 16)
 
@@ -425,7 +436,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 PRs welcome! Good first issues: Master Plan Phase 5 (performance budgets: paint metrics,
 startup profiling, memory ceilings), Phase 6 (auto-update signing, i18n), and helping test
 default-browser flows across Linux distros.
-Run `npm run typecheck` before committing. Unit tests: `npm test` — **28 suites, 1,247 tests**, every feature lands with its own suite.
+Run `npm run typecheck` before committing. Unit tests: `npm test` — **29 suites, 1,366 tests**, every feature lands with its own suite.
 
 **Headless checks** (used by CI — typecheck, build, boot + internal pages + discard/wake, unit tests):
 

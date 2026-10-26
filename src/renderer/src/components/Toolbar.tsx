@@ -60,7 +60,9 @@ export default function Toolbar(): JSX.Element {
         inputRef.current?.focus()
         inputRef.current?.select()
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'e') {
+        // v2.3.0 — the AI sidebar lives on Ctrl+E now; Ctrl+Shift+A belongs
+        // to tab search and is handled by the TabSearch overlay itself.
         e.preventDefault()
         toggleSidebar()
       }
@@ -388,7 +390,7 @@ export default function Toolbar(): JSX.Element {
         )}
       </div>
 
-      <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+Shift+A)">
+      <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+E)">
         <IconSidebar />
       </button>
 

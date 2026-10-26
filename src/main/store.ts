@@ -68,7 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   tldrHosts: [],
   spellcheck: true,
   askDownloadLocation: false,
-  downloadDir: ''
+  downloadDir: '',
+  passwordManager: true
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

@@ -74,6 +74,18 @@ import {
   removeExtension
 } from './extensions'
 import { installExtensionFromDialog, installExtensionFromFile } from './crx'
+import {
+  listCreds,
+  revealCred,
+  addCred,
+  removeCred,
+  blockHost,
+  unblockHost,
+  respondPrompt,
+  onCredSubmit,
+  isPrivateView
+} from './passwords'
+import { listApps, installFromTab, launchApp, removeApp } from './apps'
 import { MODEL_CATALOG } from './model-catalog'
 import { startPull, cancelPull, activePulls } from './model-manager'
 import { extractPage } from './extract'
@@ -402,6 +414,68 @@ export function registerIpc(): void {
       properties: ['openDirectory', 'createDirectory']
     })
     return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
+  })
+
+  // ---------- v2.3.0 password manager (vault never leaves main as plaintext) ----------
+  ipcMain.handle('creds:list', (e) => {
+    guard(e, 'creds:list')
+    return listCreds()
+  })
+  ipcMain.handle('creds:reveal', (e, id: string) => {
+    guard(e, 'creds:reveal')
+    return revealCred(String(id || ''))
+  })
+  ipcMain.handle('creds:add', (e, url: string, username: string, password: string) => {
+    guard(e, 'creds:add')
+    return addCred(String(url || ''), String(username || ''), String(password || ''))
+  })
+  ipcMain.handle('creds:remove', (e, id: string) => {
+    guard(e, 'creds:remove')
+    removeCred(String(id || ''))
+  })
+  ipcMain.handle('creds:block', (e, host: string) => {
+    guard(e, 'creds:block')
+    blockHost(String(host || ''))
+  })
+  ipcMain.handle('creds:unblock', (e, host: string) => {
+    guard(e, 'creds:unblock')
+    unblockHost(String(host || ''))
+  })
+  ipcMain.handle('creds:respond', (e, requestId: string, save: boolean, never: boolean, usernameOverride?: string) => {
+    guard(e, 'creds:respond')
+    respondPrompt(String(requestId || ''), Boolean(save), Boolean(never), String(usernameOverride || ''))
+  })
+  // The ONE channel web pages may call — deliberately outside the standard
+  // guard: write-only, the host is derived from the sender's real URL (never
+  // the payload), private windows / blocked hosts / settings-off are dropped.
+  ipcMain.handle('creds:submit', (e, payload: unknown) => {
+    let senderUrl = ''
+    let wcId = -1
+    try {
+      senderUrl = e.sender.getURL() || ''
+      wcId = e.sender.id
+    } catch {
+      return
+    }
+    onCredSubmit(senderUrl, isPrivateView(wcId), payload, wcId)
+  })
+
+  // ---------- v2.3.0 web apps (PWA install-as-app) ----------
+  ipcMain.handle('apps:list', (e) => {
+    guard(e, 'apps:list')
+    return listApps()
+  })
+  ipcMain.handle('apps:install', (e, tabId: number) => {
+    const entry = fromSender(e)
+    return installFromTab(entry.tabs, Number(tabId))
+  })
+  ipcMain.handle('apps:launch', (e, id: string) => {
+    guard(e, 'apps:launch')
+    return launchApp(String(id || ''))
+  })
+  ipcMain.handle('apps:remove', (e, id: string) => {
+    guard(e, 'apps:remove')
+    return removeApp(String(id || ''))
   })
   ipcMain.handle('history:recent', (e) => {
     guard(e, 'history:recent')

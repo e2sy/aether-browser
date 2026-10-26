@@ -121,6 +121,8 @@ export interface Settings {
   askDownloadLocation: boolean
   /** v2.2.0 — custom download directory ('' = the OS Downloads folder) */
   downloadDir: string
+  /** v2.3.0 — offer to save logins + allow autofill (vault stays OS-encrypted) */
+  passwordManager: boolean
 }
 
 /** A loaded unpacked extension (persisted across boots). */

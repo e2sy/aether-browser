@@ -7,6 +7,7 @@ import path from 'node:path'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
 import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, READINGLIST_HTML, PRIVACY_HTML, pageSecurityHeaders } from './pages'
+import { PASSWORDS_HTML } from './pages'
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
 import { mergedSettings } from './store'
@@ -43,6 +44,7 @@ import {
 } from './windows'
 import { installCrxFromArgv } from './crx'
 import { parseLaunchArgs } from './defaultbrowser'
+import { refreshOSSurfaces, consumeAppArg, launchApp } from './apps'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -85,6 +87,9 @@ app.on('second-instance', (_e, argv) => {
   // Windows jump-list / taskbar actions land here as flags (#27)
   if ((argv ?? []).includes('--new-window')) createBrowserWindow()
   if ((argv ?? []).includes('--private')) createBrowserWindow(undefined, { private: true })
+  // v2.3.0 web apps: jump-list / dock launches carry --aether-app=<id>
+  const appArg = consumeAppArg(argv)
+  if (appArg) launchApp(appArg)
 })
 
 // macOS default-browser flow: LaunchServices delivers picked-up links here
@@ -108,6 +113,7 @@ app.whenReady().then(() => {
     settings: SETTINGS_HTML,
     readinglist: READINGLIST_HTML,
     privacy: PRIVACY_HTML,
+    passwords: PASSWORDS_HTML,
     error: ERROR_HTML
   }
   protocol.handle('aether', (req) => {
@@ -267,6 +273,10 @@ app.whenReady().then(() => {
   // One-click .crx install: "Open with Aether" passes the file via argv
   // (Windows/Linux) or the open-file event (macOS).
   void installCrxFromArgv(process.argv)
+  // v2.3.0 web apps: OS launch surfaces + `--aether-app=<id>` cold start
+  refreshOSSurfaces()
+  const bootAppArg = consumeAppArg(process.argv)
+  if (bootAppArg) launchApp(bootAppArg)
   app.on('open-file', (e, filePath) => {
     e.preventDefault()
     if (/\.crx$/i.test(filePath) && app.isReady()) void installCrxFromArgv([filePath])
