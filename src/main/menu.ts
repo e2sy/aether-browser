@@ -12,6 +12,8 @@ import { printActive, savePageAsPdf } from './printpdf'
 import { importFromFileFlow, exportBookmarksFlow } from './bkmimport'
 import { saveLoginFromContext, fillLoginFor, generateAndFill } from './passwords'
 import { appForHost, launchApp, installFromTab } from './apps'
+import { listProfiles, activeProfileId } from './profiles'
+import { switchToProfile } from './windows'
 
 /** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
  *  rebuild the menu so the checkbox stays truthful. */
@@ -285,6 +287,26 @@ export function buildMenu(): Menu {
             const e = focusedEntry()
             if (e) e.tabs.muteAll(false)
           }
+        }
+      ]
+    },
+    {
+      // v2.4.0 build 18 — Chrome-style profile switcher. Rebuilt by every
+      // buildMenu() call, so registry changes show up the next time any
+      // menu opens. Switching flushes + relaunches (windows.switchToProfile).
+      label: 'Profiles',
+      submenu: [
+        ...listProfiles().map((p) => ({
+          label: `${p.id === activeProfileId() ? '● ' : ''}${p.name}`,
+          enabled: p.id !== activeProfileId(),
+          click: (): void => {
+            switchToProfile(p.id)
+          }
+        })),
+        { type: 'separator' as const },
+        {
+          label: 'Open profile manager',
+          click: (): void => openInternal('aether://settings')
         }
       ]
     },

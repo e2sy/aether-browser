@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp, useActiveTab } from '../state/store'
 import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar, IconShield } from './Icons'
 import { SECURITY_LABEL, securityOf } from '../../../shared/security'
-import { buildOmniboxRows, type SugRow } from '../../../shared/omnibox'
+import { buildOmniboxRows, inlineComplete, pasteGoTarget, type SugRow } from '../../../shared/omnibox'
+import { profileInitial, type Profile } from '../../../shared/profiles'
 
 interface ShieldsInfo {
   enabled: boolean
@@ -36,6 +37,10 @@ export default function Toolbar(): JSX.Element {
   const [shieldsOpen, setShieldsOpen] = useState(false)
   const [siteOpen, setSiteOpen] = useState(false)
   const [siteInfo, setSiteInfo] = useState<ShieldsInfo | null>(null)
+  // v2.4.0 build 18 — inline autocomplete ghost + profile switcher
+  const [ghost, setGhost] = useState<string | null>(null)
+  const [profiles, setProfiles] = useState<{ list: Profile[]; activeId: string } | null>(null)
+  const [profOpen, setProfOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -151,6 +156,24 @@ export default function Toolbar(): JSX.Element {
     return () => window.removeEventListener('mousedown', close)
   }, [siteOpen])
 
+  // profile switcher: lazily load the registry when the popup opens
+  useEffect(() => {
+    if (!profOpen) return
+    let dead = false
+    window.aether.profiles
+      .list()
+      .then((r) => {
+        if (!dead) setProfiles({ list: r.profiles, activeId: r.activeId })
+      })
+      .catch(() => undefined)
+    const close = (): void => setProfOpen(false)
+    window.addEventListener('mousedown', close)
+    return () => {
+      dead = true
+      window.removeEventListener('mousedown', close)
+    }
+  }, [profOpen])
+
   const sec = securityOf(tab?.url || '')
 
   const toggleSidebar = (): void => {
@@ -180,10 +203,16 @@ export default function Toolbar(): JSX.Element {
           suggestions?: string[]
         }
         if (mySeq !== reqSeq.current) return
-        setSugs(buildOmniboxRows(text, { history, bookmarks, suggestions }))
+        const rows = buildOmniboxRows(text, { history, bookmarks, suggestions })
+        setSugs(rows)
         setSugIdx(-1)
+        // v2.4.0 — ghost type-ahead always mirrors the TOP row
+        setGhost(inlineComplete(text, rows[0] ?? null))
       } catch {
-        if (mySeq === reqSeq.current) setSugs([])
+        if (mySeq === reqSeq.current) {
+          setSugs([])
+          setGhost(null)
+        }
       }
     }, 110)
   }
@@ -194,8 +223,29 @@ export default function Toolbar(): JSX.Element {
       window.aether.tabs.omnibox(tab.id, text)
       setSugs([])
       setSugIdx(-1)
+      setGhost(null)
       inputRef.current?.blur()
       setFocused(false)
+    }
+  }
+
+  /** Tab accepts the inline completion (Chrome-style type-ahead). */
+  const acceptGhost = (): void => {
+    const full = ghost && sugs[0] ? sugs[0].value : null
+    if (!full) return
+    setOmnibox(full)
+    setGhost(null)
+    refreshSuggestions(full)
+  }
+
+  /** v2.4.0 — middle-click paste-and-go: URL-ish clipboard navigates instantly. */
+  const pasteAndGo = async (): Promise<void> => {
+    try {
+      const text = await window.aether.clipboard.readText()
+      const target = pasteGoTarget(text)
+      if (target) commitValue(target)
+    } catch {
+      /* clipboard unavailable — ignore */
     }
   }
 
@@ -233,44 +283,63 @@ export default function Toolbar(): JSX.Element {
         >
           {sec.kind === 'secure' ? '🔒' : sec.kind === 'insecure' ? '⚠' : sec.kind === 'file' ? '🗂' : '✦'}
         </button>
-        <input
-          ref={inputRef}
-          value={omnibox}
-          placeholder={focused ? 'Search, or enter a URL — ↑↓ to pick a suggestion' : ''}
-          onChange={(e) => {
-            setOmnibox(e.target.value)
-            refreshSuggestions(e.target.value)
-          }}
-          onFocus={(e) => {
-            if (blurTimer.current) clearTimeout(blurTimer.current)
-            setFocused(true)
-            e.currentTarget.select()
-          }}
-          onBlur={() => {
-            blurTimer.current = setTimeout(() => {
-              setFocused(false)
-              setSugs([])
-              setSugIdx(-1)
-            }, 160)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' && sugs.length) {
-              e.preventDefault()
-              setSugIdx((i) => (i + 1) % sugs.length)
-            } else if (e.key === 'ArrowUp' && sugs.length) {
-              e.preventDefault()
-              setSugIdx((i) => (i - 1 + sugs.length) % sugs.length)
-            } else if (e.key === 'Enter') {
-              commitValue(sugIdx >= 0 && sugs[sugIdx] ? sugs[sugIdx].value : undefined)
-            } else if (e.key === 'Escape') {
-              setSugs([])
-              setSugIdx(-1)
-              inputRef.current?.blur()
-              setFocused(false)
-            }
-          }}
-          spellCheck={false}
-        />
+        <div className="omni-input-wrap">
+          <input
+            ref={inputRef}
+            value={omnibox}
+            placeholder={focused ? 'Search, or enter a URL — Tab completes · ↑↓ to pick' : ''}
+            onChange={(e) => {
+              setOmnibox(e.target.value)
+              refreshSuggestions(e.target.value)
+            }}
+            onFocus={(e) => {
+              if (blurTimer.current) clearTimeout(blurTimer.current)
+              setFocused(true)
+              e.currentTarget.select()
+            }}
+            onBlur={() => {
+              blurTimer.current = setTimeout(() => {
+                setFocused(false)
+                setSugs([])
+                setSugIdx(-1)
+                setGhost(null)
+              }, 160)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' && sugs.length) {
+                e.preventDefault()
+                setSugIdx((i) => (i + 1) % sugs.length)
+              } else if (e.key === 'ArrowUp' && sugs.length) {
+                e.preventDefault()
+                setSugIdx((i) => (i - 1 + sugs.length) % sugs.length)
+              } else if (e.key === 'Tab' && ghost) {
+                e.preventDefault()
+                acceptGhost()
+              } else if (e.key === 'Enter') {
+                commitValue(sugIdx >= 0 && sugs[sugIdx] ? sugs[sugIdx].value : undefined)
+              } else if (e.key === 'Escape') {
+                setSugs([])
+                setSugIdx(-1)
+                setGhost(null)
+                inputRef.current?.blur()
+                setFocused(false)
+              }
+            }}
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                e.preventDefault()
+                void pasteAndGo()
+              }
+            }}
+            spellCheck={false}
+          />
+          {focused && ghost && (
+            <div className="omni-ghost" aria-hidden="true">
+              <span className="omni-ghost-base">{omnibox}</span>
+              <span className="omni-ghost-dim">{ghost}</span>
+            </div>
+          )}
+        </div>
         <button
           className={`icon-btn star ${bookmarked ? 'on' : ''}`}
           onClick={toggleBookmark}
@@ -393,6 +462,50 @@ export default function Toolbar(): JSX.Element {
       <button className={`icon-btn ${sidebarOpen ? 'accent' : ''}`} onClick={toggleSidebar} title="AI sidebar (Ctrl+E)">
         <IconSidebar />
       </button>
+
+      {/* v2.4.0 build 18 — Chrome-style profile avatar + switcher */}
+      <div className="profile-wrap">
+        <button
+          className="profile-btn"
+          style={{ background: profiles?.list.find((p) => p.id === profiles.activeId)?.color ?? '#7c8cff' }}
+          onClick={() => setProfOpen((o) => !o)}
+          title="Profiles"
+        >
+          {profileInitial(profiles?.list.find((p) => p.id === profiles?.activeId)?.name ?? 'A')}
+        </button>
+        {profOpen && profiles && (
+          <div className="profile-menu" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="profile-menu-head">Profiles</div>
+            {profiles.list.map((p) => (
+              <button
+                key={p.id}
+                className={`profile-row ${p.id === profiles.activeId ? 'on' : ''}`}
+                onClick={() => {
+                  if (p.id !== profiles.activeId) void window.aether.profiles.switch(p.id)
+                }}
+              >
+                <span className="profile-dot" style={{ background: p.color }}>
+                  {profileInitial(p.name)}
+                </span>
+                <span className="profile-name">{p.name}</span>
+                <span className="profile-state">{p.id === profiles.activeId ? 'Current' : 'Switch'}</span>
+              </button>
+            ))}
+            <div className="profile-menu-sep" />
+            <button
+              className="profile-row"
+              onClick={() => {
+                setProfOpen(false)
+                if (tab) window.aether.tabs.omnibox(tab.id, 'aether://settings')
+              }}
+            >
+              <span className="profile-dot add">＋</span>
+              <span className="profile-name">Add profile…</span>
+              <span className="profile-state" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* v2.1.0 — in vertical-tab mode the strip is gone, so the — □ × cluster
           lives inline at the right edge of the toolbar row: full-height,

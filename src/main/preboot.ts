@@ -25,6 +25,23 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { decideProfileDir, recoveryBanner } from './profile-recovery'
+import { parseProfileArg } from '../shared/profiles'
+import { initProfiles } from './profiles'
+
+// --- 0. profile selection (v2.4.0 build 18) ---------------------------------
+// MUST happen before the single-instance lock: Electron scopes that lock to
+// the userData dir, so giving each profile its own userData gives each
+// profile its own lock — two different profiles CAN run side by side, while
+// double-launching the SAME profile still focuses the existing window.
+// The registry is pinned to the ORIGINAL userData dir so every profile can
+// see and switch to every other profile regardless of which one is active.
+const originalUserDataPath = app.getPath('userData')
+const bootProfileId = parseProfileArg(process.argv) ?? 'default'
+if (bootProfileId !== 'default') {
+  app.setPath('userData', path.join(originalUserDataPath, 'profiles', bootProfileId))
+  console.log(`[Aether] profile: ${bootProfileId}`)
+}
+initProfiles(originalUserDataPath, bootProfileId)
 
 // --- 1. single instance -----------------------------------------------------
 if (!app.requestSingleInstanceLock()) {
@@ -47,9 +64,8 @@ function writable(dir: string): boolean {
   }
 }
 
-const originalUserData = app.getPath('userData')
 const decision = decideProfileDir(
-  originalUserData,
+  app.getPath('userData'),
   writable,
   process.env.AETHER_SIMULATE_CACHE_LOCK === '1'
 )

@@ -12,11 +12,13 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { TabManager } from './tabs'
 import { registerTabManager, unregisterTabManager } from './extensions'
-import { scheduleSessionSave, type SessionTab } from './session-restore'
+import { scheduleSessionSave, flushSessionNow, type SessionTab } from './session-restore'
 import { CHROME_SHELL_LOCK } from './navlock'
 import { canOpenAsTab } from './extproto'
-import { shouldHideToTray, isQuitting, isBootHidden, wakeFromBootHidden } from './osshell'
+import { shouldHideToTray, isQuitting, isBootHidden, wakeFromBootHidden, markQuitting } from './osshell'
 import { mergedSettings } from './store'
+import { listProfiles, switchProfileArgs, activeProfileName, activeProfileId } from './profiles'
+import { validateProfileId } from '../shared/profiles'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -89,11 +91,14 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   // app icon for the taskbar / title bar in dev & unpackaged runs (packaged
   // builds get their icon from electron-builder, so a missing file is fine)
   const iconPath = path.join(__dirname, '../../build/icon.png')
+  // v2.4.0 — non-default profiles show their name in the window/taskbar title
+  const profTitle = activeProfileTitleSuffix()
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 720,
     minHeight: 520,
+    ...(profTitle ? { title: `Aether — ${profTitle}` } : {}),
     frame: process.platform === 'darwin',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : undefined,
     backgroundColor: '#16171b',
@@ -287,4 +292,32 @@ export function openUrlInRunningBrowser(url: string): void {
 
 export function appVersion(): string {
   return app.getVersion()
+}
+
+/** 'Work' when running a non-default profile, '' for the default one. */
+function activeProfileTitleSuffix(): string {
+  try {
+    return activeProfileName()
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * v2.4.0 build 18 — switch profiles Chrome-style: flush this profile's
+ * session with a clean-exit marker, then relaunch into the target profile's
+ * own userData (its own single-instance lock, its own everything).
+ * Never throws — validation failures return a typed error instead.
+ */
+export function switchToProfile(id: unknown): { ok: boolean; error?: string } {
+  const pid = String(id ?? '')
+  if (!validateProfileId(pid) || !listProfiles().some((p) => p.id === pid)) {
+    return { ok: false, error: 'Unknown profile' }
+  }
+  if (pid === activeProfileId()) return { ok: true }
+  markQuitting() // clean-exit marker so the next boot restores without the crash warning
+  flushSessionNow(allEntries(), true)
+  app.relaunch({ args: switchProfileArgs(pid) })
+  app.exit(0)
+  return { ok: true }
 }

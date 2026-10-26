@@ -143,7 +143,7 @@ ok(!ipcSrc.includes('searchSuggestions('), 'single-engine searchSuggestions no l
 const tbSrc = fs.readFileSync(path.join(APP, 'src/renderer/src/components/Toolbar.tsx'), 'utf8')
 ok(tbSrc.includes('const mySeq = ++reqSeq.current'), 'stale-guard: sequence captured per request')
 ok(tbSrc.includes('if (mySeq !== reqSeq.current) return'), 'stale-guard: stale responses dropped')
-ok(tbSrc.includes('setSugs(buildOmniboxRows(text, { history, bookmarks, suggestions }))'), 'rows built by the shared pure policy')
+ok(tbSrc.includes('buildOmniboxRows(text, { history, bookmarks, suggestions })'), 'rows built by the shared pure policy')
 ok(!tbSrc.includes('DOMAINISH'), 'local DOMAINISH copy removed (single source of truth)')
 ok(tbSrc.includes("vertical && window.aether.platform !== 'darwin'"), 'vertical mode renders inline win-controls in the toolbar')
 

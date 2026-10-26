@@ -1,9 +1,8 @@
-import { BrowserWindow, dialog, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
+import { BrowserWindow, clipboard, dialog, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
 import { resolveInput } from './resolve'
-import { entryForSender, applyLayout, allEntries, createBrowserWindow } from './windows'
 import { setShowBookmarksBar } from './menu'
 import type { ChatMsg, Settings, SidebarInject, SearchResult } from '../shared/types'
 import {
@@ -60,6 +59,8 @@ import {
 import { forgetCertMemos } from './certs'
 import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { createTray, destroyTray, applyStartupBoost } from './osshell'
+import { listProfiles, activeProfileId, createProfile, renameProfile, deleteProfile } from './profiles'
+import { entryForSender, applyLayout, allEntries, createBrowserWindow, switchToProfile } from './windows'
 import { getNotes, setNotes } from './quicknotes'
 import { listReading, addReading, removeReading, toggleReading } from './readinglist'
 import { clearHistorySince } from './store'
@@ -476,6 +477,50 @@ export function registerIpc(): void {
   ipcMain.handle('apps:remove', (e, id: string) => {
     guard(e, 'apps:remove')
     return removeApp(String(id || ''))
+  })
+
+  // ---------- v2.4.0 build 18: multi-profiles ----------
+  ipcMain.handle('profiles:list', (e) => {
+    guard(e, 'profiles:list')
+    return { profiles: listProfiles(), activeId: activeProfileId() }
+  })
+  ipcMain.handle('profiles:create', (e, name: unknown, color: unknown) => {
+    guard(e, 'profiles:create')
+    return createProfile(name, color)
+  })
+  ipcMain.handle('profiles:rename', (e, id: unknown, name: unknown) => {
+    guard(e, 'profiles:rename')
+    return renameProfile(id, name)
+  })
+  ipcMain.handle('profiles:delete', (e, id: unknown) => {
+    guard(e, 'profiles:delete')
+    return deleteProfile(id)
+  })
+  // Switch = flush this profile's session cleanly, then relaunch into the
+  // target profile (its own userData → its own single-instance lock).
+  ipcMain.handle('profiles:switch', (e, id: unknown) => {
+    guard(e, 'profiles:switch')
+    return switchToProfile(id)
+  })
+
+  // ---------- v2.4.0 build 18: tab hover previews + paste-and-go ----------
+  ipcMain.handle('tabs:preview', async (e, id: number) => {
+    guard(e, 'tabs:preview')
+    const entry = fromSender(e)
+    const rec = entry.tabs.get(Number(id))
+    const wc = rec?.view?.webContents
+    if (!wc || wc.isDestroyed()) return null
+    try {
+      const img = await wc.capturePage()
+      if (!img || img.isEmpty()) return null
+      return img.resize({ width: 560 }).toDataURL()
+    } catch {
+      return null
+    }
+  })
+  ipcMain.handle('ui:clipboard-read', (e) => {
+    guard(e, 'ui:clipboard-read')
+    return clipboard.readText()
   })
   ipcMain.handle('history:recent', (e) => {
     guard(e, 'history:recent')

@@ -111,3 +111,43 @@ export function hostOf(url: string): string {
     return ''
   }
 }
+
+// ── v2.4.0 build 18: inline autocomplete + paste-and-go ────────────────────
+
+/**
+ * Pure: Chrome-style type-ahead. Given the text currently in the box and the
+ * top dropdown row, returns the completion SUFFIX to show as ghost text —
+ * e.g. input "yout" with top row value "youtube.com" → "ube.com" — or null
+ * when there is nothing to complete.
+ *
+ * Rules (all unit-tested):
+ *  - top row must exist and start with the input (case-insensitive)
+ *  - the completion must actually ADD characters
+ *  - a trailing space means the user finished a word — never complete
+ */
+export function inlineComplete(input: string, top: { value: string } | null | undefined): string | null {
+  const t = String(input ?? '')
+  const trimmedEnd = t.replace(/\s+$/, '')
+  if (!trimmedEnd || /\s$/.test(t)) return null
+  const value = String(top?.value ?? '')
+  if (!value) return null
+  const lower = value.toLowerCase()
+  const start = trimmedEnd.toLowerCase()
+  if (!lower.startsWith(start)) return null
+  const suffix = value.slice(trimmedEnd.length)
+  return suffix.length > 0 ? suffix : null
+}
+
+/**
+ * Pure: paste-and-go target sanitizer. Accepts an http(s) URL or a
+ * domain-like blob (example.com, example.com/path, host:port) after
+ * trimming; everything else (search phrases, javascript:, data:, empty)
+ * returns null so the caller keeps the plain-paste behavior.
+ */
+export function pasteGoTarget(text: unknown): string | null {
+  const t = String(text ?? '').trim()
+  if (!t || /\s/.test(t)) return null
+  if (/^https?:\/\//i.test(t)) return t
+  if (isDomainLike(t)) return t
+  return null
+}

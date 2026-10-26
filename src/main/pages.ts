@@ -1644,6 +1644,18 @@ export const SETTINGS_HTML = pageShell(
     </div>
 
     <div class="sec">
+      <div class="label">Profiles</div>
+      <div class="hint" style="margin-bottom:10px">Profiles keep completely separate history, bookmarks, passwords, cookies, extensions and settings — work and life never mix. Switching flushes this session and relaunches Aether into the other profile; two profiles can also run side by side. The default “Personal” profile keeps your existing data and cannot be deleted.</div>
+      <div id="profList" style="display:flex; flex-direction:column; gap:6px"></div>
+      <div class="row-btns" style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <input id="profName" type="text" placeholder="New profile name" style="width:180px" />
+        <select id="profColor" style="width:70px"></select>
+        <button class="save-btn" id="profAdd">Create profile</button>
+        <span id="profMsg" style="font-size:11.5px;color:var(--ax-muted2);align-self:center"></span>
+      </div>
+    </div>
+
+    <div class="sec">
       <div class="label">Import &amp; export</div>
       <div class="hint" style="margin-bottom:10px">Bring your bookmarks from Chrome, Edge, Brave or Chromium on this machine in one click, or import any browser’s exported bookmarks HTML file. Export writes the universal format every browser understands.</div>
       <div id="impSrc" style="display:flex; flex-direction:column; gap:6px"></div>
@@ -2256,6 +2268,86 @@ export const SETTINGS_HTML = pageShell(
       })
     }).catch(function () { /* bridge down — ignore */ })
   }
+  // v2.4.0 build 18 — Profiles manager (list / create / rename / delete / switch)
+  var PROF_COLORS = ['#7c8cff', '#4cc38a', '#f5a623', '#ef6c6c', '#5ac8fa', '#c792ea', '#f06292', '#9ccc65']
+  ;(function fillProfColors() {
+    var sel = document.getElementById('profColor')
+    PROF_COLORS.forEach(function (c, i) {
+      var o = document.createElement('option')
+      o.value = c
+      o.textContent = 'Color ' + (i + 1)
+      sel.appendChild(o)
+    })
+  })()
+  function profMsg(text) {
+    var m = document.getElementById('profMsg')
+    m.textContent = text
+    setTimeout(function () { m.textContent = '' }, 3200)
+  }
+  function renderProfiles() {
+    window.aether.profiles.list().then(function (r) {
+      var box = document.getElementById('profList')
+      box.textContent = ''
+      r.profiles.forEach(function (p) {
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--ax-card2);border:1px solid var(--ax-border);border-radius:10px'
+        var dot = document.createElement('span')
+        dot.textContent = (p.name || '?').charAt(0).toUpperCase()
+        dot.style.cssText = 'width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0;background:' + p.color
+        var name = document.createElement('div')
+        name.textContent = p.name
+        name.style.cssText = 'font-size:13px;color:var(--ax-fg);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+        var actions = document.createElement('div')
+        actions.style.cssText = 'display:flex;gap:8px;align-items:center'
+        if (p.id === r.activeId) {
+          var badge = document.createElement('span')
+          badge.textContent = 'Active'
+          badge.style.cssText = 'font-size:11px;color:var(--ax-ok);font-weight:600'
+          actions.appendChild(badge)
+        } else {
+          var sw = document.createElement('button')
+          sw.className = 'save-btn'
+          sw.textContent = 'Switch'
+          sw.addEventListener('click', function () { window.aether.profiles.switch(p.id) })
+          var rn = document.createElement('button')
+          rn.className = 'muted-btn'
+          rn.textContent = 'Rename'
+          rn.addEventListener('click', function () {
+            var next = window.prompt('New name for “' + p.name + '”', p.name)
+            if (next && next.trim()) window.aether.profiles.rename(p.id, next.trim()).then(renderProfiles)
+          })
+          actions.appendChild(sw); actions.appendChild(rn)
+          var del = document.createElement('button')
+          del.className = 'muted-btn'
+          del.textContent = 'Delete'
+          del.addEventListener('click', function () {
+            if (!window.confirm('Delete profile “' + p.name + '” and ALL of its data (history, bookmarks, passwords, cookies)? This cannot be undone.')) return
+            window.aether.profiles.remove(p.id).then(function (res) {
+              if (res && res.ok) renderProfiles()
+              else profMsg((res && res.error) || 'Delete failed')
+            })
+          })
+          actions.appendChild(del)
+        }
+        row.appendChild(dot); row.appendChild(name); row.appendChild(actions)
+        box.appendChild(row)
+      })
+    }).catch(function () { /* bridge down — ignore */ })
+  }
+  document.getElementById('profAdd').addEventListener('click', function () {
+    var nameEl = document.getElementById('profName')
+    var colorEl = document.getElementById('profColor')
+    window.aether.profiles.create(nameEl.value, colorEl.value).then(function (res) {
+      if (res && res.ok) {
+        nameEl.value = ''
+        renderProfiles()
+        profMsg('Profile created — switch to it any time')
+      } else {
+        profMsg((res && res.error) || 'Could not create the profile')
+      }
+    })
+  })
+  renderProfiles()
   document.getElementById('dlChoose').addEventListener('click', async function () {
     try {
       const dir = await window.aether.downloads.chooseDir()

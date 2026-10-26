@@ -16,6 +16,40 @@ export default function TabStrip(): JSX.Element {
   const [menu, setMenu] = useState<MenuState | null>(null)
   const isMac = window.aether.platform === 'darwin'
   const isWinLike = !isMac
+  // v2.4.0 build 18 — hover a tab for 600ms → live thumbnail card
+  const [preview, setPreview] = useState<{ x: number; y: number; img: string; title: string; url: string } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const previewSeq = useRef(0)
+
+  const clearHover = (): void => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current)
+      hoverTimer.current = null
+    }
+    previewSeq.current++
+    setPreview(null)
+  }
+
+  useEffect(() => clearHover, [])
+
+  const startHover = (t: TabMeta, el: HTMLElement): void => {
+    clearHover()
+    if (t.id === activeId || t.discarded || t.hibernated) return
+    const rect = el.getBoundingClientRect()
+    const id = t.id
+    hoverTimer.current = setTimeout(async () => {
+      const mySeq = ++previewSeq.current
+      try {
+        const img = await window.aether.tabs.preview(id)
+        if (!img || mySeq !== previewSeq.current) return
+        // center on the tab, clamp to the viewport, drop below the strip
+        const x = Math.min(Math.max(rect.left + rect.width / 2, 160), window.innerWidth - 160)
+        setPreview({ x, y: rect.bottom + 8, img, title: t.title || t.url, url: t.url })
+      } catch {
+        /* tab vanished — no preview */
+      }
+    }, 600)
+  }
 
   useEffect(() => {
     if (!menu) return
@@ -135,6 +169,8 @@ export default function TabStrip(): JSX.Element {
               dragIdx.current = null
             }}
             onClick={() => window.aether.tabs.activate(t.id)}
+            onMouseEnter={(e) => startHover(t, e.currentTarget)}
+            onMouseLeave={clearHover}
             onAuxClick={(e) => {
               if (e.button === 1) window.aether.tabs.close(t.id)
             }}
@@ -227,6 +263,13 @@ export default function TabStrip(): JSX.Element {
               </button>
             )
           )}
+        </div>
+      )}
+      {preview && (
+        <div className="tab-preview" style={{ left: preview.x, top: preview.y }}>
+          <img src={preview.img} alt="" draggable={false} />
+          <div className="tab-preview-title">{preview.title}</div>
+          <div className="tab-preview-url">{preview.url}</div>
         </div>
       )}
     </div>

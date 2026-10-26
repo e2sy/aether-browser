@@ -6,8 +6,9 @@
 > Beast Search**, v1.7.0 security + default browser + OS chrome, v1.8.0 UI/UX wave, v1.9.0 privacy
 > fortress, v2.0.0 the AI milestone, v2.1.0 omnibox suggestions v2 + window-controls fix,
 > **v2.2.0 real-browser staples (bookmark import/export, print, save-as-PDF, spellcheck,
-> download-location options)**, and **v2.3.0 the power batch (password manager with an
-> OS-keychain vault, PWA web apps, Tab search Ctrl+Shift+A)**.
+> download-location options)**, **v2.3.0 the power batch (password manager with an
+> OS-keychain vault, PWA web apps, Tab search Ctrl+Shift+A)**, and **v2.4.0 multi-profiles +
+> omnibox inline autocomplete + paste-and-go + tab hover previews**.
 > The Master Plan below (118 items, 9 phases) is the contract to beat Brave/Chrome/Firefox on
 > security, looks, speed, and platform reach — desktop first, then Android/iOS. Historical
 > v1.3–v1.6 plans are kept at the bottom.
@@ -30,11 +31,16 @@ manager** (OS-keychain vault, save bar, context-menu save/fill/generate, `aether
 blocklist), **PWA web apps** (manifest install → chromeless bridgeless window, jump list / dock,
 Settings card), and the manager-page groundwork. test-v230: 119 assertions.
 
+✅ **Landed in v2.4.0 (build 18, 2026-10-26)** — punch-list items **#1 + #2 + #3** (omnibox
+inline autocomplete with ghost type-ahead + Tab-accept, middle-click **paste-and-go** with a
+strict URL sanitizer, **tab hover previews** — 600ms hover → live capturePage thumbnail card)
+plus the priority-table **multi-profiles**: full per-profile userData (own history, bookmarks,
+passwords, cookies, extensions, settings), profile arg parsed before the single-instance lock
+(two profiles can run side by side), avatar + app-menu + Settings switchers, session-flushed
+relaunch, 16-profile registry. test-v240: 98 assertions.
+
 The rest, ranked, still open:
 
-1. **Omnibox inline autocomplete** — type-ahead ghost text (Chrome-style) completing from the top suggestion; Tab accepts
-2. **Omnibox paste-and-go** — middle-click paste navigates straight to the URL, skips the dropdown
-3. **Tab hover previews** — live thumbnail card after 600ms hover (Phase 2 leftovers: #40-42)
 4. **Per-extension permission consent screen** (#5) — the last unshipped Phase-0 item
 5. **Certificate-error UX (#14)** — real interstitial with "proceed anyway" escape hatch instead of the generic error page
 6. **Chrome-UI sandbox re-audit (#17)** — get the first-party chrome window to `sandbox:true` (split the extension glue preload)

@@ -2756,3 +2756,173 @@ browser-action-list::part(action):hover {
   opacity: 0.55;
   cursor: default;
 }
+
+/* ── v2.4.0 build 18 — omnibox inline autocomplete ghost ───────────────── */
+.omni-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+}
+.omni-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: pre;
+  font-size: 13px;
+  overflow: hidden;
+  max-width: 100%;
+}
+.omni-ghost-base {
+  visibility: hidden;
+}
+.omni-ghost-dim {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* ── v2.4.0 build 18 — profile avatar + switcher menu ──────────────────── */
+.profile-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.profile-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.profile-btn:hover {
+  filter: brightness(1.15);
+}
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: #1d1f25;
+  border: 1px solid #343845;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  z-index: 120;
+}
+.profile-menu-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 10px 4px;
+}
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+.profile-row:hover {
+  background: var(--bg3);
+}
+.profile-row.on {
+  background: rgba(124, 140, 255, 0.12);
+}
+.profile-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.profile-dot.add {
+  background: var(--bg3);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 400;
+}
+.profile-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-state {
+  font-size: 10.5px;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+.profile-row.on .profile-state {
+  color: var(--ok);
+  font-weight: 600;
+}
+.profile-menu-sep {
+  height: 1px;
+  background: #343845;
+  margin: 4px 6px;
+}
+
+/* ── v2.4.0 build 18 — tab hover preview card ──────────────────────────── */
+.tab-preview {
+  position: fixed;
+  transform: translateX(-50%);
+  width: 300px;
+  background: #1d1f25;
+  border: 1px solid #343845;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  z-index: 130;
+  pointer-events: none;
+}
+.tab-preview img {
+  width: 100%;
+  border-radius: 6px;
+  display: block;
+  background: #101114;
+  min-height: 60px;
+}
+.tab-preview-title {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-preview-url {
+  font-size: 10.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

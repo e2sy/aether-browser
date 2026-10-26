@@ -92,6 +92,8 @@ export const api = {
     hibernate: (id: number) => ipcRenderer.invoke('tabs:hibernate', id),
     /** move a tab out into its own window */
     popout: (id: number) => ipcRenderer.invoke('tabs:popout', id),
+    /** v2.4.0 — live thumbnail for the tab-hover preview card (null when unavailable) */
+    preview: (id: number) => ipcRenderer.invoke('tabs:preview', id) as Promise<string | null>,
     /** v1.5.0 — middle-click a bookmarks-bar item: open without activating */
     createBackground: (url: string) => ipcRenderer.invoke('tabs:create-bg', url),
     closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
@@ -138,6 +140,27 @@ export const api = {
       ipcRenderer.invoke('apps:install', tabId) as Promise<{ ok: boolean; id?: string; name?: string; error?: string }>,
     launch: (id: string) => ipcRenderer.invoke('apps:launch', id) as Promise<number | null>,
     remove: (id: string) => ipcRenderer.invoke('apps:remove', id) as Promise<boolean>
+  },
+
+  /** v2.4.0 build 18 — multi-profiles (registry + switch via relaunch) */
+  profiles: {
+    list: () =>
+      ipcRenderer.invoke('profiles:list') as Promise<{
+        profiles: Array<{ id: string; name: string; color: string; createdAt: number; lastUsedAt: number }>
+        activeId: string
+      }>,
+    create: (name: string, color: string) =>
+      ipcRenderer.invoke('profiles:create', name, color) as Promise<{ ok: boolean; error?: string }>,
+    rename: (id: string, name: string) =>
+      ipcRenderer.invoke('profiles:rename', id, name) as Promise<{ ok: boolean; error?: string }>,
+    remove: (id: string) => ipcRenderer.invoke('profiles:delete', id) as Promise<{ ok: boolean; error?: string }>,
+    /** flushes this session and relaunches into the target profile */
+    switch: (id: string) => ipcRenderer.invoke('profiles:switch', id) as Promise<{ ok: boolean; error?: string }>
+  },
+
+  /** v2.4.0 build 18 — tab hover preview thumbnails (data URL or null) */
+  clipboard: {
+    readText: () => ipcRenderer.invoke('ui:clipboard-read') as Promise<string>
   },
 
   ui: {
