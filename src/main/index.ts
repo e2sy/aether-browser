@@ -151,6 +151,14 @@ app.whenReady().then(() => {
     referrerTight: mergedSettings().referrerTight !== false
   }))
 
+  // spellcheck (v2.2.0): en-US dictionary + right-click fixes in form fields
+  try {
+    session.defaultSession.setSpellCheckerLanguages(['en-US'])
+    session.defaultSession.setSpellCheckerEnabled(mergedSettings().spellcheck !== false)
+  } catch {
+    /* spellcheck is cosmetic — never block boot */
+  }
+
   // one-time global extensions host — resolves tabs across all windows
   initExtensions(() => {
     const entry = focusedEntry()

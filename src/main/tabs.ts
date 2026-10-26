@@ -122,7 +122,7 @@ export class TabManager {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        spellcheck: false
+        spellcheck: mergedSettings().spellcheck !== false
       }
     })
     // force-dark v2 (#52): per-site CSS inversion + night scheduler

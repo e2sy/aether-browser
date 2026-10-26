@@ -6,14 +6,15 @@ Aether is a working desktop browser built on Electron (Chromium) with a built-in
 that runs on **your own machine via Ollama**. No cloud, no API keys, no telemetry. It renders
 Google, YouTube, and everything else — because under the hood it *is* Chromium.
 
-![status](https://img.shields.io/badge/status-v2.0.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
+![status](https://img.shields.io/badge/status-v2.2.0-blue) ![CI](https://github.com/e2sy/aether-browser/actions/workflows/build.yml/badge.svg) ![license](https://img.shields.io/badge/license-GPL--3.0-green) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey) [![docs](https://img.shields.io/badge/docs-online-7c8cff)](docs/index.html)
 
 ---
 
-## ✨ Features (v2.0.0)
+## ✨ Features (v2.2.0)
 
 | Feature | What it does |
 |---|---|
+| 📦 **Migration & daily-driver staples (v2.2.0)** | **One-click bookmark import** — Aether scans this machine for **Chrome / Edge / Brave / Chromium** profiles and lists them in Settings ("Chrome — Default · 42 bookmarks → Import"), plus **import from any browser's exported HTML file** and **Chrome-JSON**. **Export** writes the universal Netscape format every browser understands (folder groups preserved, round-trip tested). **Print… (Ctrl+P)** opens the native print dialog; **Save Page as PDF (Ctrl+S)** via a save dialog. **Spellcheck** (en-US) with right-click fixes + add-to-dictionary. **Download options** — "ask where to save each file" (native save dialog) and a custom default download folder |
 | 🤖 **AI, everywhere it helps (v2.0.0)** | **TL;DR toasts** — list hosts in Settings (e.g. `en.wikipedia.org`) and pages from them get an automatic **3-bullet summary from your local model** in a dismissible toast while the tab loads (private windows excluded). **AI search depth modes** — Quick / **Deep** (synthesis across all 14 sources) / **Academic** (prefers .edu/.gov, structured review) / **Code** (docs & Stack Overflow) — each mode reshapes the prompt and the source budget. **Semantic history** — "Find that article…" on `aether://history` describes what you remember and Ollama embeddings (`nomic-embed-text`) rank your 300 most recent visits & bookmarks by meaning, vectors cached locally. **VRAM calculator** — the model manager honestly estimates weights + KV cache + overhead per quant before you pull, so "fits in 8 GB" claims don't embarrass the browser |
 | 🪟 **Your default browser (v1.7.0)** | One click in Settings → Aether registers as a **default-browser candidate on Windows/macOS/Linux**, opens the OS chooser, and **URLs from other apps open as foreground tabs in the running window** (second-instance forwarding). `.htm/.html` file associations included — the flagship feature that makes Aether a *real* daily driver |
 | 🖥️ **OS chrome (v1.7.0)** | **System tray icon** with quick actions, **Windows jump list + macOS dock menu** (new window / private window), **unread-badge** on taskbar/dock, native **notifications** for downloads, and **startup boost** (fast boot path) |
@@ -40,6 +41,16 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🏰 **Hardened by the Master Plan** | `npm audit` **0 vulnerabilities**; internal pages serve a **nonce-based CSP** (`unsafe-inline` is dead), a **will-navigate lock** keeps web pages out of privileged schemes, **Electron fuses** (RunAsNode off, cookie encryption, ASAR integrity) ship in every build, extensions extract through a **zip-hardening gate** (traversal/symlink/bomb-proof), an **XSS regression gate** runs in CI, and **Dependabot + an npm-audit CI gate** watch the supply chain — see [SECURITY.md](SECURITY.md) |
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
+
+## 📦 v2.2.0 — real-browser staples (build 16)
+
+The things people quietly expect from a browser they're switching to:
+
+- **Bookmark import done properly** — Settings → Import & export lists every Chrome-family profile found on the machine (Chrome, Edge, Brave, Chromium — Default and Profile 1…N) with a live bookmark count and an Import button. File import accepts **any browser's exported HTML** and **Chrome/Edge/Brave JSON**; URLs are filtered to http(s), decoded safely, deduped against the library and the batch (trailing-slash aware), capped at 10k per import / 20k in the library. Import-by-id is validated against a fresh scan — no arbitrary paths cross IPC.
+- **Universal export** — `aether-bookmarks-YYYY-MM-DD.html` in the Netscape format, folder groups preserved; the export is parsed back by the same test that parses Chrome's and Firefox's files (45-assertion codec suite, round-trip included).
+- **Print & Save as PDF** — **Ctrl+P** opens the native print dialog for the active tab; **Ctrl+S** saves the page as a PDF through a save dialog (filename from the page title, NTFS-safe).
+- **Spellcheck** — form fields get the en-US dictionary (was hard-disabled), with **right-click suggestions + Add to dictionary**, and a Settings toggle that flips the session spellchecker live.
+- **Download location options** — "ask where to save each file" hands the choice to Chromium's native save dialog; otherwise files land in a **configurable download folder** (Change location… in Settings) with the same dedupe + progress machinery as before.
 
 ## ⌨️ v2.1.0 — omnibox suggestions v2 + window controls done right
 
@@ -384,6 +395,8 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 - [x] v1.8.0 — **Phase 2 UI/UX: vertical tabs, tab groups, command palette, New Tab v3, History v2, reading list, context menu v2, sound control, force-dark v2**
 - [x] v1.9.0 — **Phase 3 privacy fortress: history scrubber, HTTPS-only, DoH, clear-data dialog, origin-only referrers**
 - [x] v2.0.0 — **Phase 4 AI milestone: TL;DR toasts, search depth modes, semantic history (local embeddings), VRAM calculator, AI privacy pledge page**
+- [x] v2.1.0 — **omnibox suggestions v2 (3-engine parallel feed, stale-guard) + window controls resized full-height flush in both tab modes**
+- [x] v2.2.0 — **real-browser staples: one-click bookmark import (Chrome/Edge/Brave/Chromium) + universal HTML export, Print (Ctrl+P), Save Page as PDF (Ctrl+S), spellcheck with right-click fixes, download-location prompt + custom folder**
 - [ ] Next — **the remaining Master Plan phases** (see [docs/ROADMAP.md](docs/ROADMAP.md)): AI agents + MCP, performance budgets, extension store polish, then **mobile (Android/iOS)**
 
 ## 🔐 Security notes
@@ -412,7 +425,7 @@ The core trick that makes a **9B local model** a usable web agent is *context co
 PRs welcome! Good first issues: Master Plan Phase 5 (performance budgets: paint metrics,
 startup profiling, memory ceilings), Phase 6 (auto-update signing, i18n), and helping test
 default-browser flows across Linux distros.
-Run `npm run typecheck` before committing. Unit tests: `npm test` — **27 suites, 1,119 tests**, every feature lands with its own suite.
+Run `npm run typecheck` before committing. Unit tests: `npm test` — **28 suites, 1,247 tests**, every feature lands with its own suite.
 
 **Headless checks** (used by CI — typecheck, build, boot + internal pages + discard/wake, unit tests):
 

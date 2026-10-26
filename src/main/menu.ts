@@ -8,6 +8,8 @@ import { contextMenuItems } from './extensions'
 import { mergedSettings, settings } from './store'
 import { addReading } from './readinglist'
 import { notify } from './osshell'
+import { printActive, savePageAsPdf } from './printpdf'
+import { importFromFileFlow, exportBookmarksFlow } from './bkmimport'
 
 /** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
  *  rebuild the menu so the checkbox stays truthful. */
@@ -74,6 +76,32 @@ export function buildMenu(): Menu {
           accelerator: 'CmdOrCtrl+Shift+T',
           click: (): void => {
             tabs()?.reopenClosedTab()
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Print…',
+          accelerator: 'CmdOrCtrl+P',
+          click: (): void => printActive()
+        },
+        {
+          label: 'Save Page as PDF',
+          accelerator: 'CmdOrCtrl+S',
+          click: (): void => {
+            void savePageAsPdf()
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Import Bookmarks…',
+          click: (): void => {
+            void importFromFileFlow()
+          }
+        },
+        {
+          label: 'Export Bookmarks…',
+          click: (): void => {
+            void exportBookmarksFlow()
           }
         },
         { type: 'separator' },
@@ -281,6 +309,31 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
   const extItems = contextMenuItems(wc, params)
   if (extItems.length) {
     items.push(...(extItems as unknown as MenuItemConstructorOptions[]), { type: 'separator' })
+  }
+
+  // spellcheck fixes (v2.2.0) — dictionary suggestions + add-to-dictionary
+  if (params.misspelledWord) {
+    const suggestions = (params.dictionarySuggestions || []).slice(0, 5)
+    if (suggestions.length) {
+      for (const sug of suggestions) {
+        items.push({ label: sug, click: (): void => wc.replaceMisspelling(sug) })
+      }
+    } else {
+      items.push({ label: 'No spelling suggestions', enabled: false })
+    }
+    items.push(
+      {
+        label: `Add “${params.misspelledWord.slice(0, 28)}” to dictionary`,
+        click: (): void => {
+          try {
+            wc.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+          } catch {
+            /* cosmetic */
+          }
+        }
+      },
+      { type: 'separator' }
+    )
   }
 
   if (params.selectionText?.trim()) {

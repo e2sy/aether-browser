@@ -247,6 +247,8 @@ export const api = {
     redownload: (id: string) => ipcRenderer.invoke('downloads:redownload', id),
     removeRecord: (id: string) => ipcRenderer.invoke('downloads:remove-record', id),
     clear: () => ipcRenderer.invoke('downloads:clear'),
+    /** v2.2.0 — pick a default download directory (returns path or null) */
+    chooseDir: () => ipcRenderer.invoke('downloads:chooseDir'),
     onChanged: subscribe('downloads:changed')
   },
 
@@ -289,6 +291,15 @@ export const api = {
     list: () => ipcRenderer.invoke('bookmarks:list'),
     search: (q: string) => ipcRenderer.invoke('bookmarks:search', q),
     remove: (url: string) => ipcRenderer.invoke('bookmarks:remove', url),
+    /** v2.2.0 — import/export (real-browser migration path) */
+    importSources: () => ipcRenderer.invoke('bookmarks:importSources') as Promise<
+      Array<{ id: string; browser: string; profile: string; path: string; count: number }>
+    >,
+    importProfile: (id: string) =>
+      ipcRenderer.invoke('bookmarks:importProfile', id) as Promise<{ added: number; skipped: number; label: string }>,
+    importFile: () =>
+      ipcRenderer.invoke('bookmarks:importFile') as Promise<{ added: number; skipped: number; files: number }>,
+    export: () => ipcRenderer.invoke('bookmarks:export') as Promise<string | null>,
     /** v1.5.0 — list changed (toggle/remove anywhere, incl. bookmarks page) */
     onChanged: subscribe('bookmarks:changed')
   },

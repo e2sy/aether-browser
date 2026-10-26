@@ -115,6 +115,12 @@ export interface Settings {
   searchDepth: 'quick' | 'deep' | 'academic' | 'code'
   /** v2.0 (#72) — hosts that get an automatic TL;DR toast on load */
   tldrHosts: string[]
+  /** v2.2.0 — check spelling in form fields (en-US dictionary, right-click fixes) */
+  spellcheck: boolean
+  /** v2.2.0 — ask where to save each file before downloading (native save dialog) */
+  askDownloadLocation: boolean
+  /** v2.2.0 — custom download directory ('' = the OS Downloads folder) */
+  downloadDir: string
 }
 
 /** A loaded unpacked extension (persisted across boots). */
@@ -208,6 +214,21 @@ export interface Bookmark {
   url: string
   title: string
   ts: number
+  /** v2.2.0 — import origin folder path ("Bookmarks bar / Dev"); absent for Aether-made bookmarks */
+  folder?: string
+}
+
+/** v2.2.0 — a browser profile on this machine whose bookmarks can be imported. */
+export interface ImportSource {
+  id: string
+  /** Chrome / Edge / Brave / Chromium */
+  browser: string
+  /** Default, Profile 1, … */
+  profile: string
+  /** Absolute path of the profile directory (the Bookmarks file lives inside) */
+  path: string
+  /** Bookmarks found in that profile (quick read at detection time) */
+  count: number
 }
 
 export interface HistoryEntry {

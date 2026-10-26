@@ -65,7 +65,10 @@ export const DEFAULT_SETTINGS: Settings = {
   dohTemplate: '',
   referrerTight: true,
   searchDepth: 'quick',
-  tldrHosts: []
+  tldrHosts: [],
+  spellcheck: true,
+  askDownloadLocation: false,
+  downloadDir: ''
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */

@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import type { DownloadState } from '../shared/types'
 import { progressValue, setBadgeCount, notify } from './osshell'
 import { mergedSettings } from './store'
+import { resolveDownloadDir } from '../shared/bkmformats'
 
 const active = new Map<string, { item: DownloadItem; path: string }>()
 
@@ -134,15 +135,22 @@ function stateOf(id: string, item: DownloadItem, extra: Partial<DownloadState> =
 export function installDownloadHandler(): void {
   session.defaultSession.on('will-download', (_event, item) => {
     const id = randomUUID().replace(/-/g, '').slice(0, 10)
-    const dir = app.getPath('downloads')
-    const savePath = uniquePath(dir, item.getFilename() || 'download')
-    item.setSavePath(savePath)
+    // v2.2.0 — "ask where to save" hands control to Chromium's native save
+    // dialog (no setSavePath = prompt); otherwise auto-save to the
+    // configured (or OS) Downloads folder with dedupe.
+    const s = mergedSettings()
+    let savePath = ''
+    if (!s.askDownloadLocation) {
+      const dir = resolveDownloadDir(s.downloadDir, app.getPath('downloads'))
+      savePath = uniquePath(dir, item.getFilename() || 'download')
+      item.setSavePath(savePath)
+    }
     active.set(id, { item, path: savePath })
 
     const record: DownloadRecord = {
       id,
       url: item.getURL(),
-      filename: path.basename(savePath),
+      filename: savePath ? path.basename(savePath) : sanitizeFilename(item.getFilename() || 'download'),
       path: savePath,
       total: 0,
       received: 0,
@@ -154,6 +162,11 @@ export function installDownloadHandler(): void {
 
     item.on('updated', (_e, state) => {
       const st = stateOf(id, item, state === 'interrupted' ? { error: 'interrupted' } : {})
+      // dialog-mode: the real path only exists once the user has picked it
+      if (!record.path && st.path) {
+        record.path = st.path
+        record.filename = path.basename(st.path)
+      }
       record.received = st.received
       record.total = st.total
       broadcast('download:progress', st)

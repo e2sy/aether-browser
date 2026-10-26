@@ -1,10 +1,12 @@
 # Aether Roadmap
 
-> Status: **UPDATED 2026-10-25 — THE MASTER PLAN** — shipped so far: v1.3.0 Aether Search (metasearch
+> Status: **UPDATED 2026-10-26 — THE MASTER PLAN** — shipped so far: v1.3.0 Aether Search (metasearch
 > core), v1.4.0 Customization Studio, v1.4.1 Ollama auto-reconnect, v1.5.0 the real-browser core
 > (bookmarks bar, session restore, downloads page, private windows, progress + site info), **v1.6.0
 > Beast Search**, v1.7.0 security + default browser + OS chrome, v1.8.0 UI/UX wave, v1.9.0 privacy
-> fortress, v2.0.0 the AI milestone, and **v2.1.0 omnibox suggestions v2 + window-controls fix**.
+> fortress, v2.0.0 the AI milestone, v2.1.0 omnibox suggestions v2 + window-controls fix, and
+> **v2.2.0 real-browser staples (bookmark import/export, print, save-as-PDF, spellcheck,
+> download-location options)**.
 > The Master Plan below (118 items, 9 phases) is the contract to beat Brave/Chrome/Firefox on
 > security, looks, speed, and platform reach — desktop first, then Android/iOS. Historical
 > v1.3–v1.6 plans are kept at the bottom.
@@ -14,7 +16,14 @@
 
 ## 🔧 v2.1.x punch list — the next fixes & updates (from the field)
 
-Ranked, concrete, each shippable as its own build:
+Ranked, concrete, each shippable as its own build.
+
+✅ **Landed in v2.2.0 (build 16, 2026-10-26)** — outside the punch list but field-asked: one-click
+bookmark import from Chrome/Edge/Brave/Chromium profiles + universal HTML export, Print (Ctrl+P),
+Save Page as PDF (Ctrl+S), spellcheck with right-click fixes, download-location prompt + custom
+folder. New codecs are pure + round-trip tested (test-v211, 45 assertions).
+
+The rest, ranked, still open:
 
 1. **Omnibox inline autocomplete** — type-ahead ghost text (Chrome-style) completing from the top suggestion; Tab accepts
 2. **Omnibox paste-and-go** — middle-click paste navigates straight to the URL, skips the dropdown

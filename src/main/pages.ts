@@ -1309,6 +1309,7 @@ export const SETTINGS_HTML = pageShell(
       <div class="opts">
         <label><input type="checkbox" id="confirmAgentActions" /> Agent asks before every action</label>
         <label><input type="checkbox" id="showBookmarksBar" /> Show the bookmarks bar (Ctrl+Shift+B)</label>
+        <label><input type="checkbox" id="spellcheck" /> Check spelling in form fields (en-US, right-click for fixes)</label>
         <label><input type="checkbox" id="usePageContext" /> Sidebar chat sees the current page</label>
         <label><input type="checkbox" id="pageMemory" /> Remember page conversations per site (local memory)</label>
         <label><input type="checkbox" id="adblock" /> Block ads &amp; trackers (EasyList + EasyPrivacy)</label>
@@ -1402,6 +1403,28 @@ export const SETTINGS_HTML = pageShell(
         <label><input type="checkbox" id="closeToTray" /> Closing the window keeps Aether running in the tray</label>
         <label><input type="checkbox" id="startupBoost" /> Startup boost — start with my computer (hidden, for a warm first link)</label>
         <label><input type="checkbox" id="notifyDownloads" /> Notify me when a download completes</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Downloads</div>
+      <div class="opts" style="margin-top:6px">
+        <label><input type="checkbox" id="askDownloadLocation" /> Ask where to save each file before downloading</label>
+      </div>
+      <div class="row-btns" style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+        <button class="muted-btn" id="dlChoose">Change download location…</button>
+        <span id="dlDir" style="font-size:11.5px;color:var(--ax-muted2)"></span>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="label">Import &amp; export</div>
+      <div class="hint" style="margin-bottom:10px">Bring your bookmarks from Chrome, Edge, Brave or Chromium on this machine in one click, or import any browser’s exported bookmarks HTML file. Export writes the universal format every browser understands.</div>
+      <div id="impSrc" style="display:flex; flex-direction:column; gap:6px"></div>
+      <div class="row-btns" style="margin-top:10px">
+        <button class="save-btn" id="impFile">Import bookmarks from file…</button>
+        <button class="muted-btn" id="bmExport">Export bookmarks…</button>
+        <span id="impMsg" style="font-size:11.5px;color:var(--ax-muted2);align-self:center"></span>
       </div>
     </div>
 
@@ -1567,6 +1590,10 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('closeToTray').checked = !!s.closeToTray
       document.getElementById('startupBoost').checked = !!s.startupBoost
       document.getElementById('notifyDownloads').checked = s.notifyDownloads !== false
+      document.getElementById('spellcheck').checked = s.spellcheck !== false
+      document.getElementById('askDownloadLocation').checked = !!s.askDownloadLocation
+      document.getElementById('dlDir').textContent = s.downloadDir || 'Saving to the default Downloads folder'
+      renderImportSources()
       renderShieldPresets(s)
       renderShieldLists()
       var cf = s.cloudFallback || {}
@@ -1597,6 +1624,45 @@ export const SETTINGS_HTML = pageShell(
     loadExts()
   }
   var PERM_LABELS = { media: 'camera & microphone', geolocation: 'your location', notifications: 'notifications', midi: 'MIDI devices', 'speaker-selection': 'audio output', 'display-capture': 'screen capture' }
+  // v2.2.0 — one-click bookmark import from Chrome/Edge/Brave/Chromium profiles
+  function renderImportSources() {
+    var box = document.getElementById('impSrc')
+    if (!box || !window.aether.bookmarks.importSources) return
+    window.aether.bookmarks.importSources().then(function (list) {
+      box.innerHTML = ''
+      if (!list.length) {
+        var none = document.createElement('div')
+        none.textContent = 'No Chrome-family browser profiles with bookmarks were found on this machine.'
+        none.style.cssText = 'color:var(--ax-faint);font-size:12.5px;padding:2px 2px'
+        box.appendChild(none); return
+      }
+      list.forEach(function (src) {
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--ax-card2);border:1px solid var(--ax-border);border-radius:10px'
+        var label = document.createElement('div')
+        label.style.cssText = 'flex:1;min-width:0;font-size:13px'
+        var name = document.createElement('b'); name.textContent = src.browser + ' — ' + src.profile
+        var count = document.createElement('span')
+        count.textContent = '  ·  ' + src.count + ' bookmark' + (src.count === 1 ? '' : 's')
+        count.style.cssText = 'color:var(--ax-muted2);font-size:11.5px'
+        var btn = document.createElement('button')
+        btn.className = 'muted-btn'; btn.textContent = 'Import'
+        btn.addEventListener('click', function () {
+          btn.textContent = 'Importing…'; btn.disabled = true
+          window.aether.bookmarks.importProfile(src.id).then(function (r) {
+            btn.textContent = 'Import'; btn.disabled = false
+            var msg = document.getElementById('impMsg')
+            if (msg) msg.textContent = r.label + ': added ' + r.added + (r.skipped ? ', skipped ' + r.skipped : '')
+          }).catch(function () {
+            btn.textContent = 'Import'; btn.disabled = false
+          })
+        })
+        label.appendChild(name); label.appendChild(count)
+        row.appendChild(label); row.appendChild(btn)
+        box.appendChild(row)
+      })
+    }).catch(function () { /* bridge refused — leave the section empty */ })
+  }
   function loadPerms() {
     window.aether.perms.list().then(function (list) {
       var box = document.getElementById('perms')
@@ -1925,6 +1991,39 @@ export const SETTINGS_HTML = pageShell(
   document.getElementById('closeToTray').addEventListener('change', function (e) { save({ closeToTray: e.target.checked }) })
   document.getElementById('startupBoost').addEventListener('change', function (e) { save({ startupBoost: e.target.checked }) })
   document.getElementById('notifyDownloads').addEventListener('change', function (e) { save({ notifyDownloads: e.target.checked }) })
+  document.getElementById('spellcheck').addEventListener('change', function (e) { save({ spellcheck: e.target.checked }) })
+  document.getElementById('askDownloadLocation').addEventListener('change', function (e) { save({ askDownloadLocation: e.target.checked }) })
+  document.getElementById('dlChoose').addEventListener('click', async function () {
+    try {
+      const dir = await window.aether.downloads.chooseDir()
+      if (dir) {
+        save({ downloadDir: dir })
+        document.getElementById('dlDir').textContent = dir
+      }
+    } catch (err) {
+      /* dialog refused — keep the current folder */
+    }
+  })
+  document.getElementById('impFile').addEventListener('click', async function () {
+    const msg = document.getElementById('impMsg')
+    try {
+      const r = await window.aether.bookmarks.importFile()
+      msg.textContent = r && r.files
+        ? 'Imported ' + r.added + ' bookmark' + (r.added === 1 ? '' : 's') + (r.skipped ? ' — ' + r.skipped + ' already saved' : '')
+        : 'Nothing imported'
+    } catch (err) {
+      msg.textContent = 'Import failed'
+    }
+  })
+  document.getElementById('bmExport').addEventListener('click', async function () {
+    const msg = document.getElementById('impMsg')
+    try {
+      const p = await window.aether.bookmarks.export()
+      msg.textContent = p ? 'Exported to ' + p : ''
+    } catch (err) {
+      msg.textContent = 'Export failed'
+    }
+  })
   document.getElementById('certForget').addEventListener('click', async function () {
     try {
       const n = await window.aether.certs.forget()

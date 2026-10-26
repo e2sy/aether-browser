@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
+import { BrowserWindow, dialog, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
@@ -23,6 +23,7 @@ import {
   DEFAULT_SETTINGS
 } from './store'
 import { applyAdblockSetting, shieldsState, toggleSiteShields, addFilterList, removeFilterList } from './adblock'
+import { detectImportSources, importFromProfile, importFromFileFlow, exportBookmarksFlow } from './bkmimport'
 import { defaultBrowserState, setAsDefaultBrowser, openDefaultAppsSettings } from './defaultbrowser'
 import { ollamaHealth, listModels, friendlyError, OllamaMessage } from './ollama'
 import {
@@ -333,6 +334,14 @@ export function registerIpc(): void {
     if (patch.startupBoost !== undefined) {
       applyStartupBoost(Boolean(patch.startupBoost))
     }
+    // v2.2.0 — spellcheck toggle is live via the session spellchecker
+    if (patch.spellcheck !== undefined) {
+      try {
+        session.defaultSession.setSpellCheckerEnabled(Boolean(patch.spellcheck))
+      } catch {
+        /* cosmetic */
+      }
+    }
     // v1.4.0 — normalize the appearance blob and tell every chrome window live
     if (patch.appearance !== undefined) {
       const nextAppearance = normalizeAppearance(patch.appearance, mergedSettings().appearance)
@@ -367,6 +376,32 @@ export function registerIpc(): void {
   ipcMain.handle('bookmarks:search', (e, q: string) => {
     guard(e, 'bookmarks:search')
     return searchBookmarks(String(q || ''), 300)
+  })
+  // v2.2.0 — import/export (real-browser migration path)
+  ipcMain.handle('bookmarks:importSources', (e) => {
+    guard(e, 'bookmarks:importSources')
+    return detectImportSources()
+  })
+  ipcMain.handle('bookmarks:importProfile', (e, id: string) => {
+    guard(e, 'bookmarks:importProfile')
+    return importFromProfile(String(id || ''))
+  })
+  ipcMain.handle('bookmarks:importFile', (e) => {
+    guard(e, 'bookmarks:importFile')
+    return importFromFileFlow()
+  })
+  ipcMain.handle('bookmarks:export', (e) => {
+    guard(e, 'bookmarks:export')
+    return exportBookmarksFlow()
+  })
+  ipcMain.handle('downloads:chooseDir', async (e) => {
+    guard(e, 'downloads:chooseDir')
+    const win = BrowserWindow.fromWebContents(e.sender) ?? undefined
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Download location',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
   })
   ipcMain.handle('history:recent', (e) => {
     guard(e, 'history:recent')
