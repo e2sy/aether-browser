@@ -14,12 +14,15 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { isValidContainerId } from '../shared/containers'
 
 export interface SessionTab {
   url: string
   pinned: boolean
   /** v1.8.0 (#34) — group membership by group id (group defined on the window) */
   groupId?: string | null
+  /** v2.7.0 — container tab keeps its isolated session across restarts */
+  containerId?: string | null
 }
 
 export interface SessionWindow {
@@ -56,6 +59,7 @@ export function isRestorableUrl(url: string): boolean {
 interface RawTab {
   url?: unknown
   pinned?: unknown
+  containerId?: unknown
 }
 interface RawWindow {
   tabs?: unknown
@@ -72,7 +76,7 @@ export function sanitizeWindow(w: RawWindow | null | undefined): SessionWindow |
   raw.forEach((t: RawTab, i: number) => {
     if (!t || typeof t.url !== 'string') return
     if (!isRestorableUrl(t.url)) return
-    kept.push({ url: t.url, pinned: Boolean(t.pinned) })
+    kept.push({ url: t.url, pinned: Boolean(t.pinned), containerId: isValidContainerId(t.containerId) ? (t.containerId as string) : null })
     keptIdx.push(i)
   })
   if (!kept.length) return null
@@ -121,7 +125,7 @@ export interface SessionEntryLike {
   win: { isDestroyed(): boolean }
   tabs: {
     getState(): {
-      tabs: Array<{ id: number; url: string; pinned: boolean; groupId?: string | null }>
+      tabs: Array<{ id: number; url: string; pinned: boolean; groupId?: string | null; containerId?: string | null }>
       activeId: number | null
     }
     /** tab groups (#34) — snapshot for the session store */
@@ -139,7 +143,12 @@ export function snapshotFromEntries(entries: SessionEntryLike[]): SessionSnapsho
     if (e.win.isDestroyed()) continue
     const st = e.tabs.getState()
     if (!st.tabs.length) continue
-    const tabs = st.tabs.map((t) => ({ url: t.url, pinned: t.pinned, groupId: t.groupId ?? null }))
+    const tabs = st.tabs.map((t) => ({
+      url: t.url,
+      pinned: t.pinned,
+      groupId: t.groupId ?? null,
+      containerId: isValidContainerId(t.containerId) ? t.containerId : null
+    }))
     const ai = st.activeId !== null ? st.tabs.findIndex((t) => t.id === st.activeId) : 0
     const snap = e.tabs.groupSnapshot()
     // remap live tab ids → array indexes so restore can re-bind after new ids are minted

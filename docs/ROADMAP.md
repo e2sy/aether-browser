@@ -158,6 +158,8 @@ execution order inside each phase, not strict priority — phases interleave.
 67. **Per-site shields presets** — aggressive/standard/trust like Brave
 68. **Referrer & cross-site policy tightening** — strict-referrer default, per-site exceptions
 
+> **v2.7.0 landed (build 21):** #57 **Fingerprint randomization** — shipped as Brave-style *farbling* (deterministic per-site canvas/WebGL/audio/hardware noise + timezone pockets for proxied containers, `preload/farble.js`). #66 **Tor-mode experiment** — shipped as the **IP masquerade suite** (proxy manager with per-container overrides, one-click Tor `socks5://127.0.0.1:9050`, WebRTC leak shield, "Check my IP" verifier). #62 **Cookie-consent auto-handler** — v1 shipped as two filter presets (uBlock Annoyances + EasyList Cookie) that remove the popups outright. Plus **Firefox-style container tabs** (isolated `persist:` sessions, color chips, reopen-in-container, per-container proxy/tz, session-restore).
+
 ## Phase 4 — AI: the beast differentiator (v2.0 "Aether Intelligence") — 14 items
 
 69. **Page-aware chat v2** — streaming DOM-grounded answers with element citations, per-tab memory

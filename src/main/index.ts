@@ -45,6 +45,9 @@ import {
 import { installCrxFromArgv } from './crx'
 import { parseLaunchArgs } from './defaultbrowser'
 import { refreshOSSurfaces, consumeAppArg, launchApp } from './apps'
+import { initContainers, containerTimezoneFor } from './containers'
+import { initFarble, registerFarbleEverywhere } from './farble'
+import { applyProxyEverywhere } from './netmask'
 
 // privileged scheme so internal pages behave like a real origin
 protocol.registerSchemesAsPrivileged([
@@ -159,6 +162,15 @@ app.whenReady().then(() => {
     httpsExemptHosts: Array.isArray(mergedSettings().httpsExemptHosts) ? mergedSettings().httpsExemptHosts : [],
     referrerTight: mergedSettings().referrerTight !== false
   }))
+
+  // v2.7.0 — containers (isolated tab sessions), fingerprint farbling and the
+  // IP masquerade posture. Container sessions get shields/privacy/farble/proxy
+  // wired on first use (ensureContainerSession); farbling needs its config
+  // IPC up before the first page script runs.
+  initContainers()
+  initFarble(containerTimezoneFor)
+  registerFarbleEverywhere()
+  void applyProxyEverywhere()
 
   // spellcheck (v2.2.0): en-US dictionary + right-click fixes in form fields
   try {

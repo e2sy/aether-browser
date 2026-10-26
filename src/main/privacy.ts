@@ -148,8 +148,8 @@ export interface PrivacySettings {
   referrerTight: boolean
 }
 
-export function installPrivacy(policyOf: () => PrivacySettings): void {
-  const ses = session.defaultSession
+export function installPrivacy(policyOf: () => PrivacySettings, target?: Electron.Session): void {
+  const ses = target ?? session.defaultSession
   const scrubTargets = new Set<string>()
 
   ses.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (details, callback) => {

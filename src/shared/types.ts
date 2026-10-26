@@ -18,6 +18,8 @@ export interface TabMeta {
   hibernated: boolean
   /** Tab group membership (#34) — null/absent = ungrouped */
   groupId?: string | null
+  /** v2.7.0 — container tab: isolated session (persist:cnt-<id>); null = default */
+  containerId?: string | null
 }
 
 export interface TabsState {
@@ -125,6 +127,14 @@ export interface Settings {
   downloadDir: string
   /** v2.3.0 — offer to save logins + allow autofill (vault stays OS-encrypted) */
   passwordManager: boolean
+  /** v2.7.0 — fingerprint farbling: off / standard (canvas, WebGL, audio, hardware) */
+  farbleMode: 'off' | 'standard'
+  /** v2.7.0 — WebRTC leak shield: forbid non-proxied UDP even without a proxy */
+  webrtcLeakShield: boolean
+  /** v2.7.0 — IP masquerade mode: off / manual proxy / Tor (SOCKS5 9050) */
+  proxyMode: 'off' | 'manual' | 'tor'
+  /** v2.7.0 — manual proxy URL (http/https/socks5) when proxyMode = 'manual' */
+  proxyUrl: string
 }
 
 /** A loaded unpacked extension (persisted across boots). */

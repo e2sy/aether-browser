@@ -1780,6 +1780,28 @@ body {
   color: #7c8cff;
 }
 
+/* v2.7.0 — container identity chips (Firefox-style colored containers) */
+.tab-container-chip {
+  flex: none;
+  max-width: 74px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8.5px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 1px solid;
+  border-radius: 4px;
+  opacity: 0.95;
+}
+
+.tab-container-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+}
+
 .tab-menu {
   position: fixed;
   z-index: 1000;

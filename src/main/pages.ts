@@ -1615,6 +1615,55 @@ export const SETTINGS_HTML = pageShell(
       </div>
     </div>
 
+    <div class="sec" id="containers-sec">
+      <div class="label">Container tabs — isolated identities</div>
+      <div class="hint" style="margin-bottom:8px">Each container is a fully isolated session: its own cookies, logins and storage. Right-click any tab and choose “Reopen in …” to move it; links opened from a container tab stay inside it. Your real IP and history are shared — only site data is isolated.</div>
+      <div id="containerList" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+        <input id="ctNewName" type="text" placeholder="New container name (e.g. Side project)" style="flex:1;min-width:170px" />
+        <select id="ctNewColor" style="width:110px">
+          <option value="blue">Blue</option>
+          <option value="teal">Teal</option>
+          <option value="green">Green</option>
+          <option value="yellow">Yellow</option>
+          <option value="orange">Orange</option>
+          <option value="red">Red</option>
+          <option value="pink">Pink</option>
+          <option value="purple">Purple</option>
+          <option value="gray" selected>Gray</option>
+        </select>
+        <button class="save-btn" id="ctAdd">Add container</button>
+      </div>
+      <div id="ctStatus" style="font-size:11.5px;color:var(--ax-ok);margin-top:6px"></div>
+    </div>
+
+    <div class="sec" id="netmask-sec">
+      <div class="label">IP masking &amp; fingerprint defense</div>
+      <div class="hint" style="margin-bottom:8px">Route traffic through a proxy (or Tor) and mask what fingerprinters read. No browser can fake its IP without routing — this is the honest version: real routing through a proxy or Tor, plus the WebRTC leak that would still expose you, plugged.</div>
+      <div class="opts" style="margin-top:6px">
+        <label><input type="checkbox" id="farbleMode" /> Fingerprint farbling — per-site noise for canvas, WebGL, audio and hardware (recommended)</label>
+        <label><input type="checkbox" id="webrtcLeakShield" /> WebRTC leak shield — peer-to-peer never reveals your real address</label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+        <select id="proxyMode" style="width:200px">
+          <option value="off">IP: direct (no proxy)</option>
+          <option value="manual">Manual proxy…</option>
+          <option value="tor">Tor — socks5://127.0.0.1:9050</option>
+        </select>
+        <input id="proxyUrl" type="text" placeholder="http://host:port, https://host:port or socks5://host:port" style="flex:1;min-width:190px" />
+        <button class="save-btn" id="proxySave">Apply</button>
+      </div>
+      <div id="proxyStatus" style="font-size:11.5px;margin-top:6px;color:var(--ax-muted2)"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+        <button class="muted-btn" id="checkIp">Check my IP</button>
+        <select id="checkIpTarget" style="width:180px">
+          <option value="default">Session: default</option>
+        </select>
+      </div>
+      <div id="ipResult" class="mono" style="font-size:12px;margin-top:8px;color:var(--ax-fg)"></div>
+      <div class="hint" style="margin-top:6px">Containers can override the global route: give each container its own proxy (and timezone to match the exit region) below — perfect for keeping work, banking and anonymous browsing truly apart.</div>
+    </div>
+
     <div class="sec">
       <div class="label">Downloads</div>
       <div class="opts" style="margin-top:6px">
@@ -2424,6 +2473,130 @@ export const SETTINGS_HTML = pageShell(
   document.getElementById('clearPerms').addEventListener('click', function () {
     if (confirm('Forget all remembered site permissions?')) window.aether.perms.clear().then(loadPerms)
   })
+
+  /* ---------------- v2.7.0 — container tabs + IP masking ---------------- */
+  var CT_HEX = { blue: '#3b82f6', teal: '#14b8a6', green: '#22c55e', yellow: '#eab308', orange: '#f97316', red: '#ef4444', pink: '#ec4899', purple: '#a855f7', gray: '#6b7280' }
+  function ctDot(color) {
+    var d = document.createElement('span')
+    d.style.cssText = 'width:10px;height:10px;border-radius:5px;flex:none;display:inline-block;background:' + (CT_HEX[color] || CT_HEX.gray)
+    return d
+  }
+  function renderContainers27() {
+    window.aether.containers.list().then(function (list) {
+      var box = document.getElementById('containerList')
+      box.textContent = ''
+      var target = document.getElementById('checkIpTarget')
+      while (target.options.length > 1) target.remove(1)
+      list.forEach(function (c) {
+        var opt = document.createElement('option')
+        opt.value = c.id
+        opt.textContent = 'Session: ' + c.name
+        target.appendChild(opt)
+        var row = document.createElement('div')
+        row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--ax-border);border-radius:10px;padding:8px'
+        row.appendChild(ctDot(c.color))
+        var name = document.createElement('b')
+        name.textContent = c.name
+        name.style.minWidth = '80px'
+        row.appendChild(name)
+        var proxy = document.createElement('input')
+        proxy.type = 'text'
+        proxy.placeholder = 'own proxy (optional) — socks5://host:port'
+        proxy.value = c.proxyUrl || ''
+        proxy.style.cssText = 'flex:1;min-width:150px'
+        proxy.addEventListener('change', function () {
+          window.aether.containers.update(c.id, { proxyUrl: proxy.value.trim() })
+        })
+        row.appendChild(proxy)
+        var tz = document.createElement('input')
+        tz.type = 'text'
+        tz.placeholder = 'timezone (optional) — Europe/Berlin'
+        tz.value = c.timezone || ''
+        tz.style.cssText = 'flex:1;min-width:150px'
+        tz.addEventListener('change', function () {
+          window.aether.containers.update(c.id, { timezone: tz.value.trim() })
+        })
+        row.appendChild(tz)
+        var clearBtn = document.createElement('button')
+        clearBtn.className = 'muted-btn'
+        clearBtn.textContent = 'Clear data'
+        clearBtn.addEventListener('click', function () {
+          window.aether.containers.clearData(c.id)
+          clearBtn.textContent = 'Cleared'
+          setTimeout(function () { clearBtn.textContent = 'Clear data' }, 2000)
+        })
+        row.appendChild(clearBtn)
+        var del = document.createElement('button')
+        del.className = 'muted-btn'
+        del.textContent = 'Delete'
+        del.addEventListener('click', function () {
+          window.aether.containers.remove(c.id).then(renderContainers27)
+        })
+        row.appendChild(del)
+        box.appendChild(row)
+      })
+    }).catch(function () {})
+  }
+  function netmaskRender(st) {
+    var modeSel = document.getElementById('proxyMode')
+    modeSel.value = st.mode || 'off'
+    var urlBox = document.getElementById('proxyUrl')
+    urlBox.value = st.proxyUrl || ''
+    urlBox.style.display = modeSel.value === 'manual' ? '' : 'none'
+    var label = st.mode === 'tor'
+      ? 'Routing through Tor on 127.0.0.1:9050 (needs Tor running).'
+      : st.mode === 'manual' && st.proxyUrl
+        ? 'Routing through ' + st.proxyUrl + '.'
+        : 'Direct connection — no proxy.'
+    document.getElementById('proxyStatus').textContent = label + ' WebRTC leak shield ' + (st.webrtcShield ? 'on' : 'OFF') + '.'
+  }
+  document.getElementById('ctAdd').addEventListener('click', function () {
+    var name = document.getElementById('ctNewName').value.trim()
+    var color = document.getElementById('ctNewColor').value
+    if (!name) return
+    window.aether.containers.create(name, color).then(function () {
+      document.getElementById('ctNewName').value = ''
+      var st = document.getElementById('ctStatus')
+      st.textContent = 'Container added — right-click a tab to open it inside.'
+      setTimeout(function () { st.textContent = '' }, 3000)
+      renderContainers27()
+    })
+  })
+  document.getElementById('farbleMode').addEventListener('change', function (e) {
+    save({ farbleMode: e.target.checked ? 'standard' : 'off' })
+  })
+  document.getElementById('webrtcLeakShield').addEventListener('change', function (e) {
+    save({ webrtcLeakShield: e.target.checked })
+  })
+  document.getElementById('proxyMode').addEventListener('change', function (e) {
+    document.getElementById('proxyUrl').style.display = e.target.value === 'manual' ? '' : 'none'
+  })
+  document.getElementById('proxySave').addEventListener('click', function () {
+    var st = document.getElementById('proxyStatus')
+    window.aether.netmask.set({
+      mode: document.getElementById('proxyMode').value,
+      proxyUrl: document.getElementById('proxyUrl').value.trim()
+    }).then(function (r) {
+      if (r && r.ok) st.textContent = 'Applied — new routes are live.'
+      else st.textContent = (r && r.error) || 'Could not apply the proxy.'
+      st.style.color = r && r.ok ? 'var(--ax-ok)' : '#ef4444'
+      window.aether.netmask.get().then(netmaskRender)
+    })
+  })
+  document.getElementById('checkIp').addEventListener('click', function () {
+    var out = document.getElementById('ipResult')
+    out.textContent = 'Checking…'
+    window.aether.netmask.checkIp(document.getElementById('checkIpTarget').value).then(function (r) {
+      if (r && r.ok) out.textContent = 'Exit IP ' + r.ip + ' · country ' + r.country + ' · via ' + r.via
+      else out.textContent = (r && r.error) || 'Check failed.'
+    }).catch(function () { out.textContent = 'Check failed.' })
+  })
+  window.aether.netmask.get().then(netmaskRender).catch(function () {})
+  window.aether.settings.get().then(function (s) {
+    document.getElementById('farbleMode').checked = s.farbleMode !== 'off'
+    document.getElementById('webrtcLeakShield').checked = s.webrtcLeakShield !== false
+  }).catch(function () {})
+  renderContainers27()
   load()
   `
 )

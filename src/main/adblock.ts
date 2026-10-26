@@ -59,6 +59,9 @@ let customEngines: { url: string; engine: FiltersEngine; status: 'ok' | 'cached'
 let customLoading: Promise<void> | null = null
 let pipelineInstalled = false
 let globalEnabled = false
+/** v2.7.0 — container sessions registered after boot join the shields pipeline. */
+const extraSessions = new Set<Electron.Session>()
+const pipelinedSessions = new WeakSet<Electron.Session>()
 
 const statsStore = new JsonStore<AdblockStats>('adblock-stats.json', { ...EMPTY_STATS, perHost: {} })
 
@@ -304,14 +307,16 @@ function ensurePipeline(): void {
   pipelineInstalled = true
 
   // Default session + the shared in-memory private session (v1.5.0 private
-  // windows) each get their own network/cosmetic/CSP arms — the per-site
-  // gating below is webContents-id based, so it works across sessions.
+  // windows) + every container session (v2.7.0) each get their own
+  // network/cosmetic/CSP arms — the per-site gating below is webContents-id
+  // based, so it works across sessions.
   const sessions: Electron.Session[] = [session.defaultSession]
   try {
     sessions.push(session.fromPartition('aether-private'))
   } catch (err) {
     console.warn('[shields] private session unavailable:', err instanceof Error ? err.message : err)
   }
+  for (const extra of extraSessions) sessions.push(extra)
   for (const ses of sessions) installPipelineOnSession(ses)
 
   // --- global cosmetic-filtering IPC arms (session-agnostic, install ONCE) ---
@@ -371,6 +376,8 @@ function ensurePipeline(): void {
 }
 
 function installPipelineOnSession(ses: Electron.Session): void {
+  if (pipelinedSessions.has(ses)) return
+  pipelinedSessions.add(ses)
   // --- cosmetic filtering preload (the engine's own sandboxed script) ---
   // AETHER_SHIELDS_NO_COSMETICS=1 skips this arm when bisecting site breakage.
   if (process.env.AETHER_SHIELDS_NO_COSMETICS === '1') {
@@ -503,6 +510,17 @@ export async function applyAdblockSetting(enabled: boolean): Promise<boolean> {
     customEngines.length ? '+ custom lists' : ''
   )
   return true
+}
+
+/**
+ * v2.7.0 — register a container (or any extra) session with the shields
+ * pipeline: same network/cosmetic/CSP filtering the default session gets.
+ * Idempotent; safe to call whether or not shields are currently enabled
+ * (the webRequest arms gate live through shieldsOnForHost).
+ */
+export function registerShieldsSession(ses: Electron.Session): void {
+  extraSessions.add(ses)
+  if (pipelineInstalled) installPipelineOnSession(ses)
 }
 
 /** Toolbar / settings read this through IPC. */

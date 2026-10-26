@@ -121,6 +121,18 @@ export const FILTER_PRESETS: readonly FilterPreset[] = [
     id: 'ublock-badware',
     name: 'uBlock filters – Badware risks',
     url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt'
+  },
+  {
+    // v2.7.0 — cookie-consent popups, newsletter nag screens, social overlays
+    id: 'ublock-annoyances',
+    name: 'uBlock filters – Annoyances (cookie banners, popups)',
+    url: 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/annoyances.txt'
+  },
+  {
+    // v2.7.0 — dedicated cookie-notice lists (Brave/Dolphin-style "no cookie walls")
+    id: 'easylist-cookie',
+    name: 'EasyList Cookie – consent popups',
+    url: 'https://www.easylist.to/easylistcookie.txt'
   }
 ]
 

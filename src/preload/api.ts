@@ -76,7 +76,8 @@ export const api = {
   },
 
   tabs: {
-    create: (url?: string) => ipcRenderer.invoke('tabs:create', url),
+    create: (url?: string, opts?: { containerId?: string | null }) =>
+      ipcRenderer.invoke('tabs:create', url, opts),
     list: () => ipcRenderer.invoke('tabs:list'),
     omnibox: (id: number, text: string) => ipcRenderer.invoke('tabs:omnibox', id, text),
     close: (id: number) => ipcRenderer.invoke('tabs:close', id),
@@ -110,7 +111,42 @@ export const api = {
     groupUpdate: (id: string, patch: { name?: string; color?: string; collapsed?: boolean }) =>
       ipcRenderer.invoke('tabs:groupUpdate', id, patch),
     groupDelete: (id: string) => ipcRenderer.invoke('tabs:groupDelete', id),
-    groupAssign: (tabId: number, groupId: string | null) => ipcRenderer.invoke('tabs:groupAssign', tabId, groupId)
+    groupAssign: (tabId: number, groupId: string | null) => ipcRenderer.invoke('tabs:groupAssign', tabId, groupId),
+    /** v2.7.0 — move a live tab into another container's isolated session */
+    reopenIn: (tabId: number, containerId: string | null) =>
+      ipcRenderer.invoke('tabs:reopenIn', tabId, containerId) as Promise<boolean>
+  },
+
+  /** v2.7.0 — container tabs (Firefox-style isolated sessions) */
+  containers: {
+    list: () =>
+      ipcRenderer.invoke('containers:list') as Promise<
+        Array<{ id: string; name: string; color: string; proxyUrl: string; timezone: string; builtin: boolean }>
+      >,
+    create: (name: string, color: string) =>
+      ipcRenderer.invoke('containers:create', name, color) as Promise<{ id: string; name: string; color: string } | null>,
+    update: (
+      id: string,
+      patch: { name?: string; color?: string; proxyUrl?: string; timezone?: string }
+    ) => ipcRenderer.invoke('containers:update', id, patch) as Promise<{ id: string } | null>,
+    remove: (id: string) => ipcRenderer.invoke('containers:delete', id) as Promise<boolean>,
+    clearData: (id: string) => ipcRenderer.invoke('containers:clearData', id) as Promise<boolean>
+  },
+
+  /** v2.7.0 — IP masquerade (proxy manager / Tor / WebRTC shield) */
+  netmask: {
+    get: () =>
+      ipcRenderer.invoke('netmask:get') as Promise<{ mode: string; proxyUrl: string; webrtcShield: boolean }>,
+    set: (patch: { mode?: string; proxyUrl?: string }) =>
+      ipcRenderer.invoke('netmask:set', patch) as Promise<{ ok: boolean; error?: string }>,
+    checkIp: (target: string) =>
+      ipcRenderer.invoke('netmask:checkIp', target) as Promise<{
+        ok: boolean
+        ip: string
+        country: string
+        via: string
+        error?: string
+      }>
   },
 
   omnibox: {

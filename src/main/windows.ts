@@ -209,7 +209,7 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
     let focusId = 0
     entry.tabs.restoreGroups(opts.restore.groups, opts.restore.tabGroups)
     opts.restore.tabs.forEach((t, i) => {
-      const id = entry.tabs.create(t.url, false)
+      const id = entry.tabs.create(t.url, false, { containerId: t.containerId ?? null })
       if (t.pinned) entry.tabs.setPinned(id, true)
       const gid = (t as SessionTab & { groupId?: string | null }).groupId
       if (gid) entry.tabs.setTabGroup(id, gid)
@@ -235,9 +235,15 @@ export function popoutTab(fromWinId: number, tabId: number): number | null {
   const tab = src.tabs.get(tabId)
   if (!tab) return null
   const url = /^https?:\/\//i.test(tab.url) || tab.url.startsWith('aether://') ? tab.url : undefined
+  const containerId = tab.containerId || null
   const title = tab.title
   src.tabs.close(tabId) // closes the source window if this was its last tab
   const entry = createBrowserWindow(url || undefined)
+  // carry the tab's container identity into its own window
+  if (containerId) {
+    const t = entry.tabs.active()
+    if (t) entry.tabs.moveToContainer(t.id, containerId)
+  }
   if (title && title !== 'New Tab') {
     const t = entry.tabs.active()
     if (t) t.title = title

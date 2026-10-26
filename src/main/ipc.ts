@@ -102,6 +102,15 @@ import { getTranslateDoc, runTranslate, stopTranslate, captureTranslatePage } fr
 import { clusterTabsByTopic } from './tabcluster'
 import { mapTaskMetrics, type PrevSample, type TaskTabRef } from '../shared/taskmetrics'
 import { fmtBytes, fmtPct } from '../shared/fmt'
+import { isValidContainerId } from '../shared/containers'
+import {
+  listContainers,
+  createContainer,
+  updateContainer,
+  deleteContainer,
+  clearContainerData
+} from './containers'
+import { applyProxyEverywhere, checkIp, netmaskStatus, setProxySettings } from './netmask'
 
 const HISTORY_WINDOW = 20
 /** sane bounds for the measured chrome height (tab strip + toolbar + bar) */
@@ -162,9 +171,10 @@ function isInternal(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
 
 export function registerIpc(): void {
   // ---------- tabs (routed to the sender's own window) ----------
-  ipcMain.handle('tabs:create', (e, url?: string) => {
+  ipcMain.handle('tabs:create', (e, url?: string, opts?: { containerId?: string | null }) => {
     guard(e, 'tabs:create')
-    return fromSender(e)?.tabs.create(url && /^https?:\/\//i.test(url) ? url : undefined)
+    const containerId = opts && typeof opts === 'object' && isValidContainerId(opts.containerId) ? opts.containerId : undefined
+    return fromSender(e)?.tabs.create(url && /^https?:\/\//i.test(url) ? url : undefined, true, { containerId })
   })
 
   // v1.5.0 — middle-click on the bookmarks bar: open without stealing focus
@@ -204,6 +214,17 @@ export function registerIpc(): void {
   })
 
   // tab groups (#34) — named, colored, collapsible, saved across restarts
+  // v2.7.0 — containers: move a live tab into another isolated session
+  ipcMain.handle('tabs:reopenIn', (e, tabId: number, containerId: string | null) => {
+    guard(e, 'tabs:reopenIn')
+    return (
+      fromSender(e)?.tabs.moveToContainer(
+        Number(tabId),
+        containerId === null || containerId === undefined ? null : String(containerId)
+      ) ?? false
+    )
+  })
+
   ipcMain.handle('tabs:groupCreate', (e, name: string, color?: string) => {
     guard(e, 'tabs:groupCreate')
     return fromSender(e)?.tabs.createGroup(String(name || ''), color) ?? null
@@ -345,6 +366,10 @@ export function registerIpc(): void {
     settings.save()
     if (patch.adblock !== undefined) {
       void applyAdblockSetting(Boolean(patch.adblock))
+    }
+    // v2.7.0 — proxy posture changes apply to every session immediately
+    if (patch.proxyMode !== undefined || patch.proxyUrl !== undefined || patch.webrtcLeakShield !== undefined) {
+      void applyProxyEverywhere()
     }
     // OS-integration live effects (#28/#29) — tray + login item react instantly
     if (patch.showTray !== undefined) {
@@ -502,6 +527,58 @@ export function registerIpc(): void {
   ipcMain.handle('profiles:delete', (e, id: unknown) => {
     guard(e, 'profiles:delete')
     return deleteProfile(id)
+  })
+
+  // ---------- v2.7.0 containers (isolated tab sessions) ----------
+  ipcMain.handle('containers:list', (e) => {
+    guard(e, 'containers:list')
+    return listContainers()
+  })
+  ipcMain.handle('containers:create', (e, name: unknown, color: unknown) => {
+    guard(e, 'containers:create')
+    return createContainer(String(name ?? ''), String(color ?? '')) ?? null
+  })
+  ipcMain.handle(
+    'containers:update',
+    (e, id: unknown, patch: { name?: string; color?: string; proxyUrl?: string; timezone?: string }) => {
+      guard(e, 'containers:update')
+      if (!isValidContainerId(id)) return null
+      const clean = patch && typeof patch === 'object' ? patch : {}
+      return updateContainer(String(id), clean) ?? null
+    }
+  )
+  ipcMain.handle('containers:delete', (e, id: unknown) => {
+    guard(e, 'containers:delete')
+    if (!isValidContainerId(id)) return false
+    // tabs in this container fall back to the default session in every window
+    for (const entry of allEntries()) {
+      for (const t of entry.tabs.getState().tabs) {
+        if (t.containerId === id) entry.tabs.moveToContainer(t.id, null)
+      }
+    }
+    return deleteContainer(String(id))
+  })
+  ipcMain.handle('containers:clearData', (e, id: unknown) => {
+    guard(e, 'containers:clearData')
+    if (!isValidContainerId(id)) return false
+    void clearContainerData(String(id))
+    return true
+  })
+
+  // ---------- v2.7.0 IP masquerade (proxy / Tor / WebRTC shield) ----------
+  ipcMain.handle('netmask:get', (e) => {
+    guard(e, 'netmask:get')
+    return netmaskStatus()
+  })
+  ipcMain.handle('netmask:set', (e, patch: { mode?: unknown; proxyUrl?: unknown }) => {
+    guard(e, 'netmask:set')
+    const res = setProxySettings(patch && typeof patch === 'object' ? patch : {})
+    if (res.ok) void applyProxyEverywhere()
+    return res
+  })
+  ipcMain.handle('netmask:checkIp', (e, target: unknown) => {
+    guard(e, 'netmask:checkIp')
+    return checkIp(target === 'default' || typeof target === 'string' ? String(target) : 'default')
   })
   // Switch = flush this profile's session cleanly, then relaunch into the
   // target profile (its own userData → its own single-instance lock).

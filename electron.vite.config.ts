@@ -41,6 +41,29 @@ try {
   }
 }
 
+/**
+ * Fingerprint-farbling preload (v2.7.0) — plain JS, NOT bundled (it must run
+ * import-free inside sandboxed frames). Copied verbatim from src/preload/
+ * farble.js to out/preload/farble.js on every build / dev-watch rebuild, the
+ * same trigger window the ui.js generator uses.
+ */
+function copyFarblePreload(): Plugin {
+  return {
+    name: 'aether-copy-farble-preload',
+    apply: 'build',
+    writeBundle() {
+      const src = path.resolve(__dirname, 'src/preload/farble.js')
+      const dst = path.resolve(__dirname, 'out/preload/farble.js')
+      try {
+        fs.mkdirSync(path.dirname(dst), { recursive: true })
+        fs.copyFileSync(src, dst)
+      } catch (err) {
+        console.error('[farble] preload copy failed:', err)
+      }
+    }
+  }
+}
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()]
@@ -48,7 +71,7 @@ export default defineConfig({
   preload: {
     // sandboxed tab views can only require("electron") — keep the bundle lean
     // and verify it after every build with scripts/patch-preload-sandbox.cjs
-    plugins: [externalizeDepsPlugin(), generateUiPreload()]
+    plugins: [externalizeDepsPlugin(), generateUiPreload(), copyFarblePreload()]
   },
   renderer: {
     plugins: [react()]

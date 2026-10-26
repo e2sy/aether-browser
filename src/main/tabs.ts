@@ -20,6 +20,9 @@ import { shouldShowErrorPage, errorPageUrl, originalUrlFromErrorPage, isErrorPag
 import { noteSiteHost, forgetSiteHost } from './adblock'
 import { notifyTabAdded, notifyTabRemoved, notifyTabSelected } from './extensions'
 import { noteCredContext, forgetCredContext, wireCredCapture } from './passwords'
+import { ensureContainerSession, isValidContainerId } from './containers'
+import { applyWebRTCShield } from './netmask'
+import { partitionFor } from '../shared/containers'
 
 interface Tab extends TabMeta {
   view: WebContentsView | null
@@ -27,6 +30,8 @@ interface Tab extends TabMeta {
   lastActiveAt: number
   /** tab group membership (#34) — null = ungrouped */
   groupId: string | null
+  /** v2.7.0 container id — null/'' = the default session */
+  containerId: string | null
 }
 
 const hostOf = (url: string): string => {
@@ -87,8 +92,12 @@ export class TabManager {
     return this.win
   }
 
-  create(url = 'aether://newtab', activate = true): number {
+  create(url = 'aether://newtab', activate = true, opts?: { containerId?: string | null }): number {
     const id = this.nextId++
+    // private windows never join persistent container sessions — that would
+    // write cookies to disk (Firefox ignores containers in private windows too)
+    const containerId =
+      !this.hooks.private && opts?.containerId && isValidContainerId(opts.containerId) ? opts.containerId : null
     const tab: Tab = {
       id,
       view: null,
@@ -104,6 +113,7 @@ export class TabManager {
       discarded: false,
       hibernated: false,
       groupId: null,
+      containerId,
       lastActiveAt: Date.now()
     }
     this.tabs.set(id, tab)
@@ -117,13 +127,23 @@ export class TabManager {
 
   /** (Re)create the WebContentsView for a tab — used on create and on wake from discard. */
   private spawnView(tab: Tab, url: string): void {
+    // v2.7.0 containers: the tab's own isolated session (cookie jar, storage,
+    // cache). ensureContainerSession wires shields/privacy/farble/proxy on it.
+    if (tab.containerId) {
+      try {
+        ensureContainerSession(tab.containerId)
+      } catch {
+        tab.containerId = null // unknown container — fall back to default
+      }
+    }
     const view = new WebContentsView({
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        spellcheck: mergedSettings().spellcheck !== false
+        spellcheck: mergedSettings().spellcheck !== false,
+        ...(tab.containerId ? { partition: partitionFor(tab.containerId) } : {})
       }
     })
     // force-dark v2 (#52): per-site CSS inversion + night scheduler
@@ -135,6 +155,8 @@ export class TabManager {
     tab.discarded = false
     tab.hibernated = false
     const wc = view.webContents
+    // v2.7.0 — WebRTC leak shield (per-view policy; sees the live proxy mode)
+    applyWebRTCShield(wc)
 
     wc.on('page-title-updated', (_e, title) => {
       tab.title = title || tab.title
@@ -214,7 +236,7 @@ export class TabManager {
       this.emit()
     })
     wc.setWindowOpenHandler(({ url: popupUrl }) => {
-      if (/^https?:/i.test(popupUrl)) this.create(popupUrl, true)
+      if (/^https?:/i.test(popupUrl)) this.create(popupUrl, true, { containerId: tab.containerId })
       // mailto:/magnet:/zoommtg: … from window.open never navigate —
       // ask-once-per-scheme and hand to the OS app (Master Plan #26)
       if (isExternalCandidate(popupUrl)) void maybeOpenExternal(popupUrl)
@@ -513,7 +535,7 @@ export class TabManager {
     const tab = this.tabs.get(id)
     if (!tab) return
     const url = /^https?:\/\//i.test(tab.url) || tab.url.startsWith('aether://') ? tab.url : undefined
-    const newId = this.create(url || undefined, true)
+    const newId = this.create(url || undefined, true, { containerId: tab.containerId })
     const at = this.order.indexOf(id)
     const from = this.order.indexOf(newId)
     if (at >= 0 && from >= 0) {
@@ -521,6 +543,44 @@ export class TabManager {
       this.order.splice(at + 1, 0, newId)
     }
     this.emit()
+  }
+
+  /**
+   * v2.7.0 — "Reopen in container": move a live tab into another session.
+   * The view is recreated (the page reloads — a cookie jar cannot move with
+   * it); position, pinned state and history entry stay.
+   */
+  moveToContainer(id: number, containerId: string | null): boolean {
+    const tab = this.tabs.get(id)
+    if (!tab) return false
+    const next = containerId && isValidContainerId(containerId) ? containerId : null
+    if ((tab.containerId || null) === next) return false
+    if (tab.view) {
+      try {
+        this.win.contentView.removeChildView(tab.view)
+      } catch {
+        /* already removed */
+      }
+      try {
+        tab.view.webContents.close()
+      } catch {
+        /* view gone */
+      }
+      tab.view = null
+    }
+    tab.containerId = next
+    // old webContents' destroyed hook already cleared its cred context;
+    // spawnView re-registers capture on the fresh one
+    this.spawnView(tab, tab.url || 'aether://newtab')
+    if (this.activeId === id) {
+      try {
+        this.win.contentView.addChildView(tab.view!)
+      } catch {
+        /* window gone */
+      }
+    }
+    this.emit()
+    return true
   }
 
   /** Memory saver: unload the view but remember url/title/favicon. */
@@ -827,7 +887,8 @@ export class TabManager {
         audible: t.audible,
         discarded: t.discarded,
         hibernated: t.hibernated,
-        groupId: this.tabGroupOf.get(t.id) ?? null
+        groupId: this.tabGroupOf.get(t.id) ?? null,
+        containerId: t.containerId || null
       }))
     return { tabs, activeId: this.activeId, groups: this.groups }
   }

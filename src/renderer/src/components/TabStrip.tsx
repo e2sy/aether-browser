@@ -9,6 +9,26 @@ interface MenuState {
   tab: TabMeta
 }
 
+/** v2.7.0 — container identity list for chips + the tab menu */
+interface ContainerLite {
+  id: string
+  name: string
+  color: string
+}
+
+const CONTAINER_HEX: Record<string, string> = {
+  blue: '#3b82f6',
+  teal: '#14b8a6',
+  green: '#22c55e',
+  yellow: '#eab308',
+  orange: '#f97316',
+  red: '#ef4444',
+  pink: '#ec4899',
+  purple: '#a855f7',
+  gray: '#6b7280'
+}
+const containerHex = (c: string): string => CONTAINER_HEX[c] || CONTAINER_HEX.gray
+
 export default function TabStrip(): JSX.Element {
   const { tabs, activeId, maximized } = useApp()
   const set = useApp((s) => s.set)
@@ -20,6 +40,21 @@ export default function TabStrip(): JSX.Element {
   const [preview, setPreview] = useState<{ x: number; y: number; img: string; title: string; url: string } | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const previewSeq = useRef(0)
+  const [containers, setContainers] = useState<ContainerLite[]>([])
+
+  // v2.7.0 — container identities (chips + "reopen in container" menu)
+  useEffect(() => {
+    let alive = true
+    window.aether.containers
+      .list()
+      .then((cs) => {
+        if (alive) setContainers(cs)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const clearHover = (): void => {
     if (hoverTimer.current) {
@@ -135,6 +170,17 @@ export default function TabStrip(): JSX.Element {
       disabled: t.discarded || t.pinned || t.id === activeId
     },
     { label: 'Move to new window', action: () => window.aether.tabs.popout(t.id), disabled: t.discarded },
+    // v2.7.0 — reopen this tab inside another isolated container session
+    ...(containers.length ? [{ label: '', sep: true } as const] : []),
+    ...containers
+      .filter((c) => c.id !== (t.containerId || null))
+      .slice(0, 6)
+      .map((c) => ({
+        label: `Reopen in ${c.name}`,
+        action: () => window.aether.tabs.reopenIn(t.id, c.id),
+        disabled: t.discarded
+      })),
+    ...(t.containerId ? [{ label: 'Reopen in default session', action: () => window.aether.tabs.reopenIn(t.id, null) }] : []),
     { label: '', sep: true },
     { label: 'Close tab', action: () => window.aether.tabs.close(t.id) },
     { label: 'Close other tabs', action: () => window.aether.tabs.closeOthers(t.id) },
@@ -189,6 +235,21 @@ export default function TabStrip(): JSX.Element {
             }
           >
             {favicon(t)}
+            {t.containerId &&
+              (() => {
+                const cont = containers.find((c) => c.id === t.containerId)
+                const hex = containerHex(cont?.color || 'gray')
+                return (
+                  <>
+                    {cont && !t.pinned && (
+                      <span className="tab-container-chip" style={{ color: hex, borderColor: hex }} title={`Container: ${cont.name}`}>
+                        {cont.name.slice(0, 10)}
+                      </span>
+                    )}
+                    {t.pinned && <span className="tab-container-dot" style={{ background: hex }} title={`Container: ${cont?.name || 'isolated'}`} />}
+                  </>
+                )
+              })()}
             {!t.pinned && (
               <span className="tab-title">
                 {t.loading

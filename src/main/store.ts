@@ -69,7 +69,11 @@ export const DEFAULT_SETTINGS: Settings = {
   spellcheck: true,
   askDownloadLocation: false,
   downloadDir: '',
-  passwordManager: true
+  passwordManager: true,
+  farbleMode: 'standard',
+  webrtcLeakShield: true,
+  proxyMode: 'off',
+  proxyUrl: ''
 }
 
 /** Settings with defaults merged in (older settings.json files may miss keys). */
