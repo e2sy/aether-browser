@@ -75,10 +75,16 @@ const { NEW_TAB_HTML } = await import(pathToFileURL(path.join(OUTDIR, 'bundle.mj
 console.log('\n[1] static gate — internal pages keep the XSS-safe architecture')
 {
   const src = fs.readFileSync(path.join(APP, 'src', 'main', 'pages.ts'), 'utf8')
-  // every innerHTML sink must be the clear-container pattern
+  // every innerHTML sink must be the clear-container pattern — with exactly
+  // ONE audited exception (v2.5.0): the READER page renders the article HTML
+  // that main/reader.ts sanitizeArticleElement() whitelisted (tag + attribute
+  // allowlist, no javascript:/data:, CSP nonce as the second line of defense;
+  // 13 sanitizer assertions live in test-v250).
   const sinks = [...src.matchAll(/\.innerHTML\s*=\s*([^;\n]+)/g)].map((m) => m[1].trim())
   ok(sinks.length >= 15, `innerHTML sinks found (${sinks.length})`)
-  ok(sinks.every((s) => s === "''"), `every innerHTML assignment is the '' clear (${sinks.filter((s) => s !== "''").length} violators)`)
+  const violators = sinks.filter((s) => s !== "''" && s !== "a.content || ''")
+  ok(sinks.filter((s) => s === "a.content || ''").length === 1, 'exactly one reader article sink (sanitized upstream)')
+  ok(violators.length === 0, `every other innerHTML assignment is the '' clear (${violators.length} violators)`)
   ok(!/document\.write(ln)?\(/.test(src), 'no document.write/writeln')
   ok(!/insertAdjacentHTML/.test(src), 'no insertAdjacentHTML')
   ok(!/\.outerHTML\s*=/.test(src), 'no outerHTML assignment')

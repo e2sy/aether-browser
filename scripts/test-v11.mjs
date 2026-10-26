@@ -25,7 +25,9 @@ function ok(cond, name) {
 }
 
 /* ---------- build a runnable bundle with electron + native-ish deps stubbed ---------- */
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'aether-test11-'))
+const tmp = path.join(APP, ".test-v11-tmp")
+  try { fs.rmSync(tmp, { recursive: true, force: true }) } catch {}
+  fs.mkdirSync(tmp, { recursive: true })
 
 function stubModule(name, code) {
   const dir = path.join(tmp, 'node_modules', name)

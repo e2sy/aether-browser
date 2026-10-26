@@ -8,3 +8,7 @@ dist/
 .vscode/
 *.tsbuildinfo
 .test-v211-*
+.test-v250-tmp
+.test-v11-tmp
+.test-v175-tmp
+.test-v240-tmp

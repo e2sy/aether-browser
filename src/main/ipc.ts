@@ -1,4 +1,4 @@
-import { BrowserWindow, clipboard, dialog, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, IpcMainEvent, IpcMainInvokeEvent, session } from 'electron'
 import type { WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import type { TabManager } from './tabs'
@@ -95,6 +95,10 @@ import { ipcGuardDecision, isAetherInternalSender } from './trust'
 import { agentRunner } from './agent/executor'
 import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
 import type { MacroStep } from '../shared/types'
+import { getStoredArticle, fetchArticle } from './reader'
+import { captureScreenshot } from './shot'
+import { mapTaskMetrics, type PrevSample, type TaskTabRef } from '../shared/taskmetrics'
+import { fmtBytes, fmtPct } from '../shared/fmt'
 
 const HISTORY_WINDOW = 20
 /** sane bounds for the measured chrome height (tab strip + toolbar + bar) */
@@ -1038,6 +1042,72 @@ export function registerIpc(): void {
     if (!isInternal(e)) throw new Error('Unauthorized')
     const target = String(url || '')
     if (/^https?:\/\//i.test(target) || target.startsWith('aether://')) e.sender.loadURL(target)
+  })
+
+  // ---------- reader view (v2.5.0 build 19) ----------
+  // aether://reader calls back for the article captured from THIS tab before
+  // the navigation (store is keyed by webContents id — the id survives it).
+  ipcMain.handle('reader:get', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return getStoredArticle(e.sender.id)
+  })
+  // Reader for an arbitrary URL (reading-list "open in reader" flows).
+  ipcMain.handle('reader:fetch', async (e, url: string) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return fetchArticle(String(url || ''))
+  })
+
+  // ---------- task manager (v2.5.0 build 19) ----------
+  let prevSamples: PrevSample = {}
+  ipcMain.handle('taskmgr:snapshot', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    const refs: TaskTabRef[] = []
+    for (const entry of allEntries()) {
+      if (entry.win.isDestroyed()) continue
+      try {
+        const uiPid = entry.win.webContents.getOSProcessId()
+        if (typeof uiPid === 'number') {
+          refs.push({ winId: entry.win.id, tabId: -1, title: 'Aether interface', url: '', pid: uiPid, isInterface: true })
+        }
+      } catch {
+        /* UI not ready */
+      }
+      for (const id of entry.tabs.listIds()) {
+        const t = entry.tabs.get(id)
+        const wc = t?.view?.webContents
+        if (!wc || wc.isDestroyed()) continue
+        let pid: number | undefined
+        try {
+          pid = wc.getOSProcessId()
+        } catch {
+          pid = undefined
+        }
+        refs.push({ winId: entry.win.id, tabId: id, title: wc.getTitle(), url: wc.getURL(), pid })
+      }
+    }
+    const snap = mapTaskMetrics(app.getAppMetrics(), refs, prevSamples, Date.now())
+    prevSamples = snap.next
+    return {
+      totalMemBytes: snap.totalMemBytes,
+      rows: snap.rows.map((r) => ({ ...r, cpuStr: fmtPct(r.cpuPct), memStr: fmtBytes(r.memBytes) }))
+    }
+  })
+  ipcMain.handle('taskmgr:kill', (e, winId: number, tabId: number) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    const entry = allEntries().find((en) => en.win.id === Number(winId) && !en.win.isDestroyed())
+    if (!entry) return false
+    const id = Number(tabId)
+    if (!entry.tabs.listIds().includes(id)) return false // only REAL managed tabs
+    entry.tabs.close(id)
+    return true
+  })
+
+  // ---------- screenshots (v2.5.0 build 19) ----------
+  ipcMain.handle('shots:take', (e) => {
+    guard(e, 'shots:take')
+    // captures the focused window's ACTIVE tab — never the caller itself,
+    // so a settings-page button screenshots the page the user is reading
+    return captureScreenshot()
   })
 
   ipcMain.handle('internal:startup', (e) => {

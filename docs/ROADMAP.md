@@ -41,6 +41,14 @@ relaunch, 16-profile registry. test-v240: 98 assertions.
 
 The rest, ranked, still open:
 
+✅ **Landed in v2.5.0 (build 19, 2026-10-26)** — Tier-A content & media power: **reader view**
+(F9 / context menu, Readability + strict whitelist sanitizer, `aether://reader`), **screenshot tool**
+(Ctrl+Shift+S, save + W3C-clipboard copy + folder shortcut), **picture-in-picture** (context-menu +
+View-menu, Chromium-native), and the **task manager** (`aether://taskmgr`, Shift+Esc, per-tab CPU/mem
+with End buttons). test-v250: 70 assertions; XSS audit extended with one audited reader sink.
+
+The rest, ranked, still open:
+
 4. **Per-extension permission consent screen** (#5) — the last unshipped Phase-0 item
 5. **Certificate-error UX (#14)** — real interstitial with "proceed anyway" escape hatch instead of the generic error page
 6. **Chrome-UI sandbox re-audit (#17)** — get the first-party chrome window to `sandbox:true` (split the extension glue preload)

@@ -2529,3 +2529,199 @@ export const ERROR_HTML = pageShell(
   })
   `
 )
+
+export const READER_HTML = pageShell(
+  'Reader',
+  `
+  <div id="rd-wrap" style="display:none; width:100%; max-width:760px; margin:0 auto; padding:34px 28px 80px;
+    -webkit-user-select:text; user-select:text;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:26px;">
+      <div style="display:flex; gap:8px;">
+        <button id="rd-font-minus" title="Smaller text" style="width:34px; height:34px; border-radius:8px; cursor:pointer;
+          background:var(--ax-card); border:1px solid var(--ax-border); color:var(--ax-fg); font-size:12px;">A&minus;</button>
+        <button id="rd-font-plus" title="Larger text" style="width:34px; height:34px; border-radius:8px; cursor:pointer;
+          background:var(--ax-card); border:1px solid var(--ax-border); color:var(--ax-fg); font-size:14px;">A+</button>
+      </div>
+      <button id="rd-open" style="padding:8px 14px; border-radius:8px; cursor:pointer; font-size:12px;
+        background:var(--ax-accent-soft); color:var(--ax-accent); border:none;">Open original ↗</button>
+    </div>
+    <h1 id="rd-title" style="font-size:30px; line-height:1.25; font-weight:700; letter-spacing:-0.01em;"></h1>
+    <div id="rd-meta" style="margin-top:12px; color:var(--ax-muted); font-size:12.5px; letter-spacing:.02em;"></div>
+    <div id="rd-src" style="margin-top:5px; color:var(--ax-faint); font-size:11.5px; word-break:break-all;"></div>
+    <hr style="border:none; border-top:1px solid var(--ax-border); margin:26px 0;" />
+    <article id="rd-content" style="font-size:19px; line-height:1.75; font-family:Georgia, 'Times New Roman', serif;"></article>
+    <div style="margin-top:26px; color:var(--ax-faint); font-size:11px;">Aether Browser ${VER} — reader view</div>
+  </div>
+  <div id="rd-empty" style="display:none; width:min(520px,88vw); margin-top:18vh; text-align:center;">
+    <div style="font-size:44px; line-height:1;">📖</div>
+    <div style="margin-top:18px; font-size:17px; font-weight:600;">No article captured</div>
+    <div style="margin-top:8px; color:var(--ax-muted); font-size:13px; line-height:1.6;">
+      Open a web page (http/https) first, then press <b>F9</b> or right-click → “Open in reader view”.<br />
+      Reader view re-renders articles with clean typography — no ads, no clutter, all local.
+    </div>
+  </div>
+  `,
+  `
+  var fontPx = 19
+  function bridgeDown() {
+    var el = document.getElementById('rd-empty')
+    el.style.display = 'block'
+    el.querySelector('div:nth-child(2)').textContent = 'UI bridge unavailable'
+    el.querySelector('div:nth-child(3)').textContent = 'Fully quit Aether and start it again; if it keeps happening, run: npm run build'
+  }
+  function render(a) {
+    document.getElementById('rd-title').textContent = a.title || 'Untitled'
+    var meta = []
+    if (a.siteName) meta.push(a.siteName)
+    if (a.byline) meta.push(a.byline)
+    meta.push(a.minutes + (a.minutes === 1 ? ' min read' : ' min read'))
+    if (a.words) meta.push(String(a.words).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') + ' words')
+    document.getElementById('rd-meta').textContent = meta.join('  ·  ')
+    document.getElementById('rd-src').textContent = a.url || ''
+    var content = document.getElementById('rd-content')
+    // Sanitized upstream in main/reader.ts (strict tag+attribute whitelist) —
+    // the nonce-locked CSP is the second line of defense.
+    content.innerHTML = a.content || ''
+    content.addEventListener('click', function (e) {
+      var t = e.target
+      while (t && t.tagName !== 'A') t = t.parentElement
+      if (!t) return
+      e.preventDefault()
+      var href = t.getAttribute('href')
+      if (href) window.aether.internal.open(href)
+    })
+    document.getElementById('rd-open').addEventListener('click', function () {
+      if (a.url) window.aether.internal.open(a.url)
+    })
+    document.getElementById('rd-wrap').style.display = 'block'
+  }
+  function applyFont() {
+    document.getElementById('rd-content').style.fontSize = fontPx + 'px'
+  }
+  document.getElementById('rd-font-minus').addEventListener('click', function () {
+    fontPx = Math.max(14, fontPx - 1)
+    applyFont()
+  })
+  document.getElementById('rd-font-plus').addEventListener('click', function () {
+    fontPx = Math.min(28, fontPx + 1)
+    applyFont()
+  })
+  if (typeof window.aether === 'undefined') {
+    bridgeDown()
+  } else {
+    window.aether.reader.get().then(function (a) {
+      if (a && a.content) render(a)
+      else document.getElementById('rd-empty').style.display = 'block'
+    }).catch(function () {
+      document.getElementById('rd-empty').style.display = 'block'
+    })
+  }
+  `
+)
+
+export const TASKMGR_HTML = pageShell(
+  'Task Manager',
+  `
+  <div style="width:min(880px,94vw); margin-top:9vh;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between;">
+      <h1 style="font-size:24px; font-weight:700; letter-spacing:-0.01em;">Task Manager</h1>
+      <div style="color:var(--ax-muted); font-size:12px;" id="tm-total">measuring…</div>
+    </div>
+    <div style="margin-top:6px; color:var(--ax-muted); font-size:12.5px;">
+      Live CPU and memory of every Aether process, refreshed every 1.5&nbsp;seconds.
+      Tabs can be ended individually if one misbehaves.
+    </div>
+    <div style="margin-top:18px; border:1px solid var(--ax-border); border-radius:12px; overflow:hidden; background:var(--ax-card);">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="text-align:left; color:var(--ax-muted); font-size:11px; letter-spacing:.08em;">
+            <th style="padding:10px 14px; font-weight:600;">TASK</th>
+            <th style="padding:10px 14px; font-weight:600; width:110px;">MEMORY</th>
+            <th style="padding:10px 14px; font-weight:600; width:70px;">CPU</th>
+            <th style="padding:10px 14px; font-weight:600; width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tm-rows"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:26px; color:var(--ax-faint); font-size:11px;">Aether Browser ${VER}</div>
+  </div>
+  `,
+  `
+  var rowsEl = document.getElementById('tm-rows')
+  var totalEl = document.getElementById('tm-total')
+  function fmtB(bytes) {
+    var b = Number(bytes) || 0
+    var abs = Math.abs(b)
+    if (abs < 1024) return Math.round(b) + ' B'
+    var units = ['KB', 'MB', 'GB', 'TB']
+    var v = b / 1024, i = 0
+    while (Math.abs(v) >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+    return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' ' + units[i]
+  }
+  function cell(text, opts) {
+    var td = document.createElement('td')
+    td.style.padding = '9px 14px'
+    td.style.borderTop = '1px solid var(--ax-border)'
+    td.style.verticalAlign = 'top'
+    if (opts && opts.muted) td.style.color = 'var(--ax-muted)'
+    if (opts && opts.mono) td.style.fontVariantNumeric = 'tabular-nums'
+    td.textContent = text
+    return td
+  }
+  function load() {
+    var p = window.aether.taskmgr.snapshot()
+    if (!p || !p.then) return
+    p.then(function (s) {
+      while (rowsEl.firstChild) rowsEl.removeChild(rowsEl.firstChild)
+      for (var i = 0; i < s.rows.length; i++) {
+        (function (r) {
+          var tr = document.createElement('tr')
+          var name = document.createElement('div')
+          name.textContent = r.label || '(unnamed)'
+          name.style.fontWeight = '600'
+          var sub = document.createElement('div')
+          sub.textContent = (r.sublabel || r.pid + ' · ' + r.kind) + ''
+          sub.style.color = 'var(--ax-muted)'
+          sub.style.fontSize = '11px'
+          sub.style.marginTop = '2px'
+          sub.style.wordBreak = 'break-all'
+          var tdName = cell('', {})
+          tdName.appendChild(name)
+          tdName.appendChild(sub)
+          tr.appendChild(tdName)
+          tr.appendChild(cell(r.memStr, { mono: true }))
+          tr.appendChild(cell(r.cpuStr, { mono: true }))
+          var tdAct = cell('', {})
+          if (r.kill) {
+            var btn = document.createElement('button')
+            btn.textContent = 'End'
+            btn.style.padding = '4px 12px'
+            btn.style.borderRadius = '7px'
+            btn.style.cursor = 'pointer'
+            btn.style.fontSize = '11.5px'
+            btn.style.border = '1px solid var(--ax-danger-border)'
+            btn.style.background = 'var(--ax-danger-bg)'
+            btn.style.color = 'var(--ax-danger)'
+            btn.addEventListener('click', function () {
+              window.aether.taskmgr.kill(r.kill.winId, r.kill.tabId).then(load)
+            })
+            tdAct.appendChild(btn)
+          }
+          tr.appendChild(tdAct)
+          rowsEl.appendChild(tr)
+        })(s.rows[i])
+      }
+      totalEl.textContent = fmtB(s.totalMemBytes) + ' total · ' + s.rows.length + ' processes'
+    }).catch(function () {
+      totalEl.textContent = 'unavailable'
+    })
+  }
+  if (typeof window.aether === 'undefined') {
+    totalEl.textContent = 'UI bridge unavailable — fully quit Aether and start it again.'
+  } else {
+    load()
+    setInterval(load, 1500)
+  }
+  `
+)

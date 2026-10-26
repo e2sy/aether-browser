@@ -383,6 +383,23 @@ export const api = {
     defaultBrowser: () => ipcRenderer.invoke('internal:default-browser'),
     setDefaultBrowser: () => ipcRenderer.invoke('internal:set-default-browser'),
     openSystemSettings: () => ipcRenderer.invoke('internal:open-system-settings')
+  },
+
+  /** v2.5.0 — reader view (aether://reader pages only, main enforces) */
+  reader: {
+    get: () => ipcRenderer.invoke('reader:get'),
+    fetch: (url: string) => ipcRenderer.invoke('reader:fetch', url)
+  },
+
+  /** v2.5.0 — task manager (aether://taskmgr pages only, main enforces) */
+  taskmgr: {
+    snapshot: () => ipcRenderer.invoke('taskmgr:snapshot'),
+    kill: (winId: number, tabId: number) => ipcRenderer.invoke('taskmgr:kill', winId, tabId)
+  },
+
+  /** v2.5.0 — screenshots (chrome UI + internal pages) */
+  shots: {
+    take: () => ipcRenderer.invoke('shots:take') as Promise<{ ok: boolean; file?: string; error?: string }>
   }
 }
 

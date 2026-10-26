@@ -1,6 +1,5 @@
 import { app, Menu, MenuItemConstructorOptions, clipboard, shell } from 'electron'
 import type { WebContents } from 'electron'
-import path from 'node:path'
 import fs from 'node:fs'
 import type { TabManager } from './tabs'
 import { focusedEntry, createBrowserWindow, popoutTab, allEntries } from './windows'
@@ -14,6 +13,47 @@ import { saveLoginFromContext, fillLoginFor, generateAndFill } from './passwords
 import { appForHost, launchApp, installFromTab } from './apps'
 import { listProfiles, activeProfileId } from './profiles'
 import { switchToProfile } from './windows'
+import { captureReaderArticle } from './reader'
+import { captureScreenshot, screenshotsDir } from './shot'
+
+/** v2.5.0 — capture the active tab's article, then move that tab to the reader. */
+function openReaderView(): void {
+  const entry = focusedEntry()
+  const id = entry?.tabs.activeId
+  const wc = entry?.tabs.activeView()?.webContents
+  if (!entry || typeof id !== 'number' || !wc) return
+  captureReaderArticle(wc)
+    .then(() => entry.tabs.navigate(id, 'aether://reader'))
+    .catch((err) => notify('Reader view unavailable', err instanceof Error ? err.message : String(err)))
+}
+
+/** v2.5.0 — PiP the video under the cursor (context menu) or the largest one. */
+function pipVideo(wc: WebContents, x?: number, y?: number): void {
+  const findVideo =
+    typeof x === 'number' && typeof y === 'number'
+      ? // video under the cursor (context-menu path — walk up from the point)
+        `var v=document.elementFromPoint(${x | 0},${y | 0});` +
+        `while(v&&v.tagName!=='VIDEO')v=v.parentElement;`
+      : // largest video on the page (menu path); toggles PiP off if already on
+        `var vs=[].slice.call(document.querySelectorAll('video'));` +
+        `var v=vs.sort(function(a,b){return b.videoWidth*b.videoHeight-a.videoWidth*a.videoHeight})[0];`
+  const js =
+    `(function(){` +
+    findVideo +
+    `if(!v){return 'no-video'}` +
+    `if(!document.pictureInPictureEnabled){return 'pip-disabled'}` +
+    `if(document.pictureInPictureElement){` +
+    `return document.exitPictureInPicture().then(function(){return 'exited'}).catch(function(e){return String(e&&e.message||e)})}` +
+    `return v.requestPictureInPicture().then(function(){return 'ok'}).catch(function(e){return String(e&&e.message||e)})})()`
+  void wc
+    .executeJavaScript(js, true)
+    .then((res: unknown) => {
+      const r = String(res)
+      if (r === 'no-video') notify('Picture-in-Picture', 'No video found on this page')
+      else if (r === 'pip-disabled') notify('Picture-in-Picture', 'This page does not allow picture-in-picture')
+    })
+    .catch(() => undefined)
+}
 
 /** v1.5.0 — toggle the bookmarks bar globally: persist, inform every window,
  *  rebuild the menu so the checkbox stays truthful. */
@@ -228,6 +268,43 @@ export function buildMenu(): Menu {
           accelerator: 'CmdOrCtrl+Shift+B',
           click: (item): void => setShowBookmarksBar(item.checked)
         },
+        { type: 'separator' },
+        {
+          label: 'Reader View',
+          accelerator: 'F9',
+          click: (): void => openReaderView()
+        },
+        {
+          label: 'Take Screenshot',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: (): void => {
+            void captureScreenshot()
+          }
+        },
+        {
+          label: 'Picture-in-Picture',
+          accelerator: 'Alt+P',
+          click: (): void => {
+            const wc = focusedEntry()?.tabs.activeView()?.webContents
+            if (wc) pipVideo(wc)
+          }
+        },
+        {
+          label: 'Open Screenshots Folder',
+          click: (): void => {
+            try {
+              fs.mkdirSync(screenshotsDir(), { recursive: true })
+            } catch {
+              /* open anyway */
+            }
+            void shell.openPath(screenshotsDir())
+          }
+        },
+        {
+          label: 'Task Manager',
+          accelerator: 'Shift+Escape',
+          click: (): void => openInternal('aether://taskmgr')
+        },
         { role: 'togglefullscreen' }
       ]
     },
@@ -414,6 +491,14 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
     })
   }
 
+  // v2.5.0 — floating mini-player for videos (Chromium-native PiP window)
+  if (params.mediaType === 'video') {
+    items.push({
+      label: 'Picture-in-Picture',
+      click: (): void => pipVideo(wc, params.x, params.y)
+    })
+  }
+
   // v2.3.0 password manager — right-click inside an editable field (or any
   // page when the vault has a login for this site) to save / fill / generate.
   // (Electron 45 dropped inputFieldType from the typings; the Save probe
@@ -468,7 +553,7 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
     }
   }
 
-  // Aether actions group (#45) — reading list + screenshot on any page
+  // Aether actions group (#45) — reading list + reader view + screenshot
   const pageUrl = wc.getURL()
   if (/^https?:/i.test(pageUrl)) {
     items.push({
@@ -482,18 +567,19 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
       }
     })
     items.push({
-      label: 'Save screenshot',
+      label: 'Open in reader view',
       click: (): void => {
-        void wc
-          .capturePage()
-          .then((img) => {
-            const dir = path.join(app.getPath('userData'), 'screenshots')
-            fs.mkdirSync(dir, { recursive: true })
-            const file = path.join(dir, `aether-${Date.now()}.png`)
-            fs.writeFileSync(file, img.toPNG())
-            notify('Screenshot saved', file)
-          })
-          .catch(() => undefined)
+        const tabId = findTabIdByWc(wc, tm)
+        if (tabId === null) return
+        captureReaderArticle(wc)
+          .then(() => tm.navigate(tabId, 'aether://reader'))
+          .catch((err) => notify('Reader view unavailable', err instanceof Error ? err.message : String(err)))
+      }
+    })
+    items.push({
+      label: 'Screenshot — save & copy',
+      click: (): void => {
+        void captureScreenshot(wc)
       }
     })
     items.push({ type: 'separator' })
