@@ -43,18 +43,22 @@ async function bundleShared(relSrc, outName) {
   return import(pathToFileURL(path.join(OUTDIR, outName)).href)
 }
 async function bundleMain(srcFile, outName) {
+  // v2.6.0 — stage mirrors the src/ tree so main/* can import ../shared/*
   const stage = path.join(tmp, path.basename(outName, '.mjs'))
-  fs.mkdirSync(stage, { recursive: true })
-  fs.cpSync(path.join(APP, 'src', 'main', srcFile), path.join(stage, path.basename(srcFile)))
+  fs.mkdirSync(path.join(stage, 'main'), { recursive: true })
+  fs.mkdirSync(path.join(stage, 'shared'), { recursive: true })
+  fs.cpSync(path.join(APP, 'src', 'main', srcFile), path.join(stage, 'main', path.basename(srcFile)))
+  // semhistory now pulls its pure vector math from shared/semvec.ts
+  fs.cpSync(path.join(APP, 'src', 'shared', 'semvec.ts'), path.join(stage, 'shared', 'semvec.ts'))
   const nm = path.join(tmp, 'node_modules', 'electron')
   fs.mkdirSync(nm, { recursive: true })
   fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ name: 'electron', version: '0.0.0', main: 'index.js' }))
   fs.writeFileSync(path.join(nm, 'index.js'), `module.exports = { app: { getPath: () => ${JSON.stringify(path.join(tmp, 'ud'))} } }`)
-  fs.writeFileSync(path.join(stage, 'store.ts'), `export class JsonStore { constructor(_n, d) { this.data = d } save() {} }\nexport function recentHistory(_n) { return [] }\n`)
+  fs.writeFileSync(path.join(stage, 'main', 'store.ts'), `export class JsonStore { constructor(_n, d) { this.data = d } save() {} }\nexport function recentHistory(_n) { return [] }\n`)
   const OUTDIR = path.join(APP, `.test-v185-${path.basename(outName, '.mjs')}`)
   fs.rmSync(OUTDIR, { recursive: true, force: true })
   fs.mkdirSync(OUTDIR, { recursive: true })
-  await build({ entryPoints: [path.join(stage, path.basename(srcFile))], bundle: true, platform: 'node', format: 'esm', outfile: path.join(OUTDIR, outName), logLevel: 'silent' })
+  await build({ entryPoints: [path.join(stage, 'main', path.basename(srcFile))], bundle: true, platform: 'node', format: 'esm', outfile: path.join(OUTDIR, outName), logLevel: 'silent' })
   return import(pathToFileURL(path.join(OUTDIR, outName)).href)
 }
 

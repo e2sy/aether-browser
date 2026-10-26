@@ -38,6 +38,8 @@ export interface TabGroupInfo {
 export interface ChatMsg {
   role: 'user' | 'assistant'
   content: string
+  /** v2.6.0 image-ask — data URLs attached to (usually) the newest user turn */
+  images?: string[]
 }
 
 export interface AppearanceSettings {
@@ -243,6 +245,8 @@ export interface HistoryEntry {
 export interface SidebarInject {
   text: string
   focus?: boolean
+  /** v2.6.0 image-ask — a fetched image (data URL) to ask about */
+  image?: string
 }
 
 export type SidebarMode = 'chat' | 'agent' | 'models'

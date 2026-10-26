@@ -15,6 +15,9 @@ import { listProfiles, activeProfileId } from './profiles'
 import { switchToProfile } from './windows'
 import { captureReaderArticle } from './reader'
 import { captureScreenshot, screenshotsDir } from './shot'
+import { fetchImageDataUrl } from './imgask'
+import { captureTranslatePage } from './translate'
+import { clusterTabsByTopic } from './tabcluster'
 
 /** v2.5.0 — capture the active tab's article, then move that tab to the reader. */
 function openReaderView(): void {
@@ -25,6 +28,34 @@ function openReaderView(): void {
   captureReaderArticle(wc)
     .then(() => entry.tabs.navigate(id, 'aether://reader'))
     .catch((err) => notify('Reader view unavailable', err instanceof Error ? err.message : String(err)))
+}
+
+/** v2.6.0 — capture the active tab's text, then move that tab to the translator. */
+export function translateActiveTab(): void {
+  const entry = focusedEntry()
+  const id = entry?.tabs.activeId
+  const wc = entry?.tabs.activeView()?.webContents
+  if (!entry || typeof id !== 'number' || !wc) return
+  notify('Translating page…', 'Capturing the readable text — pick a language on the next screen.')
+  captureTranslatePage(wc)
+    .then(() => entry.tabs.navigate(id, 'aether://translate'))
+    .catch((err) => notify('Translate unavailable', err instanceof Error ? err.message : String(err)))
+}
+
+/** v2.6.0 — cluster the focused window's ungrouped tabs into topic groups. */
+function groupTabsByTopic(): void {
+  const tm = focusedEntry()?.tabs
+  if (!tm) return
+  notify('Grouping tabs…', 'Embedding open tabs with your local model.')
+  clusterTabsByTopic(tm)
+    .then((res) => {
+      if (res.ok) {
+        notify('Tabs grouped', `${res.groups} topic group${res.groups === 1 ? '' : 's'} · ${res.tabs} tab${res.tabs === 1 ? '' : 's'}: ${res.labels?.join(', ')}`)
+      } else {
+        notify('Could not group tabs', res.error || 'unknown error')
+      }
+    })
+    .catch((err) => notify('Could not group tabs', err instanceof Error ? err.message : String(err)))
 }
 
 /** v2.5.0 — PiP the video under the cursor (context menu) or the largest one. */
@@ -275,6 +306,15 @@ export function buildMenu(): Menu {
           click: (): void => openReaderView()
         },
         {
+          label: 'Translate Page…',
+          accelerator: 'Alt+Shift+T',
+          click: (): void => translateActiveTab()
+        },
+        {
+          label: 'Group Tabs by Topic',
+          click: (): void => groupTabsByTopic()
+        },
+        {
           label: 'Take Screenshot',
           accelerator: 'CmdOrCtrl+Shift+S',
           click: (): void => {
@@ -483,12 +523,31 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
   }
 
   if (params.mediaType === 'image' && params.srcURL) {
-    items.push({
-      label: 'Copy image address',
-      click: (): void => {
-        void clipboard.writeText(params.srcURL)
+    items.push(
+      {
+        label: 'Ask AI about this image',
+        click: (): void => {
+          // fetch → data URL → sidebar auto-asks with the image attached
+          fetchImageDataUrl(params.srcURL, wc.getURL())
+            .then((dataUrl) =>
+              tm.sendToChrome('sidebar:inject', {
+                text: 'What is in this image? Describe it, then note anything unusual.',
+                image: dataUrl,
+                focus: true
+              })
+            )
+            .catch((err) =>
+              notify('Image unavailable', err instanceof Error ? err.message : String(err))
+            )
+        }
+      },
+      {
+        label: 'Copy image address',
+        click: (): void => {
+          void clipboard.writeText(params.srcURL)
+        }
       }
-    })
+    )
   }
 
   // v2.5.0 — floating mini-player for videos (Chromium-native PiP window)
@@ -574,6 +633,16 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
         captureReaderArticle(wc)
           .then(() => tm.navigate(tabId, 'aether://reader'))
           .catch((err) => notify('Reader view unavailable', err instanceof Error ? err.message : String(err)))
+      }
+    })
+    items.push({
+      label: 'Translate page…',
+      click: (): void => {
+        const tabId = findTabIdByWc(wc, tm)
+        if (tabId === null) return
+        captureTranslatePage(wc)
+          .then(() => tm.navigate(tabId, 'aether://translate'))
+          .catch((err) => notify('Translate unavailable', err instanceof Error ? err.message : String(err)))
       }
     })
     items.push({

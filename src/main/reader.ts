@@ -195,6 +195,42 @@ export async function captureReaderArticle(wc: WebContents): Promise<ReaderArtic
   return article
 }
 
+const TRANSLATE_MAX_PARAS = 600
+const TRANSLATE_MAX_CHARS = 60_000
+
+/**
+ * v2.6.0 — capture the readable text blocks of `wc` for full-page translate.
+ * PLAIN TEXT ONLY (textContent of p/li/h1-4/blockquote/td/pre) — no HTML
+ * crosses the bridge, so the translate page has no injection surface at all.
+ * Uses the same Readability path as the reader so boilerplate is gone.
+ */
+export async function extractParagraphs(wc: WebContents): Promise<{ title: string; paras: string[] }> {
+  const url = wc.getURL()
+  if (!/^https?:/i.test(url)) throw new Error('Translation works on web pages (http/https) only')
+  const html = (await wc.executeJavaScript('document.documentElement.outerHTML', true)) as string
+  const article = articleFromHtml(html, url, wc.getTitle() || url)
+  if (!article) throw new Error('No readable article found on this page')
+
+  const dom = new JSDOM(article.content, { url })
+  const body = dom.window.document.body
+  const paras: string[] = []
+  let total = 0
+  if (body) {
+    const blocks = body.querySelectorAll('p, li, h1, h2, h3, h4, blockquote, td, pre')
+    for (const el of Array.from(blocks)) {
+      if (paras.length >= TRANSLATE_MAX_PARAS || total >= TRANSLATE_MAX_CHARS) break
+      // skip nested duplicates (li inside td etc.): keep leaf-ish blocks only
+      if (el.querySelector('p, li, blockquote, table')) continue
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      if (t.length < 2) continue
+      paras.push(t)
+      total += t.length
+    }
+  }
+  if (!paras.length) throw new Error('No translatable text found on this page')
+  return { title: article.title, paras }
+}
+
 /** The stored article for a reader-page sender (same webContents id). */
 export function getStoredArticle(wcId: number): ReaderArticle | null {
   return store.get(wcId) ?? null

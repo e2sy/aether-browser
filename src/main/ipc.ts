@@ -97,6 +97,9 @@ import { chatWithPageSystem, SEARCH_SYSTEM } from './agent/prompts'
 import type { MacroStep } from '../shared/types'
 import { getStoredArticle, fetchArticle } from './reader'
 import { captureScreenshot } from './shot'
+import { extractChatImages, resolveVisionModel, NO_VISION_HINT } from './imgask'
+import { getTranslateDoc, runTranslate, stopTranslate, captureTranslatePage } from './translate'
+import { clusterTabsByTopic } from './tabcluster'
 import { mapTaskMetrics, type PrevSample, type TaskTabRef } from '../shared/taskmetrics'
 import { fmtBytes, fmtPct } from '../shared/fmt'
 
@@ -695,7 +698,27 @@ export function registerIpc(): void {
           }
         }
       }
-      messages.push(...payload.messages.slice(-HISTORY_WINDOW))
+      messages.push(
+        ...payload.messages.slice(-HISTORY_WINDOW).map((m) => {
+          // v2.6.0 image-ask — user turns may carry image data URLs; convert
+          // them to Ollama base64 images (size/count capped in imgask.ts)
+          const imgs = m.images && m.images.length ? extractChatImages([m]) : null
+          return imgs ? { role: m.role, content: m.content, images: imgs } : { role: m.role, content: m.content }
+        })
+      )
+
+      // v2.6.0 image-ask — an image-carrying turn needs a vision model; swap
+      // automatically (cloud fallback stays text-only for now)
+      const hasImages = messages.some((m) => m.images && m.images.length)
+      if (hasImages && choice.provider === 'local') {
+        const vision = await resolveVisionModel()
+        if (!vision) {
+          const msg = NO_VISION_HINT
+          if (!sender.isDestroyed()) sender.send('ai:chunk', { requestId, error: msg })
+          return { error: msg }
+        }
+        choice = { provider: 'local', model: vision }
+      }
 
       let full = ''
       try {
@@ -1055,6 +1078,43 @@ export function registerIpc(): void {
   ipcMain.handle('reader:fetch', async (e, url: string) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
     return fetchArticle(String(url || ''))
+  })
+
+  // ---------- full-page translate (v2.6.0 build 20) ----------
+  // aether://translate calls back for the paragraphs captured from THIS tab
+  // before the navigation (store keyed by webContents id, same as reader).
+  ipcMain.handle('translate:get', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    return getTranslateDoc(e.sender.id)
+  })
+  ipcMain.handle('translate:run', async (e, langCode: string, model?: string) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    await runTranslate(e.sender, String(langCode || 'en'), typeof model === 'string' ? model : null)
+    return getTranslateDoc(e.sender.id)
+  })
+  ipcMain.handle('translate:stop', (e) => {
+    if (!isInternal(e)) throw new Error('Unauthorized')
+    stopTranslate(e.sender.id)
+  })
+
+  // ---------- smart tab clustering (v2.6.0 build 20) ----------
+  ipcMain.handle('tabs:cluster', async (e) => {
+    guard(e, 'tabs:cluster')
+    const tm = fromSender(e)?.tabs
+    if (!tm) return { ok: false, error: 'No window' }
+    return clusterTabsByTopic(tm)
+  })
+
+  // v2.6.0 — command palette: capture the SENDER's active tab into the translator
+  ipcMain.handle('tabs:translate', async (e) => {
+    guard(e, 'tabs:translate')
+    const entry = fromSender(e)
+    const id = entry?.tabs.activeId
+    const wc = entry?.tabs.activeView()?.webContents
+    if (!entry || typeof id !== 'number' || !wc) return { ok: false }
+    await captureTranslatePage(wc)
+    entry.tabs.navigate(id, 'aether://translate')
+    return { ok: true }
   })
 
   // ---------- task manager (v2.5.0 build 19) ----------

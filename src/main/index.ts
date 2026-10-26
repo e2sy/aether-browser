@@ -6,7 +6,7 @@ import { app, Menu, protocol, session } from 'electron'
 import path from 'node:path'
 import { registerIpc } from './ipc'
 import { buildMenu } from './menu'
-import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, READINGLIST_HTML, PRIVACY_HTML, READER_HTML, TASKMGR_HTML, pageSecurityHeaders } from './pages'
+import { NEW_TAB_HTML, SEARCH_HTML, HISTORY_HTML, BOOKMARKS_HTML, SETTINGS_HTML, ERROR_HTML, DOWNLOADS_HTML, READINGLIST_HTML, PRIVACY_HTML, READER_HTML, TASKMGR_HTML, TRANSLATE_HTML, pageSecurityHeaders } from './pages'
 import { PASSWORDS_HTML } from './pages'
 import { isErrorPageUrl } from './errmap'
 import { applyAdblockSetting, installSmokeEngine } from './adblock'
@@ -116,6 +116,7 @@ app.whenReady().then(() => {
     passwords: PASSWORDS_HTML,
     reader: READER_HTML,
     taskmgr: TASKMGR_HTML,
+    translate: TRANSLATE_HTML,
     error: ERROR_HTML
   }
   protocol.handle('aether', (req) => {
@@ -287,7 +288,7 @@ app.whenReady().then(() => {
   // CI/headless smoke test hook: AETHER_SMOKE=1 boots, reports state, quits.
   if (process.env.AETHER_SMOKE) {
     console.log('[smoke] window created')
-    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false, shieldsState: false, shieldsBlock: false, privWin: false, taskmgr: false, reader: false }
+    const smoke = { chrome: false, tab: false, startup: false, enter: false, uiSuggest: false, uiNav: false, errorPage: false, shieldsState: false, shieldsBlock: false, privWin: false, taskmgr: false, reader: false, translate: false }
     // v1.1.4 regression: the preload bridge must be alive in BOTH renderers.
     // (A broken sandboxed preload used to leave window.aether undefined — the
     // whole browser looked fine but every click was dead.)
@@ -522,6 +523,21 @@ app.whenReady().then(() => {
       } catch (err) {
         console.log('[smoke] reader page (empty state) renders: NO (' + String(err) + ')')
       }
+      // v2.6.0: translate page (empty state) renders over the bridge
+      try {
+        const id = entry.tabs.create('aether://translate', true)
+        await new Promise((r) => setTimeout(r, 700))
+        const wc = entry.tabs.get(id)?.view?.webContents
+        const res = await wc
+          ?.executeJavaScript(
+            'document.getElementById("tr-empty").style.display === "block" && typeof window.aether.translate.get === "function" && document.getElementById("tr-lang").options.length > 10'
+          )
+          .catch(() => false)
+        smoke.translate = res === true
+        console.log('[smoke] translate page (empty state) renders:', smoke.translate ? 'YES' : 'NO (' + String(res) + ')')
+      } catch (err) {
+        console.log('[smoke] translate page (empty state) renders: NO (' + String(err) + ')')
+      }
     }, 12300)
     setTimeout(() => {
       const entries = allEntries()
@@ -535,7 +551,7 @@ app.whenReady().then(() => {
       const multiWindowOk = entries.length >= 2
       console.log('[smoke] multi-window:', multiWindowOk ? 'YES' : 'NO')
       const bridgesOk =
-        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage && smoke.shieldsState && smoke.shieldsBlock && smoke.privWin && smoke.taskmgr && smoke.reader
+        smoke.chrome && smoke.tab && smoke.startup && smoke.enter && smoke.uiSuggest && smoke.uiNav && smoke.errorPage && smoke.shieldsState && smoke.shieldsBlock && smoke.privWin && smoke.taskmgr && smoke.reader && smoke.translate
       app.exit(newtabLoaded && settingsLoaded && multiWindowOk && bridgesOk ? 0 : 1)
     }, 16600)
   }

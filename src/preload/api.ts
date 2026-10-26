@@ -70,7 +70,9 @@ export const api = {
     /** v2.3.0 — menu → open the tab-search overlay (Ctrl+Shift+A) */
     onTabSearchShow: subscribe('tabsearch:show'),
     /** v2.3.0 — password manager save bar prompt */
-    onCredPrompt: subscribe('creds:prompt')
+    onCredPrompt: subscribe('creds:prompt'),
+    /** v2.6.0 — live translation progress for aether://translate */
+    onTranslateUpdate: subscribe('translate:update')
   },
 
   tabs: {
@@ -94,6 +96,10 @@ export const api = {
     popout: (id: number) => ipcRenderer.invoke('tabs:popout', id),
     /** v2.4.0 — live thumbnail for the tab-hover preview card (null when unavailable) */
     preview: (id: number) => ipcRenderer.invoke('tabs:preview', id) as Promise<string | null>,
+    /** v2.6.0 — cluster the window's ungrouped tabs into topic groups (local embeddings) */
+    cluster: () => ipcRenderer.invoke('tabs:cluster') as Promise<{ ok: boolean; error?: string; groups?: number; tabs?: number }>,
+    /** v2.6.0 — capture the active tab and open aether://translate */
+    translate: () => ipcRenderer.invoke('tabs:translate') as Promise<{ ok: boolean }>,
     /** v1.5.0 — middle-click a bookmarks-bar item: open without activating */
     createBackground: (url: string) => ipcRenderer.invoke('tabs:create-bg', url),
     closeOthers: (id: number) => ipcRenderer.invoke('tabs:closeOthers', id),
@@ -187,8 +193,11 @@ export const api = {
     status: () => ipcRenderer.invoke('ai:status'),
     models: () => ipcRenderer.invoke('ai:models'),
     pageContext: () => ipcRenderer.invoke('ai:pageContext'),
-    chat: (messages: Array<{ role: string; content: string }>, usePageContext: boolean, model?: string) =>
-      stream('ai:chat', 'ai:chunk', { messages, usePageContext, model }),
+    chat: (
+      messages: Array<{ role: string; content: string; images?: string[] }>,
+      usePageContext: boolean,
+      model?: string
+    ) => stream('ai:chat', 'ai:chunk', { messages, usePageContext, model }),
     abort: (requestId: string) => ipcRenderer.invoke('ai:abort', requestId)
   },
 
@@ -389,6 +398,13 @@ export const api = {
   reader: {
     get: () => ipcRenderer.invoke('reader:get'),
     fetch: (url: string) => ipcRenderer.invoke('reader:fetch', url)
+  },
+
+  /** v2.6.0 — full-page translate (aether://translate pages only, main enforces) */
+  translate: {
+    get: () => ipcRenderer.invoke('translate:get'),
+    run: (langCode: string, model?: string) => ipcRenderer.invoke('translate:run', langCode, model),
+    stop: () => ipcRenderer.invoke('translate:stop')
   },
 
   /** v2.5.0 — task manager (aether://taskmgr pages only, main enforces) */

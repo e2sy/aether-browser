@@ -47,6 +47,9 @@ export default function Sidebar(): JSX.Element {
   const [usePage, setUsePage] = useState(true)
   const [reqId, setReqId] = useState<string | null>(null)
   const chatScroll = useRef<HTMLDivElement>(null)
+  // v2.6.0 image-ask — data URL waiting to ride along with the next send
+  const [pendingImage, setPendingImage] = useState<string | null>(null)
+  const sendRef = useRef<((text: string, image: string | null) => Promise<void>) | null>(null)
 
   // agent state
   const [task, setTask] = useState('')
@@ -119,12 +122,19 @@ export default function Sidebar(): JSX.Element {
     chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight })
   }, [messages, streaming])
 
-  // ----- context menu → prefill -----
+  // ----- context menu → prefill (v2.6.0: image-ask auto-sends) -----
   useEffect(() => {
     return window.aether.state.onSidebarInject((data) => {
       const inj = data as SidebarInject
       setMode('chat')
-      setInput((cur) => (cur ? cur + '\n\n' + inj.text : inj.text))
+      if (inj.image) {
+        setPendingImage(inj.image)
+        setInput(inj.text)
+        // the latest doSend is wired through the ref — fire the image question
+        setTimeout(() => void sendRef.current?.(inj.text, inj.image || null), 30)
+      } else {
+        setInput((cur) => (cur ? cur + '\n\n' + inj.text : inj.text))
+      }
     })
   }, [])
 
@@ -180,41 +190,53 @@ export default function Sidebar(): JSX.Element {
   }, [macroName])
 
   // ----- chat send -----
-  const send = useCallback(async (): Promise<void> => {
-    const text = input.trim()
-    if (!text || streaming) return
-    const history = [...messages, { role: 'user' as const, content: text }]
-    setMessages(history)
-    setInput('')
-    setStreaming(true)
-    setMessages([...history, { role: 'assistant', content: '' }])
+  const doSend = useCallback(
+    async (rawText: string, image: string | null): Promise<void> => {
+      const text = rawText.trim()
+      if (!text || streaming) return
+      const userMsg: ChatMsg = image ? { role: 'user', content: text, images: [image] } : { role: 'user', content: text }
+      const history = [...messages, userMsg]
+      setMessages(history)
+      setInput('')
+      setPendingImage(null)
+      setStreaming(true)
+      setMessages([...history, { role: 'assistant', content: '' }])
 
-    const req = window.aether.ai.chat(history, usePage && canUsePage, model || undefined)
-    setReqId(req.requestId)
-    req.onData((chunk) => {
-      if (chunk.delta) {
+      // image turns skip page context — the vision model answers from the image
+      const req = window.aether.ai.chat(history, usePage && canUsePage && !image, model || undefined)
+      setReqId(req.requestId)
+      req.onData((chunk) => {
+        if (chunk.delta) {
+          setMessages((m) => {
+            const copy = [...m]
+            const last = copy[copy.length - 1]
+            if (last?.role === 'assistant') copy[copy.length - 1] = { ...last, content: last.content + String(chunk.delta) }
+            return copy
+          })
+        }
+      })
+      const res = await req.result
+      setStreaming(false)
+      setReqId(null)
+      if (res.error) {
+        setMessages((m) => [...m, { role: 'assistant', content: '⚠️ ' + String(res.error) }])
+      } else if (res.content) {
         setMessages((m) => {
           const copy = [...m]
           const last = copy[copy.length - 1]
-          if (last?.role === 'assistant') copy[copy.length - 1] = { ...last, content: last.content + String(chunk.delta) }
+          if (last?.role === 'assistant' && !last.content) copy[copy.length - 1] = { ...last, content: String(res.content) }
           return copy
         })
       }
-    })
-    const res = await req.result
-    setStreaming(false)
-    setReqId(null)
-    if (res.error) {
-      setMessages((m) => [...m, { role: 'assistant', content: '⚠️ ' + String(res.error) }])
-    } else if (res.content) {
-      setMessages((m) => {
-        const copy = [...m]
-        const last = copy[copy.length - 1]
-        if (last?.role === 'assistant' && !last.content) copy[copy.length - 1] = { ...last, content: String(res.content) }
-        return copy
-      })
-    }
-  }, [input, messages, streaming, usePage, canUsePage, model])
+    },
+    [input, messages, streaming, usePage, canUsePage, model]
+  )
+
+  useEffect(() => {
+    sendRef.current = doSend
+  })
+
+  const send = useCallback((): Promise<void> => doSend(input, pendingImage), [doSend, input, pendingImage])
 
   const stop = useCallback((): void => {
     if (reqId) void window.aether.ai.abort(reqId)
@@ -484,12 +506,24 @@ export default function Sidebar(): JSX.Element {
             )}
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.role}`}>
+                {m.role === 'user' && m.images && m.images.length ? (
+                  <img className="msg-img" src={m.images[0]} alt="" />
+                ) : null}
                 {m.content}
                 {m.role === 'assistant' && i === messages.length - 1 && streaming && <span className="caret" />}
               </div>
             ))}
           </div>
           <div className="composer">
+            {pendingImage && (
+              <div className="img-chip">
+                <img src={pendingImage} alt="" />
+                <span>Image attached — a vision model will answer</span>
+                <button onClick={() => setPendingImage(null)} title="Remove image">
+                  ×
+                </button>
+              </div>
+            )}
             {canUsePage && (
               <button
                 className={`chip ${usePage ? 'on' : ''}`}

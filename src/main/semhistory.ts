@@ -12,6 +12,11 @@ import path from 'node:path'
 import { recentHistory } from './store'
 import { chatOnce } from './ollama'
 
+// pure vector math moved to shared/semvec.ts in v2.6.0 (tab clustering needs
+// it too) — re-exported here so existing importers/tests keep working
+import { cosineSim, topK } from '../shared/semvec'
+export { cosineSim, topK }
+
 export interface SemItem {
   url: string
   title: string
@@ -21,30 +26,6 @@ export interface SemItem {
 
 export const SEM_MAX_ITEMS = 300
 export const SEM_MODEL_CANDIDATES = ['nomic-embed-text', 'mxbai-embed-large', 'all-minilm']
-
-/** Pure: cosine similarity of two equal-length vectors (0 when malformed). */
-export function cosineSim(a: number[], b: number[]): number {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length === 0) return 0
-  let dot = 0
-  let na = 0
-  let nb = 0
-  for (let i = 0; i < a.length; i++) {
-    const x = Number(a[i]) || 0
-    const y = Number(b[i]) || 0
-    dot += x * y
-    na += x * x
-    nb += y * y
-  }
-  if (na === 0 || nb === 0) return 0
-  return dot / (Math.sqrt(na) * Math.sqrt(nb))
-}
-
-/** Pure: top-K items by similarity (ties keep original order). */
-export function topK<T extends { vec: number[] }>(items: T[], query: number[], k: number): Array<{ item: T; score: number }> {
-  const scored = items.map((item, i) => ({ item, score: cosineSim(query, item.vec), i }))
-  scored.sort((a, b) => b.score - a.score || a.i - b.i)
-  return scored.slice(0, Math.max(0, Math.floor(k))).map(({ item, score }) => ({ item, score }))
-}
 
 /** Pure: what text gets embedded for an item (title + host beats long URLs). */
 export function itemText(it: SemItem): string {
@@ -95,7 +76,8 @@ async function embed(model: string, text: string): Promise<number[] | null> {
   }
 }
 
-async function pickEmbedModel(): Promise<string | null> {
+/** v2.6.0 — public: which embedding model is installed (tab clustering reuses it). */
+export async function pickEmbedModel(): Promise<string | null> {
   try {
     const res = await fetch('http://127.0.0.1:11434/api/tags', { method: 'GET' })
     if (!res.ok) return null
@@ -176,4 +158,9 @@ export function semCacheSize(): number {
   } catch {
     return 0
   }
+}
+
+/** v2.6.0 — public embedding for sibling features (tab clustering). */
+export async function embedText(model: string, text: string): Promise<number[] | null> {
+  return embed(model, text)
 }

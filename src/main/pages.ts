@@ -2725,3 +2725,198 @@ export const TASKMGR_HTML = pageShell(
   }
   `
 )
+
+export const TRANSLATE_HTML = pageShell(
+  'Translate',
+  `
+  <div id="tr-wrap" style="display:none; width:100%; max-width:820px; margin:0 auto; padding:34px 28px 80px;
+    -webkit-user-select:text; user-select:text;">
+    <h1 id="tr-title" style="font-size:26px; line-height:1.25; font-weight:700; letter-spacing:-0.01em;"></h1>
+    <div id="tr-src" style="margin-top:6px; color:var(--ax-faint); font-size:11.5px; word-break:break-all;"></div>
+
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:20px;
+      padding:12px 14px; border:1px solid var(--ax-border); border-radius:12px; background:var(--ax-card);">
+      <label style="color:var(--ax-muted); font-size:12px;" for="tr-lang">Translate to</label>
+      <select id="tr-lang" style="padding:7px 10px; border-radius:8px; background:var(--ax-bg);
+        border:1px solid var(--ax-border); color:var(--ax-fg); font-size:13px; max-width:220px;"></select>
+      <button id="tr-go" style="padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12.5px;
+        background:var(--ax-accent-soft); color:var(--ax-accent); border:none;">Translate</button>
+      <button id="tr-stop" style="display:none; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:12.5px;
+        background:var(--ax-danger-bg, rgba(220,60,60,.15)); color:var(--ax-danger, #e5686a); border:none;">Stop</button>
+      <label style="display:flex; align-items:center; gap:6px; color:var(--ax-muted); font-size:12px; cursor:pointer;">
+        <input type="checkbox" id="tr-hide" /> show translation only
+      </label>
+      <span id="tr-status" style="margin-left:auto; color:var(--ax-muted); font-size:12px;"></span>
+    </div>
+
+    <div id="tr-progress" style="display:none; margin-top:12px; height:4px; border-radius:2px;
+      background:var(--ax-border); overflow:hidden;">
+      <div id="tr-fill" style="height:100%; width:0%; background:var(--ax-accent, #6c8cff); transition:width .25s;"></div>
+    </div>
+
+    <div id="tr-blocks" style="margin-top:26px;"></div>
+    <div style="margin-top:26px; color:var(--ax-faint); font-size:11px;">Aether Browser ${VER} — translated with your local model. The page text never leaves your machine (unless a cloud fallback is enabled).</div>
+  </div>
+  <div id="tr-empty" style="display:none; width:min(520px,88vw); margin-top:18vh; text-align:center;">
+    <div style="font-size:44px; line-height:1;">🌐</div>
+    <div style="margin-top:18px; font-size:17px; font-weight:600;">Nothing captured to translate</div>
+    <div style="margin-top:8px; color:var(--ax-muted); font-size:13px; line-height:1.6;">
+      Open a web page (http/https) first, then <b>View → Translate Page…</b> or right-click → “Translate page…”.<br />
+      Aether extracts the readable text and translates it with your own Ollama model — fully local.
+    </div>
+  </div>
+  `,
+  `
+  var LANGS = [['en','English'],['hi','Hindi — हिन्दी'],['bn','Bengali — বাংলা'],['ta','Tamil — தமிழ்'],
+    ['te','Telugu — తెలుగు'],['mr','Marathi — मराठी'],['gu','Gujarati — ગુજરાતી'],['kn','Kannada — ಕನ್ನಡ'],
+    ['ml','Malayalam — മലയാളം'],['pa','Punjabi — ਪੰਜਾਬੀ'],['ur','Urdu — اردو'],['es','Spanish — Español'],
+    ['fr','French — Français'],['de','German — Deutsch'],['pt','Portuguese'],['it','Italian'],['nl','Dutch'],
+    ['pl','Polish'],['ru','Russian — Русский'],['uk','Ukrainian'],['tr','Turkish'],['ar','Arabic — العربية'],
+    ['fa','Persian'],['ja','Japanese — 日本語'],['ko','Korean — 한국어'],['zh','Chinese (Simplified)'],
+    ['vi','Vietnamese'],['th','Thai'],['id','Indonesian'],['fil','Filipino']]
+
+  var doc = null
+  var hideOriginal = false
+
+  function $(id) { return document.getElementById(id) }
+
+  function bridgeDown() {
+    var el = $('tr-empty')
+    el.style.display = 'block'
+    el.querySelector('div:nth-child(2)').textContent = 'UI bridge unavailable'
+    el.querySelector('div:nth-child(3)').textContent = 'Fully quit Aether and start it again; if it keeps happening, run: npm run build'
+  }
+
+  function makeEl(tag, cls, text) {
+    var el = document.createElement(tag)
+    if (cls) el.className = cls
+    if (text !== undefined && text !== null) el.textContent = text
+    return el
+  }
+
+  function paraBlock(orig, trans) {
+    var wrap = makeEl('div', 'tr-para')
+    wrap.style.padding = '14px 0'
+    wrap.style.borderBottom = '1px solid var(--ax-border)'
+    var o = makeEl('div', 'tr-orig', orig)
+    o.style.color = 'var(--ax-muted)'
+    o.style.fontSize = '13px'
+    o.style.lineHeight = '1.55'
+    if (hideOriginal) o.style.display = 'none'
+    var t = makeEl('div', 'tr-trans', trans || '')
+    t.style.marginTop = trans ? '7px' : '0'
+    t.style.fontSize = '16px'
+    t.style.lineHeight = '1.65'
+    t.style.color = 'var(--ax-fg)'
+    if (!trans) t.style.display = 'none'
+    wrap.appendChild(o)
+    wrap.appendChild(t)
+    return { wrap: wrap, orig: o, trans: t }
+  }
+
+  function render() {
+    $('tr-title').textContent = doc.title || 'Untitled'
+    $('tr-src').textContent = doc.url || ''
+    var blocks = $('tr-blocks')
+    while (blocks.firstChild) blocks.removeChild(blocks.firstChild)
+    for (var i = 0; i < doc.paras.length; i++) {
+      var b = paraBlock(doc.paras[i], doc.out ? doc.out[i] : '')
+      b.wrap.dataset.idx = String(i)
+      blocks.appendChild(b.wrap)
+    }
+    $('tr-wrap').style.display = 'block'
+  }
+
+  function applyUpdate(u) {
+    if (!u || !doc) return
+    doc.out = u.out || doc.out
+    doc.model = u.model || doc.model
+    var blocks = $('tr-blocks').children
+    for (var i = 0; i < u.out.length && i < blocks.length; i++) {
+      var t = blocks[i].querySelector('.tr-trans')
+      var txt = u.out[i] || ''
+      if (t) {
+        if (txt) { t.textContent = txt; t.style.display = 'block' }
+        else t.style.display = 'none'
+      }
+    }
+    var pct = Number(u.progress) || 0
+    $('tr-progress').style.display = u.running ? 'block' : 'none'
+    $('tr-fill').style.width = pct + '%'
+    $('tr-go').disabled = !!u.running
+    $('tr-stop').style.display = u.running ? 'inline-block' : 'none'
+    var status = []
+    if (u.running) status.push('Translating — ' + pct + '%')
+    else if (pct >= 100) status.push('Done')
+    if (doc.model) status.push('model: ' + doc.model)
+    if (u.error) status.push('error: ' + u.error)
+    $('tr-status').textContent = status.join(' · ')
+  }
+
+  function fillLang() {
+    var sel = $('tr-lang')
+    var saved = ''
+    try { saved = localStorage.getItem('aether.translateLang') || '' } catch (e) {}
+    var current = (doc && doc.langCode) || saved || 'en'
+    while (sel.firstChild) sel.removeChild(sel.firstChild)
+    for (var i = 0; i < LANGS.length; i++) {
+      var opt = document.createElement('option')
+      opt.value = LANGS[i][0]
+      opt.textContent = LANGS[i][1]
+      if (LANGS[i][0] === current) opt.selected = true
+      sel.appendChild(opt)
+    }
+  }
+
+  $('tr-go').addEventListener('click', function () {
+    if (!doc || typeof window.aether === 'undefined') return
+    var lang = $('tr-lang').value
+    try { localStorage.setItem('aether.translateLang', lang) } catch (e) {}
+    $('tr-go').disabled = true
+    $('tr-progress').style.display = 'block'
+    $('tr-fill').style.width = '0%'
+    window.aether.translate.run(lang).then(function (d) {
+      if (d) { doc = d; applyUpdate({ out: d.out, running: d.running, error: d.error, model: d.model, progress: 100 }) }
+    }).catch(function (err) {
+      $('tr-status').textContent = 'error: ' + String(err && err.message || err)
+      $('tr-go').disabled = false
+    })
+  })
+
+  $('tr-stop').addEventListener('click', function () {
+    if (typeof window.aether === 'undefined') return
+    window.aether.translate.stop()
+    $('tr-go').disabled = false
+    $('tr-stop').style.display = 'none'
+  })
+
+  $('tr-hide').addEventListener('click', function () {
+    hideOriginal = $('tr-hide').checked
+    var blocks = $('tr-blocks').children
+    for (var i = 0; i < blocks.length; i++) {
+      var o = blocks[i].querySelector('.tr-orig')
+      if (o) o.style.display = hideOriginal ? 'none' : 'block'
+    }
+  })
+
+  if (typeof window.aether === 'undefined') {
+    bridgeDown()
+  } else {
+    fillLang()
+    window.aether.state.onTranslateUpdate(function (u) { applyUpdate(u) })
+    window.aether.translate.get().then(function (d) {
+      if (d && d.paras && d.paras.length) {
+        doc = d
+        render()
+        fillLang()
+        applyUpdate({ out: d.out, running: d.running, error: d.error, model: d.model,
+          progress: Math.round(100 * (d.out || []).filter(String).length / d.paras.length) })
+      } else {
+        $('tr-empty').style.display = 'block'
+      }
+    }).catch(function () {
+      $('tr-empty').style.display = 'block'
+    })
+  }
+  `
+)

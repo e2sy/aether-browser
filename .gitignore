@@ -12,3 +12,5 @@ dist/
 .test-v11-tmp
 .test-v175-tmp
 .test-v240-tmp
+.test-v185-*
+.test-v260-tmp

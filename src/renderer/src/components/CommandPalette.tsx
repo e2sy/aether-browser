@@ -73,6 +73,8 @@ export default function CommandPalette(): JSX.Element | null {
       set({ paletteOpen: false, tabSearchOpen: true })
     })
     t('Password manager', 'Ctrl+Shift+Y', 'page', () => void window.aether.tabs.create('aether://passwords'))
+    t('Translate page', 'Alt+Shift+T', 'action', () => void window.aether.tabs.translate())
+    t('Group tabs by topic', 'local AI', 'action', () => void window.aether.tabs.cluster())
     t('Toggle AI sidebar', 'Ctrl+E', 'action', () => {
       const openNow = useApp.getState().sidebarOpen
       set({ sidebarOpen: !openNow })

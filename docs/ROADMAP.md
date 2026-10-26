@@ -39,13 +39,21 @@ passwords, cookies, extensions, settings), profile arg parsed before the single-
 (two profiles can run side by side), avatar + app-menu + Settings switchers, session-flushed
 relaunch, 16-profile registry. test-v240: 98 assertions.
 
-The rest, ranked, still open:
-
 ✅ **Landed in v2.5.0 (build 19, 2026-10-26)** — Tier-A content & media power: **reader view**
 (F9 / context menu, Readability + strict whitelist sanitizer, `aether://reader`), **screenshot tool**
 (Ctrl+Shift+S, save + W3C-clipboard copy + folder shortcut), **picture-in-picture** (context-menu +
 View-menu, Chromium-native), and the **task manager** (`aether://taskmgr`, Shift+Esc, per-tab CPU/mem
 with End buttons). test-v250: 70 assertions; XSS audit extended with one audited reader sink.
+
+✅ **Landed in v2.6.0 (build 20, 2026-10-26)** — Tier-B AI differentiators: **image-ask** (right-click
+any image → sidebar auto-asks with the picture; `ai:chat` swaps to a vision-capable Ollama model for
+the turn — /api/show capabilities first, name-pattern fallback), **full-page translate**
+(`aether://translate` — Readability text capture, local-model chunked translation with a
+numbered-line protocol + tolerant realigner, 30 languages incl. Hindi + the 8th-schedule set,
+bilingual blocks, live progress, stop; Master Plan #76 v1 + Tier-2 #20), and **smart tab
+clustering** (local-embedding topic groups — Master Plan #157/#71: greedy online-centroid cosine
+clustering over ungrouped http(s) tabs, auto-labeled real tab groups). test-v260: 110 assertions;
+smoke boots the translate page. Vector math extracted to shared/semvec.ts (semhistory re-exports).
 
 The rest, ranked, still open:
 
