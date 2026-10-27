@@ -3,6 +3,7 @@ import type { WebContents } from 'electron'
 import fs from 'node:fs'
 import type { TabManager } from './tabs'
 import { focusedEntry, createBrowserWindow, popoutTab, allEntries } from './windows'
+import { toggleLastPanel } from './panelhost'
 import { contextMenuItems } from './extensions'
 import { mergedSettings, settings } from './store'
 import { addReading } from './readinglist'
@@ -300,6 +301,15 @@ export function buildMenu(): Menu {
           checked: mergedSettings().showBookmarksBar !== false,
           accelerator: 'CmdOrCtrl+Shift+B',
           click: (item): void => setShowBookmarksBar(item.checked)
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Side Panel',
+          accelerator: 'CmdOrCtrl+Alt+P',
+          click: (): void => {
+            const entry = focusedEntry()
+            if (entry) toggleLastPanel(entry)
+          }
         },
         { type: 'separator' },
         {

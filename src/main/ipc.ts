@@ -112,6 +112,8 @@ import {
 } from './containers'
 import { applyProxyEverywhere, checkIp, netmaskStatus, setProxySettings } from './netmask'
 import { listDials, addDial, renameDial, removeDial } from './dials'
+import { listPanels, addPanel, renamePanel, removePanel } from './panels'
+import { openPanel, closePanel, togglePanel, getPanelState, railVisible } from './panelhost'
 
 const HISTORY_WINDOW = 20
 /** sane bounds for the measured chrome height (tab strip + toolbar + bar) */
@@ -1220,6 +1222,19 @@ export function registerIpc(): void {
       }
       for (const id of entry.tabs.listIds()) {
         const t = entry.tabs.get(id)
+        // v2.10.0 — discarded tabs have no process at all; surface them as
+        // zero-cost rows so the memory saver's work is visible
+        if (t && t.discarded) {
+          refs.push({
+            winId: entry.win.id,
+            tabId: id,
+            title: t.title || 'Unloaded tab',
+            url: t.url,
+            pid: undefined,
+            discarded: true
+          })
+          continue
+        }
         const wc = t?.view?.webContents
         if (!wc || wc.isDestroyed()) continue
         let pid: number | undefined
@@ -1228,7 +1243,14 @@ export function registerIpc(): void {
         } catch {
           pid = undefined
         }
-        refs.push({ winId: entry.win.id, tabId: id, title: wc.getTitle(), url: wc.getURL(), pid })
+        refs.push({
+          winId: entry.win.id,
+          tabId: id,
+          title: wc.getTitle(),
+          url: wc.getURL(),
+          pid,
+          ...(t?.hibernated ? { hibernated: true } : {})
+        })
       }
     }
     const snap = mapTaskMetrics(app.getAppMetrics(), refs, prevSamples, Date.now())
@@ -1277,6 +1299,64 @@ export function registerIpc(): void {
   ipcMain.handle('dials:remove', (e, id: string) => {
     guard(e, 'dials:remove')
     return removeDial(String(id || ''))
+  })
+
+  // ---------- v2.10.0 side panels (pinned sites docked beside the page) ----------
+  function broadcastPanelsChanged(): void {
+    for (const entry of allEntries()) {
+      if (!entry.win.isDestroyed()) {
+        try {
+          entry.win.webContents.send('panels:changed')
+        } catch {
+          /* window gone */
+        }
+      }
+    }
+  }
+  ipcMain.handle('panels:list', (e) => {
+    guard(e, 'panels:list')
+    return { panels: listPanels(), railVisible: railVisible(entryForSender(e.sender)) }
+  })
+  ipcMain.handle('panels:add', (e, url: string, title?: string) => {
+    guard(e, 'panels:add')
+    const panel = addPanel(url, title)
+    if (panel) broadcastPanelsChanged()
+    return panel
+  })
+  ipcMain.handle('panels:rename', (e, id: string, title: string) => {
+    guard(e, 'panels:rename')
+    const okDone = renamePanel(String(id || ''), title)
+    if (okDone) broadcastPanelsChanged()
+    return okDone
+  })
+  ipcMain.handle('panels:remove', (e, id: string) => {
+    guard(e, 'panels:remove')
+    const pid = String(id || '')
+    // close the panel in every window that has it docked before forgetting it
+    for (const entry of allEntries()) {
+      if (entry.ui.panelOpenId === pid) closePanel(entry)
+    }
+    const okDone = removePanel(pid)
+    if (okDone) broadcastPanelsChanged()
+    return okDone
+  })
+  ipcMain.handle('panels:open', (e, id: string) => {
+    guard(e, 'panels:open')
+    const entry = entryForSender(e.sender)
+    if (!entry) return { ok: false, openId: null }
+    const okDone = togglePanel(entry, id)
+    return { ok: okDone, openId: entry.ui.panelOpenId }
+  })
+  ipcMain.handle('panels:close', (e) => {
+    guard(e, 'panels:close')
+    const entry = entryForSender(e.sender)
+    if (!entry) return { ok: false }
+    return { ok: closePanel(entry) }
+  })
+  ipcMain.handle('panels:getState', (e) => {
+    guard(e, 'panels:getState')
+    const entry = entryForSender(e.sender)
+    return entry ? getPanelState(entry) : { openId: null }
   })
 
   // Default-browser card (Settings) + system settings pane

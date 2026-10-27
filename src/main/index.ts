@@ -58,23 +58,35 @@ protocol.registerSchemesAsPrivileged([
 // headless / CI environments (AETHER_HEADLESS=1 xvfb-run electron .)
 if (process.env.AETHER_HEADLESS) app.disableHardwareAcceleration()
 
-// DoH selector (#61) — Chromium network-service switches; a restart applies
-// changes (documented in Settings → Privacy).
+// Chromium feature switches decided by settings — ONE combined
+// 'enable-features' value (a second appendSwitch with the same key would
+// collide). Restart applies changes.
 try {
-  const doh = mergedSettings() as { dohMode?: 'off' | 'auto' | 'secure'; dohTemplate?: string }
-  if (doh.dohMode === 'secure' || doh.dohMode === 'auto') {
-    app.commandLine.appendSwitch('enable-features', 'DnsOverHttps')
-    app.commandLine.appendSwitch('dns-over-https-mode', doh.dohMode)
-    const tpl = String(doh.dohTemplate || '').trim()
-    if (doh.dohMode === 'secure') {
+  const boot = mergedSettings() as {
+    dohMode?: 'off' | 'auto' | 'secure'
+    dohTemplate?: string
+    mediaKeys?: boolean
+  }
+  const features: string[] = []
+  if (boot.dohMode === 'secure' || boot.dohMode === 'auto') {
+    features.push('DnsOverHttps')
+    app.commandLine.appendSwitch('dns-over-https-mode', boot.dohMode)
+    const tpl = String(boot.dohTemplate || '').trim()
+    if (boot.dohMode === 'secure') {
       // secure mode REQUIRES a template — default to Cloudflare when unset
       app.commandLine.appendSwitch('dns-over-https-templates', tpl || 'https://cloudflare-dns.com/dns-query')
     } else if (tpl) {
       app.commandLine.appendSwitch('dns-over-https-templates', tpl)
     }
   }
+  // v2.10.0 — OS media keys: SMTC (Windows), MPRIS (Linux), Now Playing (mac)
+  // control whatever tab is playing audio via Chromium's media session
+  if (boot.mediaKeys !== false) {
+    features.push('HardwareMediaKeyHandling', 'MediaSessionService')
+  }
+  if (features.length) app.commandLine.appendSwitch('enable-features', features.join(','))
 } catch {
-  /* DoH is a nicety — boot must not depend on it */
+  /* boot niceties — startup must not depend on them */
 }
 
 // The lock itself is acquired in ./preboot (with a hard exit for losers).

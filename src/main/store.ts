@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pageMemory: true,
   cloudFallback: { enabled: false, baseUrl: '', apiKey: '', model: '' },
   memorySaver: 30,
+  mediaKeys: true,
   extensions: [],
   appearance: DEFAULT_APPEARANCE,
   restoreSession: true,

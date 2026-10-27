@@ -18,6 +18,10 @@ export interface TaskTabRef {
   pid: number | undefined
   /** marks the chrome-UI renderer of the window (not killable from here) */
   isInterface?: boolean
+  /** v2.10.0 — tab is hibernated (process alive, throttled to 1 fps) */
+  hibernated?: boolean
+  /** v2.10.0 — tab is discarded (view unloaded, NO process: zero-cost row) */
+  discarded?: boolean
 }
 
 export interface PrevSample {
@@ -33,6 +37,10 @@ export interface TaskRow {
   cpuPct: number
   /** working set in bytes */
   memBytes: number
+  /** v2.10.0 — tab is hibernated (muted + throttled, instant wake) */
+  hibernated?: boolean
+  /** v2.10.0 — tab is discarded (no process at all; mem is genuinely 0) */
+  discarded?: boolean
   /** present ONLY for tab rows — the task-manager page may close this tab */
   kill?: { winId: number; tabId: number }
 }
@@ -105,6 +113,7 @@ export function mapTaskMetrics(
         sublabel: tab.isInterface ? 'Browser UI' : tab.url,
         cpuPct,
         memBytes,
+        ...(tab.hibernated ? { hibernated: true } : {}),
         ...(tab.isInterface ? {} : { kill: { winId: tab.winId, tabId: tab.tabId } })
       })
       continue
@@ -132,6 +141,23 @@ export function mapTaskMetrics(
   const live = new Set(metrics.map((m) => m?.pid).filter((p) => typeof p === 'number'))
   for (const pid of Object.keys(prev).map(Number)) {
     if (!live.has(pid)) delete next[pid]
+  }
+
+  // v2.10.0 — discarded tabs have no process, so no metric row can exist for
+  // them; emit synthetic zero-cost rows so the memory saver's work is visible
+  let syntheticPid = -1
+  for (const t of tabs) {
+    if (!t.discarded || typeof t.pid === 'number') continue
+    rows.push({
+      pid: syntheticPid--,
+      kind: 'tab',
+      label: t.title || 'Unloaded tab',
+      sublabel: t.url,
+      cpuPct: 0,
+      memBytes: 0,
+      discarded: true,
+      kill: { winId: t.winId, tabId: t.tabId }
+    })
   }
 
   rows.sort((a, b) => b.memBytes - a.memBytes)

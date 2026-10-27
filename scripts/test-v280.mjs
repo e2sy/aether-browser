@@ -441,7 +441,8 @@ section('wiring: CI + package')
   )
 
   const pkg = JSON.parse(read('package.json'))
-  ok(pkg.version >= '2.8.0', 'package version is at least 2.8.0 (browsing-flow wave; later builds move on)')
+  const [vmaj, vmin] = pkg.version.split('.').map(Number)
+  ok(vmaj > 2 || (vmaj === 2 && vmin >= 8), 'package version is at least 2.8.0 (numeric-aware: 2.10 beats 2.8)')
   ok(pkg.scripts.test.includes('test-v280.mjs'), 'test chain includes test-v280')
 }
 

@@ -305,7 +305,8 @@ section('wiring: renderer surfaces')
 section('wiring: package')
 {
   const pkg = JSON.parse(read('package.json'))
-  ok(pkg.version === '2.9.0', 'package version 2.9.0')
+  const [vMaj, vMin] = pkg.version.split('.').map(Number)
+  ok(vMaj > 2 || (vMaj === 2 && vMin >= 9), 'package version is at least 2.9.0 (numeric-aware: later builds move on)')
   ok(pkg.scripts.test.includes('test-v290.mjs'), 'test chain includes test-v290')
   ok(pkg.scripts.test.includes('test-v280.mjs'), 'prior suite still chained')
 }

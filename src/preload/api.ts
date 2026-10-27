@@ -69,6 +69,10 @@ export const api = {
     onPrivate: subscribe('win:private'),
     /** v2.9.0 — this window's profile identity (avatar + top tint) */
     onProfile: subscribe('win:profile'),
+    /** v2.10.0 — side panels: which panel is docked in THIS window */
+    onPanelState: subscribe('panels:state'),
+    /** v2.10.0 — side panels: the pinned list changed anywhere */
+    onPanelsChanged: subscribe('panels:changed'),
     /** v2.3.0 — menu → open the tab-search overlay (Ctrl+Shift+A) */
     onTabSearchShow: subscribe('tabsearch:show'),
     /** v2.3.0 — password manager save bar prompt */
@@ -166,6 +170,29 @@ export const api = {
 
   omnibox: {
     suggest: (q: string) => ipcRenderer.invoke('omnibox:suggest', q)
+  },
+
+  /** v2.10.0 — side panels (pinned sites docked beside the page) */
+  panels: {
+    list: () =>
+      ipcRenderer.invoke('panels:list') as Promise<{
+        panels: Array<{ id: string; url: string; title: string; ts: number }>
+        railVisible: boolean
+      }>,
+    add: (url: string, title?: string) =>
+      ipcRenderer.invoke('panels:add', url, title) as Promise<{
+        id: string
+        url: string
+        title: string
+      } | null>,
+    rename: (id: string, title: string) =>
+      ipcRenderer.invoke('panels:rename', id, title) as Promise<boolean>,
+    remove: (id: string) => ipcRenderer.invoke('panels:remove', id) as Promise<boolean>,
+    /** toggle a panel docked in this window */
+    open: (id: string) =>
+      ipcRenderer.invoke('panels:open', id) as Promise<{ ok: boolean; openId: string | null }>,
+    close: () => ipcRenderer.invoke('panels:close') as Promise<{ ok: boolean }>,
+    getState: () => ipcRenderer.invoke('panels:getState') as Promise<{ openId: string | null }>
   },
 
   /** v2.3.0 — password manager (vault + save bar + blocklist) */

@@ -19,6 +19,7 @@ import { shouldHideToTray, isQuitting, isBootHidden, wakeFromBootHidden, markQui
 import { mergedSettings } from './store'
 import { listProfiles, switchProfileArgs, activeProfileName, activeProfileId, activeProfile } from './profiles'
 import { validateProfileId } from '../shared/profiles'
+import { panelSplit, railVisible, destroyPanelViews, applyPanelBounds } from './panelhost'
 
 export const CHROME_HEIGHT = 84
 export const SIDEBAR_WIDTH = 400
@@ -26,7 +27,13 @@ export const SIDEBAR_WIDTH = 400
 export interface WindowEntry {
   win: BrowserWindow
   tabs: TabManager
-  ui: { sidebarOpen: boolean; /** vertical-tabs panel width (#33) — 0 when disabled */ vtabWidth: number }
+  ui: {
+    sidebarOpen: boolean
+    /** vertical-tabs panel width (#33) — 0 when disabled */
+    vtabWidth: number
+    /** v2.10.0 — which side panel is docked in this window (null = none) */
+    panelOpenId: string | null
+  }
   /** v1.5.0 build 5: private windows skip history writes + session persistence */
   private?: boolean
   /** measured chrome height (tab strip + toolbar + optional bookmarks bar) */
@@ -65,19 +72,28 @@ export function focusedEntry(): WindowEntry | undefined {
   return entryForWin(BrowserWindow.getFocusedWindow()) ?? allEntries().find((e) => !e.win.isDestroyed())
 }
 
-/** Re-fit the chrome height / vertical-tabs / sidebar split for one window. */
+/** Re-fit the chrome height / vertical-tabs / side-panel / sidebar split for one window. */
 export function applyLayout(entry: WindowEntry): void {
   if (entry.win.isDestroyed()) return
   const [w, h] = entry.win.getContentSize()
   const chromeH = Math.max(CHROME_HEIGHT, entry.chromeH || CHROME_HEIGHT)
   const sidebar = entry.ui.sidebarOpen ? SIDEBAR_WIDTH : 0
   const vtabs = Math.max(0, Math.min(400, entry.ui.vtabWidth || 0))
+  const split = panelSplit({
+    w,
+    h,
+    chromeH,
+    vtabs,
+    rail: railVisible(entry),
+    panelOpen: Boolean(entry.ui.panelOpenId)
+  })
   entry.tabs.setBounds({
-    x: vtabs,
+    x: split.contentX,
     y: chromeH,
-    width: Math.max(60, w - sidebar - vtabs),
+    width: Math.max(60, Math.min(split.contentW, w - sidebar - split.contentX)),
     height: Math.max(60, h - chromeH)
   })
+  applyPanelBounds(entry)
 }
 
 export interface CreateWindowOptions {
@@ -134,7 +150,7 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   const entry: WindowEntry = {
     win,
     tabs: null as unknown as TabManager,
-    ui: { sidebarOpen: false, vtabWidth: 0 },
+    ui: { sidebarOpen: false, vtabWidth: 0, panelOpenId: null },
     chromeH: CHROME_HEIGHT,
     ...(opts.private ? { private: true } : {})
   }
@@ -197,6 +213,7 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   })
   win.on('closed', () => {
     entry.tabs.stopMemorySaver()
+    destroyPanelViews(entry)
     unregisterTabManager(entry.tabs)
     entries.delete(win.id)
     if (!entry.private) scheduleSessionSave()

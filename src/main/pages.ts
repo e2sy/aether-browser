@@ -1621,6 +1621,9 @@ export const SETTINGS_HTML = pageShell(
           <option value="60">1 hour</option>
         </select>
       </div>
+      <div class="opts" style="margin-top:8px">
+        <label><input type="checkbox" id="mediaKeys" /> OS media keys control the playing tab (play/pause/next from keyboard media buttons — SMTC / MPRIS; takes effect after restart)</label>
+      </div>
       <div class="label" style="margin-top:18px">Shields — blocking strength</div>
       <div class="opts">
         <label><input type="checkbox" id="shieldsAggressive" /> Aggressive mode — also inject anti-adblock scriptlets (stronger, but can break heavy sites like YouTube; use the toolbar shields popup to turn shields off per site)</label>
@@ -1963,6 +1966,7 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('shieldsAggressive').checked = !!s.shieldsAggressive
       document.getElementById('stripElectronUA').checked = !!s.stripElectronUA
       document.getElementById('memorySaver').value = String(s.memorySaver || 0)
+      document.getElementById('mediaKeys').checked = s.mediaKeys !== false
       document.getElementById('grantTtl').value = String(s.grantTtlDays ?? 180)
       document.getElementById('showTray').checked = s.showTray !== false
       document.getElementById('closeToTray').checked = !!s.closeToTray
@@ -2368,6 +2372,7 @@ export const SETTINGS_HTML = pageShell(
 
   document.getElementById('stripElectronUA').addEventListener('change', function (e) { save({ stripElectronUA: e.target.checked }) })
   document.getElementById('memorySaver').addEventListener('change', function (e) { save({ memorySaver: Number(e.target.value) || 0 }) })
+  document.getElementById('mediaKeys').addEventListener('change', function (e) { save({ mediaKeys: e.target.checked }) })
   document.getElementById('grantTtl').addEventListener('change', function (e) { save({ grantTtlDays: Number(e.target.value) || 0 }) })
   document.getElementById('showTray').addEventListener('change', function (e) { save({ showTray: e.target.checked }) })
   document.getElementById('closeToTray').addEventListener('change', function (e) { save({ closeToTray: e.target.checked }) })
@@ -2951,6 +2956,14 @@ export const TASKMGR_HTML = pageShell(
           var name = document.createElement('div')
           name.textContent = r.label || '(unnamed)'
           name.style.fontWeight = '600'
+          if (r.hibernated || r.discarded) {
+            var badge = document.createElement('span')
+            badge.textContent = r.discarded ? ' · unloaded' : ' · sleeping'
+            badge.style.fontWeight = '500'
+            badge.style.fontSize = '10.5px'
+            badge.style.color = 'var(--ax-ok, #3fb950)'
+            name.appendChild(badge)
+          }
           var sub = document.createElement('div')
           sub.textContent = (r.sublabel || r.pid + ' · ' + r.kind) + ''
           sub.style.color = 'var(--ax-muted)'
@@ -2983,7 +2996,16 @@ export const TASKMGR_HTML = pageShell(
           rowsEl.appendChild(tr)
         })(s.rows[i])
       }
-      totalEl.textContent = fmtB(s.totalMemBytes) + ' total · ' + s.rows.length + ' processes'
+      var sleeping = 0
+      var unloaded = 0
+      for (var j = 0; j < s.rows.length; j++) {
+        if (s.rows[j].hibernated) sleeping++
+        if (s.rows[j].discarded) unloaded++
+      }
+      var parts = [fmtB(s.totalMemBytes) + ' total', s.rows.length + ' processes']
+      if (sleeping) parts.push(sleeping + ' sleeping')
+      if (unloaded) parts.push(unloaded + ' unloaded (0 MB)')
+      totalEl.textContent = parts.join(' · ')
     }).catch(function () {
       totalEl.textContent = 'unavailable'
     })

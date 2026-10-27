@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp, upsertDownload } from './state/store'
 import type { DownloadState } from '../../shared/types'
 import TabStrip from './components/TabStrip'
 import VerticalTabs from './components/VerticalTabs'
+import PanelRail from './components/PanelRail'
 import Toolbar from './components/Toolbar'
 import BookmarksBar from './components/BookmarksBar'
 import Sidebar from './components/Sidebar'
@@ -28,6 +29,26 @@ export default function App(): JSX.Element {
 
   // v1.8.0 (#33) — vertical tabs need the tab strip gone from the top chrome
   const vertical = tabOrientation === 'left'
+
+  // v2.10.0 — side-panel rail: on whenever at least one panel is pinned
+  const [panelsOn, setPanelsOn] = useState(false)
+  useEffect(() => {
+    let alive = true
+    const refresh = (): void => {
+      void window.aether.panels
+        .list()
+        .then((r) => {
+          if (alive) setPanelsOn((r.panels || []).length > 0)
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const off = window.aether.state.onPanelsChanged(refresh)
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
 
   // v1.5.0 — bookmarks bar visibility: from settings, live from the menu toggle
   useEffect(() => {
@@ -158,8 +179,9 @@ export default function App(): JSX.Element {
   }, [])
 
   return (
-    <div className={`app ${vertical ? 'vtabs-on' : ''}`}>
+    <div className={`app ${vertical ? 'vtabs-on' : ''} ${panelsOn ? 'panels-on' : ''}`}>
       {vertical && <VerticalTabs />}
+      {panelsOn && <PanelRail />}
       <div className="app-main">
         <div className="chrome" ref={chromeRef}>
           {/* v2.9.0 — Chrome-style profile identity tint (non-default profiles) */}

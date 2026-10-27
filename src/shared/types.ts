@@ -79,6 +79,10 @@ export interface Settings {
   /** Tiered memory saver: hibernate idle background tabs after N minutes,
    *  fully unload them after 3×N minutes (0 disables the memory saver) */
   memorySaver: number
+  /** v2.10.0 — let the OS media keys (SMTC / MPRIS / Now Playing) control
+   *  the tab that is playing audio. Chromium media-session integration;
+   *  takes effect after a restart. */
+  mediaKeys: boolean
   /** Unpacked extensions to load at boot */
   extensions: ExtensionRecord[]
   /** v1.4.0 Customization Studio — themes, accent, fonts, new-tab look */
