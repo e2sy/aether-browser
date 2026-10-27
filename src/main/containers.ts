@@ -30,6 +30,7 @@ import {
 export { isValidContainerId } from '../shared/containers'
 import { registerShieldsSession } from './adblock'
 import { registerFarbleOnSession } from './farble'
+import { registerGestureOnSession } from './gestures'
 import { installPrivacy } from './privacy'
 import { JsonStore, mergedSettings } from './store'
 import { applySessionProxy, effectiveProxyForContainer } from './netmask'
@@ -99,9 +100,11 @@ export function ensureContainerSession(id: string): Electron.Session {
     stripSessionUA(ses)
     registerShieldsSession(ses)
     registerFarbleOnSession(ses)
+    registerGestureOnSession(ses)
     installPrivacy(
       () => ({
         paramScrubber: mergedSettings().paramScrubber !== false,
+        deAmp: mergedSettings().deAmp !== false,
         httpsOnly: mergedSettings().httpsOnly === true,
         httpsExemptHosts: Array.isArray(mergedSettings().httpsExemptHosts) ? mergedSettings().httpsExemptHosts : [],
         referrerTight: mergedSettings().referrerTight !== false

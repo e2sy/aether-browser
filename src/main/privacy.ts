@@ -30,6 +30,75 @@ export const TRACKING_PARAMS: readonly string[] = Object.freeze([
   'mib_extid', 'irclickid', 'ireid', 'sr_id', 'vbref'
 ])
 
+// ---------- de-amping (v2.8.0, field-asked Brave parity) ----------
+
+/**
+ * Pure: rewrite known AMP-cache URLs to the publisher's canonical page.
+ * Covers the two shapes Brave's de-amping handles:
+ *   • cdn.ampproject.org/c/s/example.com/path   → https://example.com/path
+ *   • cdn.ampproject.org/c/example.com/path     → http://example.com/path
+ *   • www.google.<tld>/amp/s/amp.example.com/…  → https://example.com/…
+ * plus the soft cases: a trailing /amp or /amp/ path segment and an `amp`
+ * query param (only ever stripped from https pages, never localhost).
+ * Returns null when the URL is not AMP-shaped — callers redirect only on a
+ * non-null result, so a clean URL can never loop.
+ */
+export function deAmpUrl(rawUrl: string): string | null {
+  const u = String(rawUrl || '').trim()
+  if (!/^https?:\/\//i.test(u)) return null
+  let parsed: URL
+  try {
+    parsed = new URL(u)
+  } catch {
+    return null
+  }
+  const host = parsed.hostname.toLowerCase()
+
+  // hard case 1 — the AMP cache itself
+  if (host === 'cdn.ampproject.org' || host.endsWith('.ampproject.org')) {
+    const m = /^\/c\/(?:s\/)?(.+)$/.exec(parsed.pathname)
+    if (m && m[1]) {
+      const secure = /\/c\/s\//.test(parsed.pathname)
+      const rest = m[1].replace(/^s\//, '')
+      if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(rest.split('/')[0] || '')) {
+        const scheme = secure ? 'https' : 'http'
+        const query = parsed.search || ''
+        return `${scheme}://${rest}${query}${parsed.hash}`
+      }
+    }
+  }
+
+  // hard case 2 — google's /amp/ proxy wrapper
+  if (/^www\.google\./i.test(host)) {
+    const m = /^\/amp\/(?:s\/)?(.+)$/.exec(parsed.pathname)
+    if (m && m[1]) {
+      const secure = /\/amp\/s\//.test(parsed.pathname)
+      const rest = m[1].replace(/^s\//, '')
+      if (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(rest.split('/')[0] || '')) {
+        const scheme = secure ? 'https' : 'http'
+        return `${scheme}://${rest}${parsed.search || ''}${parsed.hash}`
+      }
+    }
+  }
+
+  // soft cases — a trailing /amp segment or an amp=1 param on a normal site
+  if (isLocalHost(host)) return null
+  let pathname = parsed.pathname
+  let changed = false
+  if (/\/(amp|amp.html)\/?$/i.test(pathname) && pathname.length > 5) {
+    pathname = pathname.replace(/\/(amp|amp.html)\/?$/i, '/')
+    changed = true
+  }
+  const params = new URLSearchParams(parsed.search)
+  if (params.has('amp')) {
+    params.delete('amp')
+    changed = true
+  }
+  if (!changed) return null
+  const qs = [...params.keys()].length ? `?${params.toString()}` : ''
+  return `${parsed.origin}${pathname}${qs}${parsed.hash}`
+}
+
 /** Pure: strip known tracking params from a URL. Returns null when unchanged. */
 export function stripTrackingParams(rawUrl: string): string | null {
   const u = String(rawUrl || '').trim()
@@ -143,6 +212,7 @@ let httpsMemo = new Set<string>()
 
 export interface PrivacySettings {
   paramScrubber: boolean
+  deAmp: boolean
   httpsOnly: boolean
   httpsExemptHosts: string[]
   referrerTight: boolean
@@ -157,13 +227,18 @@ export function installPrivacy(policyOf: () => PrivacySettings, target?: Electro
       const p = policyOf()
       const isTopFrame = details.resourceType === 'mainFrame'
 
-      // #58 — scrub tracking params on top-frame navigations
-      if (p.paramScrubber && isTopFrame && /^https?:/i.test(details.url)) {
-        const clean = stripTrackingParams(details.url)
-        if (clean) {
-          scrubTargets.add(clean.toLowerCase())
+      // #58 + de-amp —, then scrub tracking params on top-frame
+      // navigations (one combined redirect; the result re-enters this
+      // handler and passes through clean)
+      if (isTopFrame && /^https?:/i.test(details.url)) {
+        const ampTarget = p.deAmp ? deAmpUrl(details.url) : null
+        const base = ampTarget || details.url
+        const scrubbed = p.paramScrubber ? stripTrackingParams(base) : null
+        const target = scrubbed || ampTarget
+        if (target) {
+          scrubTargets.add(target.toLowerCase())
           void shell // no-op keep import shape
-          callback({ redirectURL: clean })
+          callback({ redirectURL: target })
           return
         }
       }

@@ -111,7 +111,24 @@ export const NEW_TAB_HTML = pageShell(
       letter-spacing:.08em; background:var(--ax-accent-soft); border:none; border-radius:8px; padding:6px 10px;
       cursor:pointer;">AI</button>
   </form>
-  <div style="margin-top:44px; width:min(640px,88vw); display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:start;" id="widgets">
+  <div style="margin-top:38px; width:min(640px,88vw);">
+    <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em;">SPEED DIAL</div>
+    <div id="dials" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;"></div>
+    <div id="dialform" style="display:none; gap:8px; margin-top:12px;">
+      <input id="dialurl" type="url" placeholder="https://example.com" autocomplete="off"
+        style="flex:1; padding:9px 12px; font-size:13px; color:var(--ax-fg); background:var(--ax-card);
+        border:1px solid var(--ax-border); border-radius:10px; outline:none;" />
+      <input id="dialname" type="text" placeholder="Name (optional)" autocomplete="off"
+        style="width:170px; padding:9px 12px; font-size:13px; color:var(--ax-fg); background:var(--ax-card);
+        border:1px solid var(--ax-border); border-radius:10px; outline:none;" />
+      <button id="dialsave" type="button" style="padding:9px 16px; font-size:12.5px; color:#fff; background:var(--ax-accent);
+        border:none; border-radius:10px; cursor:pointer;">Add</button>
+      <button id="dialcancel" type="button" style="padding:9px 12px; font-size:12.5px; color:var(--ax-muted);
+        background:transparent; border:1px solid var(--ax-border); border-radius:10px; cursor:pointer;">Cancel</button>
+    </div>
+    <div id="dialhint" style="font-size:10.5px; color:var(--ax-faint); margin-top:6px;">Right-click any page → “Add to speed dial”.</div>
+  </div>
+  <div style="margin-top:26px; width:min(640px,88vw); display:grid; grid-template-columns: 1fr 1fr; gap:22px; align-items:start;" id="widgets">
     <div>
       <div style="color:var(--ax-muted); font-size:12px; letter-spacing:.1em; margin-bottom:14px;">TOP SITES</div>
       <div id="top" style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;"></div>
@@ -209,8 +226,78 @@ export const NEW_TAB_HTML = pageShell(
   if (typeof window.aether === 'undefined') {
     bridgeError('UI bridge failed to load — keyboard and buttons cannot talk to the browser. Fully quit Aether (close every window) and start it again; if it keeps happening, run: npm run build')
   }
+  function dialTile(d) {
+    var card = el('a'); card.href = '#'
+    card.style.cssText = 'position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px;background:var(--ax-card);border:1px solid var(--ax-border);border-radius:12px;overflow:hidden'
+    var letter = document.createElement('div')
+    var host = (d.url || '?').replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0]
+    letter.textContent = (d.title || host || '?').charAt(0).toUpperCase()
+    letter.style.cssText = 'width:34px;height:34px;border-radius:50%;background:var(--ax-accent-soft);color:var(--ax-accent);display:flex;align-items:center;justify-content:center;font-weight:600'
+    var label = document.createElement('div')
+    label.textContent = d.title || host
+    label.style.cssText = 'font-size:11px;color:var(--ax-fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+    var x = document.createElement('button')
+    x.type = 'button'
+    x.textContent = '×'
+    x.title = 'Remove from speed dial'
+    x.style.cssText = 'position:absolute;top:4px;right:6px;width:18px;height:18px;line-height:16px;text-align:center;font-size:13px;color:var(--ax-faint);background:transparent;border:none;border-radius:50%;cursor:pointer;padding:0'
+    x.addEventListener('mouseenter', function () { x.style.color = 'var(--ax-danger)' })
+    x.addEventListener('mouseleave', function () { x.style.color = 'var(--ax-faint)' })
+    x.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation()
+      window.aether.dials.remove(d.id).then(function () { refreshDials() }).catch(function () {})
+    })
+    card.appendChild(letter); card.appendChild(label); card.appendChild(x)
+    card.title = d.url
+    card.addEventListener('click', function (e) { e.preventDefault(); window.aether.internal.open(d.url) })
+    return card
+  }
+  function addTile() {
+    var card = el('a'); card.href = '#'
+    card.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:14px 8px;background:transparent;border:1px dashed var(--ax-border);border-radius:12px;min-height:76px'
+    var plus = document.createElement('div')
+    plus.textContent = '+'
+    plus.style.cssText = 'font-size:22px;color:var(--ax-muted);font-weight:300'
+    var lbl = document.createElement('div')
+    lbl.textContent = 'Add dial'
+    lbl.style.cssText = 'font-size:11px;color:var(--ax-muted)'
+    card.appendChild(plus); card.appendChild(lbl)
+    card.addEventListener('click', function (e) {
+      e.preventDefault()
+      document.getElementById('dialform').style.display = 'flex'
+      document.getElementById('dialurl').focus()
+    })
+    return card
+  }
+  function renderDials(list) {
+    var grid = document.getElementById('dials')
+    grid.textContent = ''
+    var safe = Array.isArray(list) ? list.slice(0, 16) : []
+    safe.forEach(function (d) { grid.appendChild(dialTile(d)) })
+    if (safe.length < 16) grid.appendChild(addTile())
+    document.getElementById('dialhint').style.display = safe.length ? 'none' : 'block'
+  }
+  function refreshDials() {
+    window.aether.dials.list().then(renderDials).catch(function () {})
+  }
+  document.getElementById('dialsave').addEventListener('click', function () {
+    var url = document.getElementById('dialurl').value.trim()
+    var name = document.getElementById('dialname').value.trim()
+    if (!url) return
+    window.aether.dials.add(url, name).then(function (d) {
+      if (!d) { document.getElementById('dialurl').focus(); return }
+      document.getElementById('dialurl').value = ''
+      document.getElementById('dialname').value = ''
+      document.getElementById('dialform').style.display = 'none'
+      refreshDials()
+    }).catch(function () {})
+  })
+  document.getElementById('dialcancel').addEventListener('click', function () {
+    document.getElementById('dialform').style.display = 'none'
+  })
   try {
     window.aether.internal.startup().then(function (data) {
+    renderDials(data.dials)
     var top = document.getElementById('top')
     if (!data.topSites.length) {
       top.innerHTML = ''
@@ -1564,6 +1651,8 @@ export const SETTINGS_HTML = pageShell(
       <div class="label" style="margin-top:18px">Privacy fortress</div>
       <div class="opts" style="margin-top:6px">
         <label><input type="checkbox" id="paramScrubber" /> Strip tracking parameters from addresses (utm_*, gclid, fbclid…)</label>
+        <label><input type="checkbox" id="deAmp" /> Open publisher pages instead of AMP copies (de-amp Google/cache links)</label>
+        <label><input type="checkbox" id="gestures" /> Mouse gestures — drag with the right button: ← back, → forward, ↑ new tab, ↓ close tab</label>
         <label><input type="checkbox" id="referrerTight" /> Only tell sites the bare origin when you follow an outside link</label>
         <label><input type="checkbox" id="httpsOnly" /> HTTPS-only mode — upgrade http:// addresses automatically (localhost never touched)</label>
       </div>
@@ -1855,6 +1944,8 @@ export const SETTINGS_HTML = pageShell(
       document.getElementById('fdMode').value = s.forceDarkMode || 'off'
       document.getElementById('fdHosts').value = Array.isArray(s.forceDarkHosts) ? s.forceDarkHosts.join(', ') : ''
       document.getElementById('paramScrubber').checked = s.paramScrubber !== false
+      document.getElementById('deAmp').checked = s.deAmp !== false
+      document.getElementById('gestures').checked = s.gestures !== false
       document.getElementById('referrerTight').checked = s.referrerTight !== false
       document.getElementById('httpsOnly').checked = s.httpsOnly === true
       document.getElementById('dohMode').value = s.dohMode || 'off'
@@ -2145,6 +2236,8 @@ export const SETTINGS_HTML = pageShell(
       save({ forceDarkHosts: hosts })
     })
     document.getElementById('paramScrubber').addEventListener('change', function (e) { save({ paramScrubber: e.target.checked }) })
+    document.getElementById('deAmp').addEventListener('change', function (e) { save({ deAmp: e.target.checked }) })
+    document.getElementById('gestures').addEventListener('change', function (e) { save({ gestures: e.target.checked }) })
     document.getElementById('referrerTight').addEventListener('change', function (e) { save({ referrerTight: e.target.checked }) })
     document.getElementById('httpsOnly').addEventListener('change', function (e) { save({ httpsOnly: e.target.checked }) })
     document.getElementById('dohMode').addEventListener('change', function (e) { save({ dohMode: (e.target as HTMLSelectElement).value }) })

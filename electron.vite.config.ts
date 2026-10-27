@@ -42,23 +42,29 @@ try {
 }
 
 /**
- * Fingerprint-farbling preload (v2.7.0) — plain JS, NOT bundled (it must run
- * import-free inside sandboxed frames). Copied verbatim from src/preload/
- * farble.js to out/preload/farble.js on every build / dev-watch rebuild, the
- * same trigger window the ui.js generator uses.
+ * Sandboxed plain preloads (v2.7.0 farbling, v2.8.0 gestures) — plain JS,
+ * NOT bundled (they must run import-free inside sandboxed frames). Copied
+ * verbatim from src/preload/*.js to out/preload/ on every build / dev-watch
+ * rebuild, the same trigger window the ui.js generator uses.
  */
 function copyFarblePreload(): Plugin {
   return {
     name: 'aether-copy-farble-preload',
     apply: 'build',
     writeBundle() {
-      const src = path.resolve(__dirname, 'src/preload/farble.js')
-      const dst = path.resolve(__dirname, 'out/preload/farble.js')
-      try {
-        fs.mkdirSync(path.dirname(dst), { recursive: true })
-        fs.copyFileSync(src, dst)
-      } catch (err) {
-        console.error('[farble] preload copy failed:', err)
+      // shipped sandbox-safe plain preloads:
+      //   src/preload/farble.js   → out/preload/farble.js
+      //   src/preload/gesture.js  → out/preload/gesture.js
+      const names = ['farble.js', 'gesture.js']
+      for (const name of names) {
+        const src = path.resolve(__dirname, 'src/preload', name)
+        const dst = path.resolve(__dirname, 'out/preload', name)
+        try {
+          fs.mkdirSync(path.dirname(dst), { recursive: true })
+          fs.copyFileSync(src, dst)
+        } catch (err) {
+          console.error(`[preload] ${name} copy failed:`, err)
+        }
       }
     }
   }

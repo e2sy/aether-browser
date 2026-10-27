@@ -149,6 +149,19 @@ export const api = {
       }>
   },
 
+  /** v2.8.0 — speed dial (New Tab pinned tiles) */
+  dials: {
+    list: () =>
+      ipcRenderer.invoke('dials:list') as Promise<
+        Array<{ id: string; url: string; title: string; ts: number }>
+      >,
+    add: (url: string, title?: string) =>
+      ipcRenderer.invoke('dials:add', url, title) as Promise<{ id: string; url: string; title: string } | null>,
+    rename: (id: string, title: string) =>
+      ipcRenderer.invoke('dials:rename', id, title) as Promise<boolean>,
+    remove: (id: string) => ipcRenderer.invoke('dials:remove', id) as Promise<boolean>
+  },
+
   omnibox: {
     suggest: (q: string) => ipcRenderer.invoke('omnibox:suggest', q)
   },

@@ -47,6 +47,7 @@ import { parseLaunchArgs } from './defaultbrowser'
 import { refreshOSSurfaces, consumeAppArg, launchApp } from './apps'
 import { initContainers, containerTimezoneFor } from './containers'
 import { initFarble, registerFarbleEverywhere } from './farble'
+import { initGestures, registerGestureEverywhere } from './gestures'
 import { applyProxyEverywhere } from './netmask'
 
 // privileged scheme so internal pages behave like a real origin
@@ -158,6 +159,7 @@ app.whenReady().then(() => {
   resetHttpsMemo()
   installPrivacy(() => ({
     paramScrubber: mergedSettings().paramScrubber !== false,
+    deAmp: mergedSettings().deAmp !== false,
     httpsOnly: mergedSettings().httpsOnly === true,
     httpsExemptHosts: Array.isArray(mergedSettings().httpsExemptHosts) ? mergedSettings().httpsExemptHosts : [],
     referrerTight: mergedSettings().referrerTight !== false
@@ -170,6 +172,15 @@ app.whenReady().then(() => {
   initContainers()
   initFarble(containerTimezoneFor)
   registerFarbleEverywhere()
+  // v2.8.0 — mouse gestures: config IPC up before the first page script runs
+  initGestures((wc) => {
+    for (const entry of allEntries()) {
+      const id = entry.tabs.tabIdForWebContents(wc)
+      if (id !== null) return { tm: entry.tabs, tabId: id }
+    }
+    return null
+  })
+  registerGestureEverywhere()
   void applyProxyEverywhere()
 
   // spellcheck (v2.2.0): en-US dictionary + right-click fixes in form fields

@@ -59,6 +59,8 @@ export const DEFAULT_SETTINGS: Settings = {
   forceDarkMode: 'off',
   forceDarkHosts: [],
   paramScrubber: true,
+  deAmp: true,
+  gestures: true,
   httpsOnly: false,
   httpsExemptHosts: [],
   dohMode: 'off',

@@ -18,6 +18,8 @@ import { captureScreenshot, screenshotsDir } from './shot'
 import { fetchImageDataUrl } from './imgask'
 import { captureTranslatePage } from './translate'
 import { clusterTabsByTopic } from './tabcluster'
+import { stripTrackingParams } from './privacy'
+import { addDial } from './dials'
 
 /** v2.5.0 — capture the active tab's article, then move that tab to the reader. */
 function openReaderView(): void {
@@ -544,10 +546,23 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
       {
         label: 'Copy image address',
         click: (): void => {
-          void clipboard.writeText(params.srcURL)
+          // v2.8.0 — the copied address never carries tracking params
+          void clipboard.writeText(stripTrackingParams(params.srcURL) || params.srcURL)
         }
       }
     )
+  }
+
+  // v2.8.0 — standard "Copy link address" (Chromium parity) with the same
+  // tracking-param scrub the navigation scrubber applies
+  if (params.linkURL?.trim()) {
+    items.push({
+      label: 'Copy link address',
+      click: (): void => {
+        const raw = params.linkURL.trim()
+        void clipboard.writeText(stripTrackingParams(raw) || raw)
+      }
+    })
   }
 
   // v2.5.0 — floating mini-player for videos (Chromium-native PiP window)
@@ -649,6 +664,14 @@ export function onContextMenu(wc: WebContents, params: Electron.ContextMenuParam
       label: 'Screenshot — save & copy',
       click: (): void => {
         void captureScreenshot(wc)
+      }
+    })
+    items.push({
+      label: 'Add to speed dial',
+      click: (): void => {
+        const dial = addDial(pageUrl, wc.getTitle())
+        if (dial) notify('Added to speed dial', dial.title || hostLabel(pageUrl))
+        else notify('Could not add', 'Only http(s) pages can be pinned')
       }
     })
     items.push({ type: 'separator' })

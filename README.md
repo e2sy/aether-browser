@@ -47,6 +47,17 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
 
+## 📦 v2.8.0 — mouse gestures, speed dial, de-amping (build 22)
+
+The Dolphin-style browsing-flow wave — drive the browser with the mouse, pin your favorite sites, and stop loading Google's AMP copies:
+
+- **Mouse gestures** — press the **right button and draw**: ← back, → forward, ↑ new tab, ↓ close tab, ↓↑ reload, ↑↓ reopen closed tab. A sandbox-safe plain-JS preload (next to the farbling preload, injected on **every** session incl. containers + private) detects the stroke with a 30px dominant-axis threshold and a 3-segment scribble guard; a recognized shape **swallows the native context menu** (one-shot), a plain right-click passes through untouched. The sequence maps onto the sender's own TabManager, the toggle lives in Settings (live — no restart), and when the bridge is down gestures never hijack right-click.
+- **Speed dial** — the New Tab page gets a **pinned-tiles grid** above Top Sites: add any http(s) page via the **“Add to speed dial” context-menu action** (right-click any page) or the inline add-form on the New Tab itself (URL + optional name), hover-× to remove, letter-avatar tiles, **dedupe by URL (first wins), capped at 16**, persisted in `dials.json` and served with the startup payload. All rendering is createElement/textContent-only (XSS-audit clean).
+- **De-amping** — AMP-cache links now load the **publisher's page**: `cdn.ampproject.org/c/s/…`, Google's `/amp/s/…` wrapper, trailing `/amp` segments and `?amp=1` params are rewritten in one combined redirect with the tracking-param scrubber (idempotent — no loops, localhost never touched). Toggled in Settings → Privacy fortress.
+- **Copy-link scrubbing** — the context menu gains the standard **“Copy link address”** item (Chromium parity), and copied addresses — links and images — **never carry tracking params** (the same utm/gclid/fbclid scrubber applies to the clipboard).
+- **CI unblocked** — the macOS leg switches to `continue-on-error` (GitHub's macOS runners cancelled build 21's job with **zero executed steps four times in a row**); real failures still surface as annotated jobs, Windows + Ubuntu keep gating.
+- **125 new assertions** (trail→sequence math + action map + hostile-payload sanitize, dial url/title cleaning + dedupe/cap/sanitize matrix, de-amp URL matrix incl. loop safety, a **functional test that executes gesture.js under node with stubbed DOM** — enabled detection, emitter wiring, one-shot menu suppression, the disabled gate — and the runAction dispatch) — **1,888+ across 35 suites**, Xvfb smoke green.
+
 ## 📦 v2.7.0 — container tabs, IP masquerade, fingerprint farbling (build 21)
 
 The privacy & isolation wave — isolated profiles, the honest IP spoofer, and Brave's best anti-fingerprinting trick:

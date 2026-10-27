@@ -111,6 +111,7 @@ import {
   clearContainerData
 } from './containers'
 import { applyProxyEverywhere, checkIp, netmaskStatus, setProxySettings } from './netmask'
+import { listDials, addDial, renameDial, removeDial } from './dials'
 
 const HISTORY_WINDOW = 20
 /** sane bounds for the measured chrome height (tab strip + toolbar + bar) */
@@ -1249,7 +1250,25 @@ export function registerIpc(): void {
 
   ipcMain.handle('internal:startup', (e) => {
     if (!isInternal(e)) throw new Error('Unauthorized')
-    return { topSites: topSites(8), bookmarks: bookmarks.data.slice(0, 6) }
+    return { topSites: topSites(8), bookmarks: bookmarks.data.slice(0, 6), dials: listDials() }
+  })
+
+  // ---------- v2.8.0 speed dial (New Tab pinned tiles) ----------
+  ipcMain.handle('dials:list', (e) => {
+    guard(e, 'dials:list')
+    return listDials()
+  })
+  ipcMain.handle('dials:add', (e, url: string, title?: string) => {
+    guard(e, 'dials:add')
+    return addDial(url, typeof title === 'string' ? title : '')
+  })
+  ipcMain.handle('dials:rename', (e, id: string, title: string) => {
+    guard(e, 'dials:rename')
+    return renameDial(String(id || ''), title)
+  })
+  ipcMain.handle('dials:remove', (e, id: string) => {
+    guard(e, 'dials:remove')
+    return removeDial(String(id || ''))
   })
 
   // Default-browser card (Settings) + system settings pane

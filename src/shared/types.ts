@@ -105,6 +105,10 @@ export interface Settings {
   forceDarkHosts: string[]
   /** v1.9.0 (#58) — strip utm_…, gclid, fbclid trackers from navigations */
   paramScrubber: boolean
+  /** v2.8.0 — rewrite AMP-cache URLs to the publisher's page */
+  deAmp: boolean
+  /** v2.8.0 — Dolphin-style mouse gestures (right-drag navigation) */
+  gestures: boolean
   /** v1.9.0 (#60) — upgrade http navigations to https */
   httpsOnly: boolean
   /** v1.9.0 (#60) — hosts allowed to stay on http */

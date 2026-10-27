@@ -723,6 +723,19 @@ export class TabManager {
     return [...this.order]
   }
 
+  /** v2.8.0 — which tab of this manager owns the given webContents? (gestures) */
+  tabIdForWebContents(wc: Electron.WebContents): number | null {
+    try {
+      for (const id of this.order) {
+        const t = this.tabs.get(id)
+        if (t && t.view && t.view.webContents === wc) return id
+      }
+    } catch {
+      /* destroyed */
+    }
+    return null
+  }
+
   /** Reorder tabs (drag & drop): move the tab at fromIdx to toIdx. */
   reorder(fromIdx: number, toIdx: number): void {
     const from = Math.max(0, Math.min(Math.floor(fromIdx), this.order.length - 1))
