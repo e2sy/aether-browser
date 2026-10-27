@@ -428,10 +428,17 @@ section('wiring: CI + package')
 {
   const yml = read('.github/workflows/build.yml')
   ok(
-    yml.includes("continue-on-error: ${{ matrix.os == 'macos-latest' }}"),
-    'macos legs continue-on-error (infra-flake unblock)'
+    yml.includes('os: [ubuntu-latest, windows-latest]'),
+    'gating test matrix = ubuntu + windows only'
   )
-  ok(yml.split("continue-on-error: ${{ matrix.os == 'macos-latest' }}").length === 3, 'applied to test + release jobs')
+  ok(
+    yml.includes('test-macos:') && yml.includes("if: github.event_name == 'workflow_dispatch'"),
+    'macOS coverage kept as a manual-dispatch job (runner pool cancels jobs before they start)'
+  )
+  ok(
+    yml.includes("continue-on-error: ${{ matrix.os == 'macos-latest' }}"),
+    'release job keeps continue-on-error for the mac packaging leg'
+  )
 
   const pkg = JSON.parse(read('package.json'))
   ok(pkg.version === '2.8.0', 'package version 2.8.0')
