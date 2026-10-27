@@ -47,6 +47,16 @@ Google, YouTube, and everything else — because under the hood it *is* Chromium
 | 🎨 **Customization Studio** | **Make the browser yours**: dark / light / follow-system themes (a real light theme — every internal page + the chrome), **8 accent presets + any custom color** (live preview, derives button/focus/tint variants automatically), **UI size slider** (85–125%), **5 new-tab backgrounds** (Aurora glow, Midnight, Slate, Daylight, Plain), clock toggle, restore-defaults. Themes are a typed appearance engine with per-field validation — a corrupted settings file can never break boot. Open source, so you can fork the palette too |
 | 🪪 **Chrome-like identity** | Optionally strips the `Electron/` UA token so Google and YouTube treat Aether like a regular Chrome browser |
 
+## 📦 v2.10.0 — Side panels, OS media keys, memory-saver visibility (build 24)
+
+The docking wave — pin any site beside your page, drive playback from your keyboard, and see the memory saver work:
+
+| Feature | What it does |
+|---|---|
+| 📌 **Side panels** | Pin any site into a **360px docked view** beside the page (message-web style): 44px **panel rail** on the window's left edge with letter-avatar glyphs, hover-× remove, **"Use current page"** quick-add, panel views are **kept alive** across open/close (instant reopen, session survives), popups open as real tabs, private windows use the private partition, panels are **sandboxed with no browser bridge**, `Ctrl+Alt+P` toggles, `panels.json` persistence (URL dedupe, cap 12, fail-closed sanitize) |
+| ⌨️ **OS media keys** | Keyboard **play/pause/next/prev** control whatever tab is playing audio — **SMTC** (Windows), **MPRIS** (Linux), **Now Playing** (macOS) via Chromium's media-session integration (one combined `enable-features` switch, Settings toggle, restart applies) |
+| 💤 **Memory-saver visibility** | The tiered memory saver (shipped in v2.3.0) is now **visible**: Task Manager rows show **· sleeping** (hibernated) and **· unloaded** (discarded — genuinely 0 MB) badges with a live count summary, so you can watch RAM come back |
+
 ## 📦 v2.9.0 — AI that always answers, side-by-side profiles (build 23)
 
 The reliability + identity wave — the "connected but never replies" AI bug is dead, and profiles get Chrome's best tricks:
