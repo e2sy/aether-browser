@@ -15,6 +15,8 @@ import type { AgentEventType, Macro, MacroStep, PageSnapshot, ToolCallArgs } fro
 const MAX_STEPS = 12
 const CONFIRM_TIMEOUT_MS = 120_000
 const ANSWER_TIMEOUT_MS = 180_000
+/** v2.9.0 — hard ceiling for ONE model call inside the agent loop. */
+const AGENT_CALL_TIMEOUT_MS = 300_000
 
 export class AgentRunner {
   private aborts = new Map<string, AbortController>()
@@ -83,18 +85,32 @@ export class AgentRunner {
 
   /**
    * One model turn with a single retry on transient failures (model load, hiccup).
+   * v2.9.0 — each call is also race-limited (5 min): a wedged Ollama used to
+   * leave the agent looping on a step forever with no error surfaced.
    */
   private async chatOnceRetry(
     model: string,
     messages: OllamaMessage[],
     signal: AbortSignal
   ): Promise<OllamaMessage> {
+    const callOnce = (): Promise<OllamaMessage> => {
+      const inner = new AbortController()
+      const onOuter = (): void => inner.abort()
+      signal.addEventListener('abort', onOuter, { once: true })
+      const timer = setTimeout(() => inner.abort(), AGENT_CALL_TIMEOUT_MS)
+      return chatOnce(model, messages, TOOLS, inner.signal)
+        .then((r) => r.message)
+        .finally(() => {
+          clearTimeout(timer)
+          signal.removeEventListener('abort', onOuter)
+        })
+    }
     try {
-      return (await chatOnce(model, messages, TOOLS, signal)).message
+      return await callOnce()
     } catch (err) {
       if (signal.aborted) throw err
       await new Promise((r) => setTimeout(r, 1200))
-      return (await chatOnce(model, messages, TOOLS, signal)).message
+      return await callOnce()
     }
   }
 

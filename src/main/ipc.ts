@@ -36,7 +36,7 @@ import {
   clearDownloadHistory
 } from './downloads'
 import { listModelsDetailed, deleteModel, modelInfo, runningModels } from './ollama'
-import { resolveBrain, streamBrain, aiStatus, brainError, BrainChoice } from './brain'
+import { resolveBrain, watchBrainStream, aiStatus, brainError, BrainChoice } from './brain'
 import { addMemory, memoryPromptFor, hostOf, listMemory, removeMemory, clearMemory } from './memory'
 import { ENGINE_NAMES, tryEngine, wikiPanel } from './search'
 import { normalizeAppearance } from './appearance'
@@ -59,7 +59,7 @@ import {
 import { forgetCertMemos } from './certs'
 import { listExternalChoices, forgetExternalChoices } from './extproto'
 import { createTray, destroyTray, applyStartupBoost } from './osshell'
-import { listProfiles, activeProfileId, createProfile, renameProfile, deleteProfile } from './profiles'
+import { listProfiles, activeProfileId, createProfile, renameProfile, deleteProfile, launchProfile } from './profiles'
 import { entryForSender, applyLayout, allEntries, createBrowserWindow, switchToProfile } from './windows'
 import { getNotes, setNotes } from './quicknotes'
 import { listReading, addReading, removeReading, toggleReading } from './readinglist'
@@ -529,6 +529,11 @@ export function registerIpc(): void {
     guard(e, 'profiles:delete')
     return deleteProfile(id)
   })
+  // v2.9.0 — open another profile side-by-side in its own window
+  ipcMain.handle('profiles:launch', (e, id: unknown) => {
+    guard(e, 'profiles:launch')
+    return launchProfile(id)
+  })
 
   // ---------- v2.7.0 containers (isolated tab sessions) ----------
   ipcMain.handle('containers:list', (e) => {
@@ -800,7 +805,10 @@ export function registerIpc(): void {
 
       let full = ''
       try {
-        for await (const delta of streamBrain(choice, messages, ctrl.signal)) {
+        // v2.9.0 — watchdogged stream: a wedged model (stalled load / hung
+        // server) now errors out instead of spinning forever, and page-context
+        // gathering above can no longer hang on a frozen renderer (extract.ts)
+        for await (const delta of watchBrainStream(choice, messages, ctrl)) {
           full += delta
           if (!sender.isDestroyed()) sender.send('ai:chunk', { requestId, delta })
         }
@@ -1397,7 +1405,7 @@ export function registerIpc(): void {
         })
         return { ok: false }
       }
-      for await (const delta of streamBrain(choice, buildSearchMessages(String(payload.q || ''), sources, depth), ctrl.signal)) {
+      for await (const delta of watchBrainStream(choice, buildSearchMessages(String(payload.q || ''), sources, depth), ctrl)) {
         send({ delta })
       }
       send({ done: true })

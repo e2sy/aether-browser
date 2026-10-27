@@ -809,6 +809,17 @@ body {
   animation: blink 1s steps(1) infinite;
   vertical-align: text-bottom;
 }
+/* v2.9.0 — “still waiting for the model” patience hint in the AI sidebar */
+.wait-hint {
+  margin: 6px 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border, #343845);
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: rgba(124, 140, 255, 0.06);
+}
 
 @keyframes blink {
   50% {
@@ -2891,7 +2902,7 @@ browser-action-list::part(action):hover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 240px;
+  width: 268px;
   background: #1d1f25;
   border: 1px solid #343845;
   border-radius: 12px;
@@ -2965,6 +2976,103 @@ browser-action-list::part(action):hover {
   height: 1px;
   background: #343845;
   margin: 4px 6px;
+}
+/* v2.9.0 — per-profile “Open in new window” affordance */
+.profile-launch {
+  color: var(--accent);
+  cursor: pointer;
+  padding: 3px 7px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.profile-row:hover .profile-launch {
+  opacity: 1;
+}
+.profile-launch:hover {
+  background: rgba(124, 140, 255, 0.16);
+}
+/* v2.9.0 — inline profile creation inside the popover */
+.profile-create {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-create input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg3);
+  border: 1px solid #343845;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12.5px;
+  padding: 7px 9px;
+  outline: none;
+}
+.profile-create input:focus {
+  border-color: var(--accent);
+}
+.profile-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.profile-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.profile-swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+.profile-err {
+  font-size: 11px;
+  color: var(--bad, #ef6c6c);
+}
+.profile-create-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.profile-create-btns button {
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.profile-cancel {
+  background: var(--bg3);
+  color: var(--text);
+}
+.profile-ok {
+  background: var(--accent);
+  color: #fff;
+}
+.profile-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.profile-dot.gear {
+  background: var(--bg3);
+  color: var(--muted);
+  font-size: 12px;
+}
+/* v2.9.0 — Chrome-style profile identity tint across the very top of the chrome */
+.profile-tint {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 60;
+  pointer-events: none;
 }
 
 /* ── v2.4.0 build 18 — tab hover preview card ──────────────────────────── */

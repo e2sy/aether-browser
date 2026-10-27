@@ -67,6 +67,8 @@ export const api = {
     onBookmarksBar: subscribe('chrome:bookmarksBar'),
     /** v1.5.0 — this window is private (badge + no-history indicator) */
     onPrivate: subscribe('win:private'),
+    /** v2.9.0 — this window's profile identity (avatar + top tint) */
+    onProfile: subscribe('win:profile'),
     /** v2.3.0 — menu → open the tab-search overlay (Ctrl+Shift+A) */
     onTabSearchShow: subscribe('tabsearch:show'),
     /** v2.3.0 — password manager save bar prompt */
@@ -210,7 +212,9 @@ export const api = {
       ipcRenderer.invoke('profiles:rename', id, name) as Promise<{ ok: boolean; error?: string }>,
     remove: (id: string) => ipcRenderer.invoke('profiles:delete', id) as Promise<{ ok: boolean; error?: string }>,
     /** flushes this session and relaunches into the target profile */
-    switch: (id: string) => ipcRenderer.invoke('profiles:switch', id) as Promise<{ ok: boolean; error?: string }>
+    switch: (id: string) => ipcRenderer.invoke('profiles:switch', id) as Promise<{ ok: boolean; error?: string }>,
+    /** v2.9.0 — open another profile side-by-side in its own window */
+    launch: (id: string) => ipcRenderer.invoke('profiles:launch', id) as Promise<{ ok: boolean; error?: string }>
   },
 
   /** v2.4.0 build 18 — tab hover preview thumbnails (data URL or null) */

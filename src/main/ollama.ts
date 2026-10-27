@@ -253,7 +253,7 @@ export async function pullModel(
       if (total > 0) lastPercent = Math.min(100, Math.round((completed / total) * 100))
       const status = evt.status || ''
       if (/^success$/i.test(status)) return
-      onProgress({ status, total, completed, percent: total > 0 ? lastPercent : lastPercent })
+      onProgress({ status, total, completed, percent: lastPercent })
     }
   }
 }

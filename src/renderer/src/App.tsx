@@ -20,6 +20,7 @@ export default function App(): JSX.Element {
   const activeLoading = useApp((s) => s.tabs.find((t) => t.id === s.activeId)?.loading)
   const isPrivate = useApp((s) => s.isPrivate)
   const tabOrientation = useApp((s) => s.tabOrientation)
+  const profile = useApp((s) => s.profile)
   const set = useApp((s) => s.set)
   const chromeRef = useRef<HTMLDivElement>(null)
   // v2.1.0: the — □ × cluster moved into Toolbar.tsx (vertical mode), so the
@@ -42,9 +43,15 @@ export default function App(): JSX.Element {
       .catch(() => undefined)
     const unsubBar = window.aether.state.onBookmarksBar((v) => set({ showBookmarksBar: Boolean(v) }))
     const unsubPriv = window.aether.state.onPrivate(() => set({ isPrivate: true }))
+    // v2.9.0 — profile identity drives the Chrome-style top tint
+    const unsubProf = window.aether.state.onProfile((raw) => {
+      const p = raw as { id?: string; name?: string; color?: string } | null
+      if (p && p.id) set({ profile: { id: String(p.id), name: String(p.name || 'Profile'), color: String(p.color || '#7c8cff') } })
+    })
     return () => {
       unsubBar()
       unsubPriv()
+      unsubProf()
     }
   }, [])
 
@@ -155,6 +162,10 @@ export default function App(): JSX.Element {
       {vertical && <VerticalTabs />}
       <div className="app-main">
         <div className="chrome" ref={chromeRef}>
+          {/* v2.9.0 — Chrome-style profile identity tint (non-default profiles) */}
+          {profile && profile.id !== 'default' && (
+            <div className="profile-tint" style={{ background: profile.color }} title={`Profile: ${profile.name}`} />
+          )}
           {!vertical && <TabStrip />}
           <Toolbar />
           <BookmarksBar />

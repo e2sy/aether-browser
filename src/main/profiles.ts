@@ -13,6 +13,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import {
   DEFAULT_PROFILE_ID,
   MAX_PROFILES,
@@ -131,4 +132,39 @@ export function switchProfileArgs(id: string): string[] {
       .filter((a) => !/^--aether-profile(=|$)/.test(a) && !/^--aether-app(=|$)/.test(a)),
     `--aether-profile=${id}`
   ]
+}
+
+/** Pure validation for "open this profile in its own window" — the IPC layer
+ *  calls this, then spawns. Kept free of electron/child_process so the tests
+ *  can exercise the policy directly. */
+export function canLaunchProfile(id: unknown, activeId: string): { ok: boolean; error?: string } {
+  const pid = String(id ?? '')
+  if (!validateProfileId(pid)) return { ok: false, error: 'Unknown profile' }
+  if (!cache.profiles.some((p) => p.id === pid)) return { ok: false, error: 'Unknown profile' }
+  if (pid === activeId) return { ok: false, error: 'This profile is already running in this window' }
+  return { ok: true }
+}
+
+/**
+ * v2.9.0 — open another profile side-by-side in its OWN window (Chrome's
+ * "Open profile in new window"): spawn a detached second instance pointed at
+ * --aether-profile=<id>. Safe because the single-instance lock is scoped to
+ * the userData dir and every profile owns one — the two instances coexist
+ * and never steal each other's windows.
+ */
+export function launchProfile(id: unknown): { ok: boolean; error?: string } {
+  const verdict = canLaunchProfile(id, activeId)
+  if (!verdict.ok) return verdict
+  const pid = String(id)
+  try {
+    const child = spawn(process.execPath, switchProfileArgs(pid), {
+      detached: true,
+      stdio: 'ignore',
+      ...(process.platform === 'win32' ? { windowsHide: true } : {})
+    })
+    child.unref()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }

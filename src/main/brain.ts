@@ -121,6 +121,63 @@ export async function* streamBrain(choice: BrainChoice, messages: OllamaMessage[
   }
 }
 
+/* ==================== v2.9.0 stall watchdogs ==================== */
+/**
+ * "Connected but never replies" had a second face: a wedged backend. Ollama
+ * accepts the POST, then the model load stalls / the server hangs mid-token,
+ * and the stream sits silent forever — the UI spins with no error and no
+ * text. watchBrainStream() wraps any brain stream with two race clocks:
+ *   • FIRST-TOKEN — nothing at all within `firstTokenMs` (generous: cold
+ *     model loads on slow disks can legitimately take minutes);
+ *   • IDLE — the stream stops producing for `idleMs` after it started.
+ * On trigger the underlying fetch is hard-aborted through the caller's
+ * controller and a descriptive error is thrown, so the chat always surfaces
+ * something actionable instead of an eternal typing indicator.
+ */
+export const FIRST_TOKEN_TIMEOUT_MS = 180_000
+export const STREAM_IDLE_TIMEOUT_MS = 120_000
+
+export interface WatchdogOpts {
+  firstTokenMs?: number
+  idleMs?: number
+}
+
+export async function* watchBrainStream(
+  choice: BrainChoice,
+  messages: OllamaMessage[],
+  ctrl: AbortController,
+  opts: WatchdogOpts = {}
+): AsyncGenerator<string> {
+  const firstTokenMs = opts.firstTokenMs ?? FIRST_TOKEN_TIMEOUT_MS
+  const idleMs = opts.idleMs ?? STREAM_IDLE_TIMEOUT_MS
+  const src = streamBrain(choice, messages, ctrl.signal)
+  let gotFirst = false
+  while (true) {
+    const budget = gotFirst ? idleMs : firstTokenMs
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const gate = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        if (!ctrl.signal.aborted) ctrl.abort() // hard-kill the underlying fetch
+        reject(
+          new Error(
+            gotFirst
+              ? `The model stalled — no output for ${Math.round(idleMs / 1000)}s. It may have run out of memory; try again or pick a smaller model.`
+              : `The model accepted the request but produced no output within ${Math.round(firstTokenMs / 1000)}s (still loading, wedged, or out of memory). Retry, or pick a smaller model.`
+          )
+        )
+      }, budget)
+    })
+    try {
+      const step = await Promise.race([src.next(), gate])
+      if (step.done) return
+      gotFirst = true
+      yield step.value
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
+}
+
 /** Human-friendly error that mentions the fallback state. */
 export function brainError(err: unknown): string {
   return friendlyError(err)

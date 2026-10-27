@@ -3,7 +3,7 @@ import { useApp, useActiveTab } from '../state/store'
 import { IconBack, IconForward, IconReload, IconStop, IconStar, IconSidebar, IconShield } from './Icons'
 import { SECURITY_LABEL, securityOf } from '../../../shared/security'
 import { buildOmniboxRows, inlineComplete, pasteGoTarget, type SugRow } from '../../../shared/omnibox'
-import { profileInitial, type Profile } from '../../../shared/profiles'
+import { profileInitial, PROFILE_COLORS, type Profile } from '../../../shared/profiles'
 
 interface ShieldsInfo {
   enabled: boolean
@@ -173,6 +173,29 @@ export default function Toolbar(): JSX.Element {
       window.removeEventListener('mousedown', close)
     }
   }, [profOpen])
+
+  // v2.9.0 — inline profile creation from the popover (no Settings detour)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState<string>(PROFILE_COLORS[1])
+  const [profErr, setProfErr] = useState('')
+  const createProfileInline = async (): Promise<void> => {
+    setProfErr('')
+    try {
+      const res = (await window.aether.profiles.create(newName, newColor)) as { ok: boolean; error?: string }
+      if (!res?.ok) {
+        setProfErr(res?.error || 'Could not create the profile')
+        return
+      }
+      setCreateOpen(false)
+      setNewName('')
+      setProfiles(null) // force a re-read on next paint of the open popup
+      const r = await window.aether.profiles.list()
+      setProfiles({ list: r.profiles, activeId: r.activeId })
+    } catch (err) {
+      setProfErr(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   const sec = securityOf(tab?.url || '')
 
@@ -488,10 +511,70 @@ export default function Toolbar(): JSX.Element {
                   {profileInitial(p.name)}
                 </span>
                 <span className="profile-name">{p.name}</span>
-                <span className="profile-state">{p.id === profiles.activeId ? 'Current' : 'Switch'}</span>
+                {p.id === profiles.activeId ? (
+                  <span className="profile-state">Current</span>
+                ) : (
+                  <span
+                    className="profile-state profile-launch"
+                    title={`Open “${p.name}” side-by-side in its own window`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void window.aether.profiles.launch(p.id)
+                    }}
+                  >
+                    Open in new window
+                  </span>
+                )}
               </button>
             ))}
             <div className="profile-menu-sep" />
+            {createOpen ? (
+              <div className="profile-create" onMouseDown={(e) => e.stopPropagation()}>
+                <input
+                  value={newName}
+                  autoFocus
+                  maxLength={40}
+                  placeholder="Profile name (e.g. Work)"
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void createProfileInline()
+                    if (e.key === 'Escape') setCreateOpen(false)
+                  }}
+                />
+                <div className="profile-colors">
+                  {PROFILE_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`profile-swatch ${newColor === c ? 'on' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setNewColor(c)}
+                      title={`Color ${PROFILE_COLORS.indexOf(c) + 1}`}
+                    />
+                  ))}
+                </div>
+                {profErr && <div className="profile-err">{profErr}</div>}
+                <div className="profile-create-btns">
+                  <button className="profile-cancel" onClick={() => setCreateOpen(false)}>
+                    Cancel
+                  </button>
+                  <button className="profile-ok" disabled={!newName.trim()} onClick={() => void createProfileInline()}>
+                    Create profile
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="profile-row"
+                onClick={() => {
+                  setProfErr('')
+                  setCreateOpen(true)
+                }}
+              >
+                <span className="profile-dot add">＋</span>
+                <span className="profile-name">New profile…</span>
+                <span className="profile-state" />
+              </button>
+            )}
             <button
               className="profile-row"
               onClick={() => {
@@ -499,8 +582,8 @@ export default function Toolbar(): JSX.Element {
                 if (tab) window.aether.tabs.omnibox(tab.id, 'aether://settings')
               }}
             >
-              <span className="profile-dot add">＋</span>
-              <span className="profile-name">Add profile…</span>
+              <span className="profile-dot gear">⚙</span>
+              <span className="profile-name">Manage profiles</span>
               <span className="profile-state" />
             </button>
           </div>

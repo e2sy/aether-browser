@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import type { TabMeta, Settings, Bookmark, SidebarMode, DownloadState, TabGroupInfo } from '../../../shared/types'
 
+/** v2.9.0 — this window's profile identity (from main's win:profile event) */
+export interface WindowProfile {
+  id: string
+  name: string
+  color: string
+}
+
 interface AppState {
   tabs: TabMeta[]
   activeId: number | null
@@ -22,6 +29,8 @@ interface AppState {
   showBookmarksBar: boolean
   /** v1.5.0 — this window is private (in-memory session, nothing saved) */
   isPrivate: boolean
+  /** v2.9.0 — this window's profile (drives the chrome top tint) */
+  profile: WindowProfile | null
   /** v1.8.0 (#37) — command palette visibility */
   paletteOpen: boolean
   /** v2.3.0 — tab search overlay (Ctrl+Shift+A, Chrome parity) */
@@ -45,6 +54,7 @@ export const useApp = create<AppState>((set) => ({
   zoom: null,
   showBookmarksBar: true,
   isPrivate: false,
+  profile: null,
   paletteOpen: false,
   tabSearchOpen: false,
   credPrompt: null,

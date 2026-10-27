@@ -17,7 +17,7 @@ import { CHROME_SHELL_LOCK } from './navlock'
 import { canOpenAsTab } from './extproto'
 import { shouldHideToTray, isQuitting, isBootHidden, wakeFromBootHidden, markQuitting } from './osshell'
 import { mergedSettings } from './store'
-import { listProfiles, switchProfileArgs, activeProfileName, activeProfileId } from './profiles'
+import { listProfiles, switchProfileArgs, activeProfileName, activeProfileId, activeProfile } from './profiles'
 import { validateProfileId } from '../shared/profiles'
 
 export const CHROME_HEIGHT = 84
@@ -173,6 +173,11 @@ export function createBrowserWindow(url?: string, opts: CreateWindowOptions = {}
   })
   win.webContents.on('did-finish-load', () => {
     if (entry.private && !win.isDestroyed()) win.webContents.send('win:private', true)
+    // v2.9.0 — profile identity for the chrome (avatar + colored top tint)
+    if (!win.isDestroyed()) {
+      const prof = activeProfile()
+      if (prof) win.webContents.send('win:profile', { id: prof.id, name: prof.name, color: prof.color })
+    }
   })
   // navlock: the chrome shell is pure first-party UI — it must never navigate
   // anywhere (an injected script or a stray link must not replace the browser

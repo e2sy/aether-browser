@@ -122,6 +122,19 @@ export default function Sidebar(): JSX.Element {
     chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight })
   }, [messages, streaming])
 
+  // v2.9.0 — first-token patience hint: when a send sits with an empty answer
+  // bubble for 6s (cold model load can take minutes), tell the user WHY it is
+  // quiet instead of leaving an apparently-dead input
+  const [waitingHint, setWaitingHint] = useState(false)
+  useEffect(() => {
+    if (!streaming) {
+      setWaitingHint(false)
+      return
+    }
+    const timer = window.setTimeout(() => setWaitingHint(true), 6_000)
+    return () => window.clearTimeout(timer)
+  }, [streaming, messages.length])
+
   // ----- context menu → prefill (v2.6.0: image-ask auto-sends) -----
   useEffect(() => {
     return window.aether.state.onSidebarInject((data) => {
@@ -219,7 +232,22 @@ export default function Sidebar(): JSX.Element {
       setStreaming(false)
       setReqId(null)
       if (res.error) {
-        setMessages((m) => [...m, { role: 'assistant', content: '⚠️ ' + String(res.error) }])
+        const msg = String(res.error)
+        // v2.9.0 — surface failures INSIDE the answer bubble (it used to spawn
+        // a second bubble and left the empty one spinning) and re-check the
+        // backend so a dead model name / dropped Ollama heals itself
+        const aborted = /^Aborted\.$/.test(msg)
+        setMessages((m) => {
+          const copy = [...m]
+          const last = copy[copy.length - 1]
+          if (last?.role === 'assistant' && !last.content) {
+            copy[copy.length - 1] = { ...last, content: aborted ? 'Stopped.' : '⚠️ ' + msg }
+          } else {
+            copy.push({ role: 'assistant', content: aborted ? 'Stopped.' : '⚠️ ' + msg })
+          }
+          return copy
+        })
+        if (!aborted) void refresh()
       } else if (res.content) {
         setMessages((m) => {
           const copy = [...m]
@@ -513,6 +541,11 @@ export default function Sidebar(): JSX.Element {
                 {m.role === 'assistant' && i === messages.length - 1 && streaming && <span className="caret" />}
               </div>
             ))}
+            {streaming && waitingHint && (
+              <div className="wait-hint">
+                Still waiting for {model || 'the model'} — cold model loads can take a minute or two. If nothing arrives, try a smaller model or press ⟳ to reconnect.
+              </div>
+            )}
           </div>
           <div className="composer">
             {pendingImage && (

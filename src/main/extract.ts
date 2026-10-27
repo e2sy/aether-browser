@@ -6,6 +6,35 @@ import type { PageDoc } from '../shared/types'
 
 const MAX_CHARS = 24000
 
+/**
+ * v2.9.0 bugfix — executeJavaScript() on a busy/frozen renderer (a spin-looping
+ * page, an un-dismissed alert()/confirm() dialog, a throttled background frame)
+ * can hang FOREVER: the promise never resolves and never rejects. Before this
+ * guard, one wedged page froze `ai:chat` page-context gathering for good — the
+ * model stayed "connected" but never produced a single token and never showed
+ * an error (the reported "the model ain't replying" bug). Every script eval is
+ * now race-limited: a stalled frame costs a few seconds of context, never the
+ * whole chat.
+ */
+export function withTimeout<T>(p: Promise<T>, ms: number, label = 'operation'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      }
+    )
+  })
+}
+
+/** Hard ceiling for one executeJavaScript round-trip. */
+const EVAL_TIMEOUT_MS = 5_000
+
 // turndown expects a DOM in Node; give it a tiny jsdom one.
 let turndown: TurndownService | null = null
 function getTurndown(): TurndownService | null {
@@ -36,15 +65,19 @@ export async function extractPage(view: WebContentsView): Promise<PageDoc | null
   const url = wc.getURL()
   if (!/^https?:/i.test(url)) return null
 
-  const fallbackText = (await wc
-    .executeJavaScript(
-      `(document.body && document.body.innerText || '').replace(/[ \\t]+/g,' ').replace(/\\n{3,}/g,'\\n\\n').slice(0, ${MAX_CHARS})`,
-      true
-    )
-    .catch(() => '')) as string
+  const evalJs = (script: string): Promise<string> =>
+    withTimeout(wc.executeJavaScript(script, true), EVAL_TIMEOUT_MS, 'page script eval').catch(() => '')
+
+  const fallbackText = (await evalJs(
+    `(document.body && document.body.innerText || '').replace(/[ \\t]+/g,' ').replace(/\\n{3,}/g,'\\n\\n').slice(0, ${MAX_CHARS})`
+  )) as string
 
   try {
-    const html = (await wc.executeJavaScript('document.documentElement.outerHTML', true)) as string
+    const html = (await withTimeout(
+      wc.executeJavaScript('document.documentElement.outerHTML', true),
+      EVAL_TIMEOUT_MS,
+      'page DOM capture'
+    )) as string
     const dom = new JSDOM(html, { url })
     dom.window.document.querySelectorAll('script,style,noscript,svg,iframe').forEach((el) => el.remove())
 

@@ -2451,6 +2451,11 @@ export const SETTINGS_HTML = pageShell(
           sw.className = 'save-btn'
           sw.textContent = 'Switch'
           sw.addEventListener('click', function () { window.aether.profiles.switch(p.id) })
+          // v2.9.0 — open this profile side-by-side in its own window
+          var lw = document.createElement('button')
+          lw.className = 'muted-btn'
+          lw.textContent = 'Open in new window'
+          lw.addEventListener('click', function () { window.aether.profiles.launch(p.id) })
           var rn = document.createElement('button')
           rn.className = 'muted-btn'
           rn.textContent = 'Rename'
@@ -2458,7 +2463,7 @@ export const SETTINGS_HTML = pageShell(
             var next = window.prompt('New name for “' + p.name + '”', p.name)
             if (next && next.trim()) window.aether.profiles.rename(p.id, next.trim()).then(renderProfiles)
           })
-          actions.appendChild(sw); actions.appendChild(rn)
+          actions.appendChild(sw); actions.appendChild(lw); actions.appendChild(rn)
           var del = document.createElement('button')
           del.className = 'muted-btn'
           del.textContent = 'Delete'
