@@ -163,12 +163,15 @@ section('main/panels.ts: JsonStore round-trip')
 section('main/panelhost.ts: panelSplit layout math')
 {
   // one combined entry so panelhost and its panels store share ONE instance
-  // (no disk handoff, no debounce races between assertions)
+  // (no disk handoff, no debounce races between assertions). Import
+  // specifiers MUST use forward slashes — on Windows the backslashes in
+  // ROOT would be eaten as escape sequences inside the string literals.
+  const rootFwd = ROOT.replace(/\\/g, '/')
   const entryTs = path.join(outdir, 'panelhost-entry.ts')
   writeFileSync(
     entryTs,
-    `export { panelSplit, railVisible, openPanel, closePanel, togglePanel, toggleLastPanel, applyPanelBounds, destroyPanelViews, getPanelState, PANEL_RAIL_WIDTH, PANEL_VIEW_WIDTH, MIN_CONTENT_WIDTH } from '${ROOT}/src/main/panelhost';\n` +
-      `export { listPanels, addPanel, renamePanel, removePanel } from '${ROOT}/src/main/panels';\n`
+    `export { panelSplit, railVisible, openPanel, closePanel, togglePanel, toggleLastPanel, applyPanelBounds, destroyPanelViews, getPanelState, PANEL_RAIL_WIDTH, PANEL_VIEW_WIDTH, MIN_CONTENT_WIDTH } from '${rootFwd}/src/main/panelhost';\n` +
+      `export { listPanels, addPanel, renamePanel, removePanel } from '${rootFwd}/src/main/panels';\n`
   )
   // start from a clean disk state regardless of the flush above
   try {
